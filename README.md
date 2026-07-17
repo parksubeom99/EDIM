@@ -11,6 +11,24 @@ AHU 파라메트릭 CTO 플랫폼 (RCCS).
 
 설계는 STEP 1~6까지 확정됐고(화면 · 코드 · 매크로 · 승인 · 데이터 · 스택), 그 설계를 얹을 저장소 바닥을 정리하는 중입니다.
 
+## 스택
+
+TypeScript · Next.js App Router · PostgreSQL · Prisma · pnpm 워크스페이스 (Modular Monolith).
+고객사 격리는 애플리케이션 `WHERE`가 아니라 Postgres RLS로 강제한다.
+
+```
+apps/web                 Next.js (UI + route handlers + auth)
+packages/core-ontology   순수 도메인 타입 (아무것도 import 하지 않음)
+packages/db              Prisma 스키마 · 마이그레이션 · RLS · tenant 스코프 클라이언트
+packages/auth            세션 · tenant 결정 · RBAC 가드
+packages/ui              디자인 시스템
+```
+
+빌드 · 실행 · 검증 명령과 RLS/RBAC 상세는 **[docs/01-design/00-monorepo-skeleton.md](docs/01-design/00-monorepo-skeleton.md)** 참조.
+
+> ⚠️ **미해결** — TS 테스트 약 94개(vitest)가 CI에 배선돼 있지 않다. 현재 verified-green = 0.
+> 이식 직후 첫 일감. 근거: [2026-07-17 결정 로그](docs/04-decisions/2026-07-17-repo-separation.md)
+
 ## 로드맵
 
 | 단계 | 내용 | 끝나는 기준 |
