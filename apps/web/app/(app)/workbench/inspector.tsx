@@ -161,21 +161,21 @@ export function Inspector({
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
           {canEdit && p.next === "org" && (
-            <button type="button" disabled={busy} style={btn(true)} onClick={() => request("org")}>
+            <button type="button" data-testid="request-org" disabled={busy} style={btn(true)} onClick={() => request("org")}>
               Check 요청 (조직)
             </button>
           )}
           {canEdit && p.next === "platform" && (
-            <button type="button" disabled={busy} style={btn(true)} onClick={() => request("platform")}>
+            <button type="button" data-testid="request-platform" disabled={busy} style={btn(true)} onClick={() => request("platform")}>
               Accepted 요청 (플랫폼)
             </button>
           )}
           {canDecide && p.pending && (
             <>
-              <button type="button" disabled={busy} style={btn(true)} onClick={() => decide(p.pending!.id, "approved")}>
+              <button type="button" data-testid="approve-btn" disabled={busy} style={btn(true)} onClick={() => decide(p.pending!.id, "approved")}>
                 승인
               </button>
-              <button type="button" disabled={busy} style={btn()} onClick={() => decide(p.pending!.id, "rejected")}>
+              <button type="button" data-testid="reject-btn" disabled={busy} style={btn()} onClick={() => decide(p.pending!.id, "rejected")}>
                 반려
               </button>
             </>

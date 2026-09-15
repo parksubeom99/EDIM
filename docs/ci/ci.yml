@@ -1,0 +1,28 @@
+name: CI
+on:
+  push:
+    branches: [main, "feat/**"]
+  pull_request:
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: postgres:16-alpine
+        env: { POSTGRES_USER: edim, POSTGRES_PASSWORD: edim, POSTGRES_DB: edim }
+        ports: ["5433:5432"]
+        options: >-
+          --health-cmd "pg_isready -U edim -d edim" --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 9.15.0 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: cp .env.example .env
+      - run: pnpm db:generate
+      - run: pnpm db:migrate
+      - run: pnpm db:seed
+      - run: pnpm typecheck
+      - run: pnpm -r --workspace-concurrency=1 test
