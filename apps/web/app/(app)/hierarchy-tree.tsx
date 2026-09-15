@@ -30,9 +30,11 @@ const row: CSSProperties = {
 function TreeItem({
   node,
   selected,
+  basePath,
 }: {
   node: HierarchyTreeNode;
   selected: string | null;
+  basePath: string;
 }) {
   const [open, setOpen] = useState(true);
   const router = useRouter();
@@ -51,7 +53,7 @@ function TreeItem({
             : "transparent",
         }}
         onClick={() => {
-          if (isProject) router.push(`/?node=${node.stableId}`);
+          if (isProject) router.push(`${basePath}?node=${node.stableId}`);
           else if (hasChildren) setOpen(!open);
         }}
         aria-expanded={hasChildren ? open : undefined}
@@ -101,7 +103,12 @@ function TreeItem({
           }}
         >
           {node.children.map((c) => (
-            <TreeItem key={c.stableId} node={c} selected={selected} />
+            <TreeItem
+              key={c.stableId}
+              node={c}
+              selected={selected}
+              basePath={basePath}
+            />
           ))}
         </ul>
       )}
@@ -112,9 +119,12 @@ function TreeItem({
 export function HierarchyTree({
   nodes,
   selected = null,
+  basePath = "/",
 }: {
   nodes: HierarchyTreeNode[];
   selected?: string | null;
+  /** route that receives ?node=<stable> on project click (default: Main Form `/`) */
+  basePath?: string;
 }) {
   if (nodes.length === 0) {
     return (
@@ -132,7 +142,12 @@ export function HierarchyTree({
   return (
     <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
       {nodes.map((n) => (
-        <TreeItem key={n.stableId} node={n} selected={selected} />
+        <TreeItem
+          key={n.stableId}
+          node={n}
+          selected={selected}
+          basePath={basePath}
+        />
       ))}
     </ul>
   );
