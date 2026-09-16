@@ -34,7 +34,7 @@ export function buildDxf(slots: SlotValues, code: string): { dxf: string; meta: 
   // dimensions
   ents += line(0, -300, length, -300, "DIM"); ents += text(length / 2 - 200, -420, 70, `L=${length}`); n += 2;
   ents += line(-300, 0, -300, face, "DIM"); ents += text(-900, face / 2, 70, `H=${face}`); n += 2;
-  ents += text(0, face + 300, 90, `EDIM ${code} · AHU ${cap}000 CMH · PLAN`); n++;
+  ents += text(0, face + 300, 90, `EDIM ${code} - AHU ${cap}000 CMH - PLAN`); n++;
   const dxf =
     `0\nSECTION\n2\nHEADER\n9\n$ACADVER\n1\nAC1009\n9\n$INSUNITS\n70\n4\n0\nENDSEC\n` +
     `0\nSECTION\n2\nTABLES\n0\nTABLE\n2\nLAYER\n70\n5\n` +
