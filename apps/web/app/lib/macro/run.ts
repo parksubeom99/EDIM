@@ -6,6 +6,9 @@ import { getTreeForSession } from "../hierarchy";
 import type { SlotValues } from "../rccs";
 import { providerFromSlots } from "./provider";
 
+/** Baseline slots used to probe a draft at runtime (all code refs defined). */
+const BASELINE_SLOTS: SlotValues = { A: "EU", B: "55", C: "2123", D: "630", E: "SS", F: "1-21-13-15" };
+
 export interface RunOutcome {
   readonly ok: boolean;
   readonly status: "ran" | "no-macro" | "parse-error" | "eval-error";
@@ -40,7 +43,7 @@ export async function runApprovedForSession(stableId: string, slots: SlotValues)
     dsl: macro.dsl,
     value: r.value,
     preview: r.preview,
-    message: r.preview ?? `Run → ${String(r.value)}`,
+    message: `Run → ${typeof r.value === "number" ? Math.round(r.value * 1000) / 1000 : String(r.value)}`,
   };
 }
 
@@ -53,7 +56,16 @@ export async function draftDslForSession(
   if (!session) return null;
   const tree = await getTreeForSession();
   if (!tree) return null;
-  const diagnostics = verify(dsl, { tree, tenantId: session.tenantId });
+  const diagnostics = [...verify(dsl, { tree, tenantId: session.tenantId })];
+  if (!hasErrors(diagnostics)) {
+    // Static verify cannot see runtime code refs / tables; dry-run against the
+    // baseline provider so an unknown symbol is caught *before* it can be approved.
+    const parsed = parse(dsl);
+    if (parsed.ok) {
+      const probe = dryRun(parsed.value, providerFromSlots(BASELINE_SLOTS));
+      if (!probe.ok && probe.diagnostic) diagnostics.push(probe.diagnostic);
+    }
+  }
   if (hasErrors(diagnostics)) return { macroId: null, diagnostics };
   const macroId = await withTenant(session.tenantId, (tx) =>
     createDraft(tx, { stableId, dsl, createdBy: session.userId }),

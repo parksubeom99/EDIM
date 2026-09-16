@@ -278,7 +278,7 @@ function KeyDims({ slots, runs }: { slots: SlotValues; runs: RunResult[] }) {
     ["풍량", cap ? `${cap * 1000} CMH` : "—"],
     ["단면", cap ? `${Math.round(Math.sqrt(cap * 1000 / 2.5) * 10)}×${Math.round(Math.sqrt(cap * 1000 / 2.5) * 8)}` : "—"],
     ["패널", slots.C === "2123" ? "이중 50T" : slots.C === "3110" ? "위생 50T" : "표준 25T"],
-    ["매크로 산출", last?.value !== undefined && last.value !== null ? String(last.value) : "—"],
+    ["매크로 산출", typeof last?.value === "number" ? String(Math.round(last.value * 1000) / 1000) : last?.value != null ? String(last.value) : "—"],
   ];
   return (
     <div style={{ display: "flex", gap: 14, fontSize: "var(--fs-13)" }}>

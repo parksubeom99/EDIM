@@ -7,7 +7,7 @@ import type { RunResult } from "./action-bar";
 interface MacroRow { id: string; dsl: string; status: string; revision: number; verified: boolean; createdAt: string }
 interface Diag { severity: string; message: string; code?: string }
 
-const SAMPLE_DSL = "=IF(CAP,CAP>25, Table1(A,ROW)*Var(NS,15)*Var(NS,20), Table1(A,ROW)*Var(NS,20))";
+const SAMPLE_DSL = "=IF(CAP,CAP>25, SUM(Table1(A,4:4))*Var(NS,15)*Var(NS,20), SUM(Table1(A,1:1))*Var(NS,20))";
 
 const card: CSSProperties = { background: "var(--surface-2)", border: "1px solid var(--line)", borderRadius: "var(--radius)", padding: 14 };
 const h: CSSProperties = { fontFamily: "var(--font-display)", fontSize: "var(--fs-14)", fontWeight: 600, margin: "0 0 8px" };
@@ -70,7 +70,7 @@ export function MacroPanel({
       <div style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 8 }}>
         <button type="button" data-testid="macro-verify" disabled={busy || !nodeStable} style={btn()} onClick={() => post("verify")}>Verify</button>
         {canEdit && <button type="button" data-testid="macro-draft" disabled={busy || !nodeStable} style={btn(true)} onClick={() => post("draft")}>Save draft</button>}
-        <span style={muted}>코드참조 A B C D E F CAP CMH ROW · Table1(A|B|C, row) · Var(NS, 10|15|20)</span>
+        <span style={muted}>코드참조 A B C D E F CAP CMH · SUM(Table1(A|B|C, r:r)) · Var(NS, 10|15|20)</span>
         {msg && <span data-testid="macro-msg" style={{ marginLeft: "auto", fontSize: "var(--fs-12)", color: "var(--ink-muted)" }}>{msg}</span>}
       </div>
       {diags && diags.length > 0 && (
