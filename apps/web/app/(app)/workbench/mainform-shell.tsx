@@ -184,6 +184,9 @@ export function MainFormShell({
             onSlots={setSlots}
             assembled={assembled}
             runs={runs}
+            nodeStable={selectedNode}
+            canEdit={canEdit}
+            canDecide={canDecide}
           />
         </main>
 
@@ -222,6 +225,8 @@ export function MainFormShell({
         codeOk={assembled.ok}
         canEdit={canEdit}
         onResult={(r) => setRuns((xs) => [r, ...xs].slice(0, 20))}
+        nodeStable={selectedNode}
+        slots={slots}
       />
     </div>
   );

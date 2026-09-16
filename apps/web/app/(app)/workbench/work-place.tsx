@@ -6,6 +6,7 @@ import { RCCS_SLOTS, type SlotValues, type AssembleResult } from "@/app/lib/rccs
 import type { WorkTab } from "./toolbar";
 import type { WorkbenchProject } from "./mainform-shell";
 import type { RunResult } from "./action-bar";
+import { MacroPanel } from "./macro-panel";
 
 const card: CSSProperties = {
   background: "var(--surface-2)",
@@ -28,6 +29,9 @@ export function WorkPlace({
   onSlots,
   assembled,
   runs,
+  nodeStable,
+  canEdit,
+  canDecide,
 }: {
   tab: WorkTab;
   project: WorkbenchProject | null;
@@ -35,6 +39,9 @@ export function WorkPlace({
   onSlots: (s: SlotValues) => void;
   assembled: AssembleResult;
   runs: RunResult[];
+  nodeStable: string | null;
+  canEdit: boolean;
+  canDecide: boolean;
 }) {
   return (
     <div style={{ display: "grid", gridTemplateRows: "1fr auto", minHeight: 0, height: "100%" }}>
@@ -52,7 +59,7 @@ export function WorkPlace({
         {tab === "code" && <CodeBuilder slots={slots} onSlots={onSlots} assembled={assembled} />}
         {tab === "design" && <DesignCanvas code={assembled.code} slots={slots} />}
         {tab === "bom" && <BomPanel code={assembled.code} runs={runs} />}
-        {tab === "macro" && <MacroPanel />}
+        {tab === "macro" && <MacroPanel project={project} nodeStable={nodeStable} canEdit={canEdit} canDecide={canDecide} runs={runs} />}
         {tab === "document" && <DocumentPanel project={project} code={assembled.code} />}
       </div>
 
@@ -77,7 +84,7 @@ export function WorkPlace({
         </div>
         <div data-testid="key-workplace" style={{ padding: "8px 12px" }}>
           <div style={{ ...muted, textTransform: "uppercase", letterSpacing: ".3px", marginBottom: 4 }}>Key Work Place · 핵심 치수</div>
-          <KeyDims slots={slots} />
+          <KeyDims slots={slots} runs={runs} />
         </div>
       </div>
     </div>
@@ -245,30 +252,6 @@ function BomPanel({ code, runs }: { code: string; runs: RunResult[] }) {
   );
 }
 
-function MacroPanel() {
-  return (
-    <div data-testid="macro-panel" style={card}>
-      <div style={h}>Macro · EDIM Toolbox</div>
-      <p style={{ ...muted, margin: 0 }}>
-        Prompt → Macro(DSL) → Flowchart/Description → Run (p57). 컴파일·검증·승인 패키지(macro-compile/verify/registry)는
-        이미 존재하며, 이 탭의 실행 고리는 M2에서 연결됩니다.
-      </p>
-      <pre
-        style={{
-          marginTop: 10,
-          fontFamily: "var(--font-mono)",
-          fontSize: "var(--fs-12)",
-          background: "var(--surface-1)",
-          border: "1px solid var(--line)",
-          borderRadius: "var(--radius-sm)",
-          padding: 10,
-          overflow: "auto",
-        }}
-      >{`IF(E > 25, Table12(E, 10:25, Cos2), Var(FES))`}</pre>
-    </div>
-  );
-}
-
 function DocumentPanel({ project, code }: { project: WorkbenchProject | null; code: string }) {
   return (
     <div data-testid="document-panel" style={card}>
@@ -288,12 +271,14 @@ function DocumentPanel({ project, code }: { project: WorkbenchProject | null; co
   );
 }
 
-function KeyDims({ slots }: { slots: SlotValues }) {
+function KeyDims({ slots, runs }: { slots: SlotValues; runs: RunResult[] }) {
+  const last = runs.find((r) => r.kind === "edim" && r.status === "ran");
   const cap = Number(slots.B ?? 0) || 0;
   const dims = [
     ["풍량", cap ? `${cap * 1000} CMH` : "—"],
     ["단면", cap ? `${Math.round(Math.sqrt(cap * 1000 / 2.5) * 10)}×${Math.round(Math.sqrt(cap * 1000 / 2.5) * 8)}` : "—"],
     ["패널", slots.C === "2123" ? "이중 50T" : slots.C === "3110" ? "위생 50T" : "표준 25T"],
+    ["매크로 산출", last?.value !== undefined && last.value !== null ? String(last.value) : "—"],
   ];
   return (
     <div style={{ display: "flex", gap: 14, fontSize: "var(--fs-13)" }}>

@@ -2,12 +2,14 @@
 
 import { useState, type CSSProperties } from "react";
 import type { WorkbenchProject } from "./mainform-shell";
+import type { SlotValues } from "@/app/lib/rccs";
 
 export interface RunResult {
   kind: string;
   status: string;
   message: string;
   at: string;
+  value?: number | number[] | string | null;
 }
 
 const RUNS: { kind: "bom" | "edim" | "ebom" | "cost"; label: string }[] = [
@@ -35,12 +37,16 @@ export function ActionBar({
   codeOk,
   canEdit,
   onResult,
+  nodeStable,
+  slots,
 }: {
   project: WorkbenchProject | null;
   code: string;
   codeOk: boolean;
   canEdit: boolean;
   onResult: (r: RunResult) => void;
+  nodeStable: string | null;
+  slots: SlotValues;
 }) {
   const [last, setLast] = useState<RunResult | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -52,7 +58,7 @@ export function ActionBar({
       const res = await fetch(`/api/run/${kind}`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ projectId: project?.id ?? null, code }),
+        body: JSON.stringify({ projectId: project?.id ?? null, code, node: nodeStable, slots }),
       });
       const body = (await res.json().catch(() => ({}))) as Partial<RunResult> & { error?: string };
       const r: RunResult = {
@@ -60,6 +66,7 @@ export function ActionBar({
         status: res.ok ? (body.status ?? "ok") : `HTTP ${res.status}`,
         message: res.ok ? (body.message ?? "") : (body.error ?? "error"),
         at: body.at ?? new Date().toISOString(),
+        value: body.value ?? null,
       };
       setLast(r);
       onResult(r);
@@ -111,7 +118,7 @@ export function ActionBar({
           marginLeft: "auto",
           fontFamily: "var(--font-mono)",
           fontSize: "var(--fs-12)",
-          color: last ? (last.status === "stub" ? "var(--warn)" : "var(--accent)") : "var(--ink-muted)",
+          color: last ? (last.status === "ran" ? "var(--accent)" : "var(--warn)") : "var(--ink-muted)",
         }}
       >
         {last ? `${last.kind.toUpperCase()} · ${last.status} · ${last.message}` : "ready"}

@@ -32,6 +32,9 @@ importers:
       '@edim/macro-compile':
         specifier: workspace:*
         version: link:../../packages/macro-compile
+      '@edim/macro-dsl':
+        specifier: workspace:*
+        version: link:../../packages/macro-dsl
       '@edim/macro-registry':
         specifier: workspace:*
         version: link:../../packages/macro-registry
