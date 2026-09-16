@@ -227,6 +227,7 @@ export function MainFormShell({
         onResult={(r) => setRuns((xs) => [r, ...xs].slice(0, 20))}
         nodeStable={selectedNode}
         slots={slots}
+        macroValue={(() => { const r = runs.find((x) => x.kind === "edim" && x.status === "ran"); return typeof r?.value === "number" ? r.value : null; })()}
       />
     </div>
   );

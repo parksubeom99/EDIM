@@ -7,6 +7,7 @@ import type { WorkTab } from "./toolbar";
 import type { WorkbenchProject } from "./mainform-shell";
 import type { RunResult } from "./action-bar";
 import { MacroPanel } from "./macro-panel";
+import { BomPanel } from "./bom-panel";
 
 const card: CSSProperties = {
   background: "var(--surface-2)",
@@ -215,43 +216,21 @@ function DesignCanvas({ code, slots }: { code: string; slots: SlotValues }) {
           {slots.A ?? "—"} series {slots.C ?? "—"} {slots.E ? `· ${slots.E}` : ""}
         </text>
       </svg>
-      <p style={{ ...muted, margin: "8px 0 0" }}>
-        캔버스는 슬롯 선택에 반응하는 개략 배치도입니다. 실 도면(DXF) 출력은 M3에서 연결됩니다.
-      </p>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8 }}>
+        <a
+          data-testid="dxf-download"
+          href={`/api/dxf?${Object.entries(slots).filter(([, v]) => v).map(([k, v]) => `${k}=${encodeURIComponent(v as string)}`).join("&")}`}
+          style={{ fontSize: "var(--fs-12)", color: "var(--accent-contrast)", background: "var(--accent)", border: "1px solid var(--line)", borderRadius: "var(--radius-sm)", padding: "5px 10px", textDecoration: "none" }}
+        >
+          DXF 다운로드
+        </a>
+        <span style={muted}>평면 배치도 R12 DXF — AutoCAD·FreeCAD에서 열림 (레이어 OUTLINE/SECTION/DIM/TEXT)</span>
+      </div>
     </div>
   );
 }
 
-/* ───────────── BOM / Macro / Document panels (M2·M3 seams) ───────────── */
-function BomPanel({ code, runs }: { code: string; runs: RunResult[] }) {
-  const last = runs.find((r) => r.kind === "bom" || r.kind === "ebom");
-  return (
-    <div data-testid="bom-panel" style={card}>
-      <div style={h}>BOM</div>
-      <p style={{ ...muted, margin: "0 0 10px" }}>
-        코드 <CodeChip code={code || "—"} /> 의 BOM은 Action Bar → BOM Run 결과가 여기에 표시됩니다 (M2 실행기 연결 전 stub).
-      </p>
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "var(--fs-13)" }}>
-        <thead>
-          <tr style={{ color: "var(--ink-muted)", textAlign: "left" }}>
-            <th style={{ padding: 6, borderBottom: "1px solid var(--line)" }}>#</th>
-            <th style={{ padding: 6, borderBottom: "1px solid var(--line)" }}>Part</th>
-            <th style={{ padding: 6, borderBottom: "1px solid var(--line)" }}>Qty</th>
-            <th style={{ padding: 6, borderBottom: "1px solid var(--line)" }}>Material</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td colSpan={4} style={{ padding: 10, color: "var(--ink-muted)" }}>
-              {last ? `${last.kind.toUpperCase()} Run ${last.at} — ${last.message}` : "아직 실행 결과 없음"}
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
+/* ───────────── Document panel ───────────── */
 function DocumentPanel({ project, code }: { project: WorkbenchProject | null; code: string }) {
   return (
     <div data-testid="document-panel" style={card}>

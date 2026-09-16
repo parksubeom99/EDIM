@@ -10,6 +10,9 @@ export interface RunResult {
   message: string;
   at: string;
   value?: number | number[] | string | null;
+  lines?: unknown;
+  groups?: unknown;
+  cost?: unknown;
 }
 
 const RUNS: { kind: "bom" | "edim" | "ebom" | "cost"; label: string }[] = [
@@ -32,6 +35,7 @@ const btn = (primary: boolean, disabled: boolean): CSSProperties => ({
 });
 
 export function ActionBar({
+  macroValue,
   project,
   code,
   codeOk,
@@ -47,6 +51,7 @@ export function ActionBar({
   onResult: (r: RunResult) => void;
   nodeStable: string | null;
   slots: SlotValues;
+  macroValue: number | null;
 }) {
   const [last, setLast] = useState<RunResult | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -58,7 +63,7 @@ export function ActionBar({
       const res = await fetch(`/api/run/${kind}`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ projectId: project?.id ?? null, code, node: nodeStable, slots }),
+        body: JSON.stringify({ projectId: project?.id ?? null, code, node: nodeStable, slots, macroValue }),
       });
       const body = (await res.json().catch(() => ({}))) as Partial<RunResult> & { error?: string };
       const r: RunResult = {
@@ -67,6 +72,9 @@ export function ActionBar({
         message: res.ok ? (body.message ?? "") : (body.error ?? "error"),
         at: body.at ?? new Date().toISOString(),
         value: body.value ?? null,
+        lines: body.lines,
+        groups: body.groups,
+        cost: body.cost,
       };
       setLast(r);
       onResult(r);
