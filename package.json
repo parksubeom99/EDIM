@@ -15,6 +15,8 @@
     "db:generate": "pnpm --filter @edim/db generate",
     "db:migrate": "pnpm --filter @edim/db migrate",
     "db:seed": "pnpm --filter @edim/db seed",
+    "db:seed:demo": "pnpm --filter @edim/db seed:demo",
+    "demo:e2e": "python3 scripts/demo_e2e.py",
     "db:up": "docker compose up -d db",
     "db:down": "docker compose down",
     "smoke": "node scripts/smoke.mjs"

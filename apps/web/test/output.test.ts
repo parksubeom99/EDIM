@@ -17,6 +17,14 @@ describe("M3 output — BOM/EBOM/Cost (deterministic)", () => {
     expect(buildBom(S55).some((l) => l.section === "Rotor")).toBe(true);
     expect(buildBom(S10).some((l) => l.section === "Rotor")).toBe(false);
   });
+  it("spec strings carry EDIM.pdf p14 AHU spec table (not invented materials)", () => {
+    const b = buildBom(S55);
+    expect(b.find((l) => l.part === "Panel (double skin)")?.spec).toContain("칼라강판 0.8T");
+    expect(b.find((l) => l.part === "Panel (double skin)")?.spec).toContain("G/Wool 48K 50T");
+    expect(b.find((l) => l.part === "Plug fan")?.spec).toContain("EURUS");
+    expect(b.find((l) => l.part === "Cooling coil")?.spec).toContain("8FPI");
+    expect(b.find((l) => l.part === "Mixing damper")?.spec).toContain("OA/EA/BYPASS");
+  });
   it("fan spec follows Table1 (55 → 22kW, 10 → 3.7kW)", () => {
     expect(buildBom(S55).find((l) => l.part === "Plug fan")?.spec).toMatch(/^22kW/);
     expect(buildBom(S10).find((l) => l.part === "Plug fan")?.spec).toMatch(/^3.7kW/);

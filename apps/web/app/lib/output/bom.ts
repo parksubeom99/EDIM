@@ -6,7 +6,29 @@ import { SAMPLE_TABLES, SAMPLE_VARS, codesFromSlots } from "../macro/provider";
  * present, the approved-macro value), produce the Item BOM, the section-grouped
  * EBOM, and the cost roll-up. Pure: same slots → same BOM → same cost.
  * Unit costs are SAMPLE values (KRW); real price tables bind later.
+ *
+ * Spec strings follow the blueprint's own AHU spec table — EDIM.pdf p14
+ * "공기조화기 사양" (casing/frame/fan/coil/damper) — so the BOM reads as the
+ * company's product, not an invented one. Where p14 gives no value (filters,
+ * rotor, VFD) the spec stays a documented sample. Sources are cited per line.
  */
+/** EDIM.pdf p14 — 공기조화기 사양 (verbatim materials/thicknesses). */
+export const P14_SPEC = {
+  casingOuter: "칼라강판 0.8T",          // CASING 외판
+  casingInner: "아연도(G.I) 강판 0.8T",  // CASING 내판
+  insulation: "G/Wool 48K 50T",         // CASING 보온재
+  panelForm: "계단식(凸) 판넬",           // CASING 특징
+  frame: "Steel 1.6t Forming 분체소부도장", // FRAME 구조
+  corner: "AL 다이케스팅",               // FRAME 코너 마운틴
+  fan: "EURUS 에어포일 · AMCA Seal",     // FAN Fan/인증현황/적용Fan형식
+  motor: "효성모터",                     // FAN 적용모터
+  coilFin: "AL Fin 8FPI 0.12mmT",        // COIL AL Fin
+  coilTube: "Cu 1/2\"×0.5mmT",          // COIL Tube규격
+  coilFrame: "SGCC 1.6T",               // COIL Frame
+  damper: "OA/EA/BYPASS Link식 SGCC 1.6T/AL 1.2T", // DAMPER
+  damperVel: "5~7 m/s 이하",            // DAMPER 설계풍속
+} as const;
+
 export interface BomLine {
   no: number;
   section: string;
@@ -53,14 +75,14 @@ export function buildBom(slots: SlotValues, macroValue?: number | null): BomLine
   const length = sections.length * 900;
 
   const lines: Omit<BomLine, "no">[] = [
-    { section: "Casing", part: "Panel (double skin)", spec: `${panelMm}T ${face}×${face}`, qty: sections.length * 4, unit: "ea", material: mat, unitCost: Math.round(48000 * mf * (panelMm / 25)) },
-    { section: "Casing", part: "Base frame", spec: `L${length} C-channel`, qty: 1, unit: "set", material: "SS400", unitCost: Math.round(120000 + length * 45) },
-    { section: "Mixing", part: "Mixing damper", spec: `${face}×600 opposed`, qty: 2, unit: "ea", material: mat, unitCost: Math.round(85000 * mf) },
+    { section: "Casing", part: "Panel (double skin)", spec: `${panelMm}T ${face}×${face} · ${P14_SPEC.casingOuter}/${P14_SPEC.casingInner} · ${P14_SPEC.insulation}`, qty: sections.length * 4, unit: "ea", material: mat, unitCost: Math.round(48000 * mf * (panelMm / 25)) },
+    { section: "Casing", part: "Base frame", spec: `L${length} C-channel · ${P14_SPEC.frame} · ${P14_SPEC.corner}`, qty: 1, unit: "set", material: "SS400", unitCost: Math.round(120000 + length * 45) },
+    { section: "Mixing", part: "Mixing damper", spec: `${face}×600 opposed · ${P14_SPEC.damper} · ${P14_SPEC.damperVel}`, qty: 2, unit: "ea", material: mat, unitCost: Math.round(85000 * mf) },
     { section: "Filter", part: "Pre filter", spec: "MERV 8 592×592×50", qty: Math.ceil((face / 592) ** 2), unit: "ea", material: "Synthetic", unitCost: 18000 },
     { section: "Filter", part: "Bag filter", spec: "MERV 13 592×592×600", qty: Math.ceil((face / 592) ** 2), unit: "ea", material: "Glass fiber", unitCost: 62000 },
-    { section: "Coil", part: "Cooling coil", spec: `${coilRows}R ${face}×${Math.round(face * 0.8)} Cu/Al`, qty: 1, unit: "ea", material: "Cu/Al", unitCost: Math.round(420000 + coilRows * 95000 + cap * 6000) },
+    { section: "Coil", part: "Cooling coil", spec: `${coilRows}R ${face}×${Math.round(face * 0.8)} · ${P14_SPEC.coilFin} · ${P14_SPEC.coilTube} · Frame ${P14_SPEC.coilFrame}`, qty: 1, unit: "ea", material: "Cu/Al", unitCost: Math.round(420000 + coilRows * 95000 + cap * 6000) },
     { section: "Coil", part: "Drain pan", spec: `${face}×600 SUS`, qty: 1, unit: "ea", material: "SUS304", unitCost: 68000 },
-    { section: "Fan", part: "Plug fan", spec: `${fanKw}kW 380V 4P IE3`, qty: 1, unit: "ea", material: "AL impeller", unitCost: Math.round(680000 + fanKw * 52000) },
+    { section: "Fan", part: "Plug fan", spec: `${fanKw}kW 380V 4P IE3 · ${P14_SPEC.fan} · ${P14_SPEC.motor}`, qty: 1, unit: "ea", material: "AL impeller", unitCost: Math.round(680000 + fanKw * 52000) },
     { section: "Fan", part: "Inverter", spec: `${fanKw}kW VFD`, qty: 1, unit: "ea", material: "—", unitCost: Math.round(310000 + fanKw * 21000) },
   ];
   if (slots.D === "630") lines.push({ section: "Rotor", part: "Heat recovery rotor", spec: `Ø${Math.round(face * 1.1)} sensible`, qty: 1, unit: "ea", material: "AL", unitCost: Math.round(1400000 + cap * 18000) });
