@@ -27,7 +27,7 @@ async function main() {
   check("current = highest rev (B, 630SS)", cur?.revNo === 2 && cur.code === "EU-55-2123-630SS");
 
   const list = await withTenant(IDS.tenantA, (tx) => listRevisions(tx, IDS.a_proj));
-  check("history keeps both (desc order)", list.length === 2 && list[0].revNo === 2 && list[1].revNo === 1);
+  check("history keeps both (desc order)", list.length === 2 && list[0]?.revNo === 2 && list[1]?.revNo === 1);
 
   const fromB = await withTenant(IDS.tenantB, (tx) => listRevisions(tx, IDS.a_proj));
   check("RLS: tenant B sees 0 of tenant A's revisions", fromB.length === 0, `${fromB.length}`);
