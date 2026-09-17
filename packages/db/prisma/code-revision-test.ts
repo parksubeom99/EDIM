@@ -1,4 +1,4 @@
-import { appPrisma } from "../src/client";
+import { adminPrisma } from "../src/client";
 import { withTenant } from "../src/tenant";
 import { saveRevision, listRevisions, getCurrentRevision, revLabel } from "../src/code-revision";
 import { seedAll, IDS } from "./seed";
@@ -15,7 +15,9 @@ function check(name: string, ok: boolean, detail = "") {
 
 async function main() {
   await seedAll();
-  await appPrisma.$executeRawUnsafe(`DELETE FROM code_revision`).catch(() => undefined);
+  // reset with the schema owner: the app role deliberately has no DELETE on code_revision
+  await adminPrisma.$executeRawUnsafe(`DELETE FROM code_revision`);
+  await adminPrisma.$executeRawUnsafe(`DELETE FROM audit_log WHERE action = 'code.revision'`);
 
   check("revLabel 1→A 26→Z 27→AA", revLabel(1) === "A" && revLabel(26) === "Z" && revLabel(27) === "AA");
 
