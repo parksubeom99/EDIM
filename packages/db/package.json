@@ -18,7 +18,8 @@
     "rls:test": "dotenv -e ../../.env -- tsx prisma/rls-isolation-test.ts",
     "hierarchy:test": "dotenv -e ../../.env -- tsx prisma/hierarchy-test.ts",
     "macro:test": "dotenv -e ../../.env -- tsx prisma/macro-registry-test.ts",
-    "project:test": "dotenv -e ../../.env -- tsx prisma/project-test.ts"
+    "project:test": "dotenv -e ../../.env -- tsx prisma/project-test.ts",
+    "revision:test": "dotenv -e ../../.env -- tsx prisma/code-revision-test.ts"
   },
   "dependencies": {
     "@edim/core-ontology": "workspace:*",

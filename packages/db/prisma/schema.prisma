@@ -31,6 +31,7 @@ model Tenant {
   attachments     ProjectAttachment[]
   tasks           ProjectTask[]
   approvals       ProjectApproval[]
+  codeRevisions   CodeRevision[]
 
   @@map("tenant")
 }
@@ -50,6 +51,7 @@ model AppUser {
   uploadedFiles      ProjectAttachment[]
   approvalsRequested ProjectApproval[]   @relation("ApprovalRequester")
   approvalsToDecide  ProjectApproval[]   @relation("ApprovalApprover")
+  codeRevisions      CodeRevision[]
 
   @@map("app_user")
 }
@@ -216,4 +218,27 @@ model ProjectApproval {
 
   @@index([tenantId, projectId])
   @@map("project_approval")
+}
+
+/// Tier B — RCCS 조립 코드 영속 + Revision (EDIM.pdf p24 Revisions: rev_no·rev_date·
+/// rev_reason·revised_by; p12/p13 "Revision : A"). One row per save; rev_no is
+/// monotonic per (tenant, node). The current code of a node = its max rev_no.
+/// Nothing is ever updated in place — a correction is a new revision.
+model CodeRevision {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  hierarchyStable String   @map("hierarchy_stable") @db.Uuid
+  revNo           Int      @map("rev_no")
+  code            String
+  slots           Json     @db.JsonB
+  reason          String?
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdBy       String   @map("created_by") @db.Uuid
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  creator AppUser @relation(fields: [createdBy], references: [id])
+
+  @@unique([tenantId, hierarchyStable, revNo])
+  @@index([tenantId, hierarchyStable])
+  @@map("code_revision")
 }

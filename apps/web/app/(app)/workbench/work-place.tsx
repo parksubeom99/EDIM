@@ -1,6 +1,6 @@
 "use client";
 
-import type { CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { CodeChip } from "@edim/ui";
 import { RCCS_SLOTS, type SlotValues, type AssembleResult } from "@/app/lib/rccs";
 import type { WorkTab } from "./toolbar";
@@ -33,6 +33,8 @@ export function WorkPlace({
   nodeStable,
   canEdit,
   canDecide,
+  rev,
+  onRev,
 }: {
   tab: WorkTab;
   project: WorkbenchProject | null;
@@ -43,6 +45,8 @@ export function WorkPlace({
   nodeStable: string | null;
   canEdit: boolean;
   canDecide: boolean;
+  rev: RevInfo | null;
+  onRev: (r: RevInfo | null) => void;
 }) {
   return (
     <div style={{ display: "grid", gridTemplateRows: "1fr auto", minHeight: 0, height: "100%" }}>
@@ -57,7 +61,7 @@ export function WorkPlace({
             </p>
           </div>
         )}
-        {tab === "code" && <CodeBuilder slots={slots} onSlots={onSlots} assembled={assembled} />}
+        {tab === "code" && <CodeBuilder slots={slots} onSlots={onSlots} assembled={assembled} nodeStable={nodeStable} canEdit={canEdit} rev={rev} onRev={onRev} />}
         {tab === "design" && <DesignCanvas code={assembled.code} slots={slots} />}
         {tab === "bom" && <BomPanel code={assembled.code} runs={runs} />}
         {tab === "macro" && <MacroPanel project={project} nodeStable={nodeStable} canEdit={canEdit} canDecide={canDecide} runs={runs} />}
@@ -93,15 +97,45 @@ export function WorkPlace({
 }
 
 /* ───────────── Code Builder (A~F) ───────────── */
+export interface RevInfo { revNo: number; rev: string; code: string }
+interface RevRow extends RevInfo { id: string; reason: string | null; createdAt: string }
+
 function CodeBuilder({
   slots,
   onSlots,
   assembled,
+  nodeStable,
+  canEdit,
+  rev,
+  onRev,
 }: {
   slots: SlotValues;
   onSlots: (s: SlotValues) => void;
   assembled: AssembleResult;
+  nodeStable: string | null;
+  canEdit: boolean;
+  rev: RevInfo | null;
+  onRev: (r: RevInfo | null) => void;
 }) {
+  /* Tier B — revision history of this node (EDIM.pdf p24). Append-only on the server. */
+  const [revs, setRevs] = useState<RevRow[]>([]);
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  useEffect(() => {
+    if (!nodeStable) { setRevs([]); return; }
+    fetch(`/api/rccs/revisions?node=${nodeStable}`).then((r) => r.json()).then((j) => setRevs(j.revisions ?? [])).catch(() => setRevs([]));
+  }, [nodeStable]);
+  async function save() {
+    if (!nodeStable) return;
+    setBusy(true); setMsg(null);
+    const r = await fetch("/api/rccs/revisions", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ node: nodeStable, slots, reason }) });
+    const j = await r.json();
+    setBusy(false);
+    if (j.ok) { setRevs((xs) => [j.revision, ...xs]); onRev({ revNo: j.revision.revNo, rev: j.revision.rev, code: j.revision.code }); setReason(""); setMsg(`저장 · Rev ${j.revision.rev}`); }
+    else setMsg(`거부: ${j.error ?? r.status}`);
+  }
+  const dirty = !rev || rev.code !== assembled.code;
   return (
     <div data-testid="code-builder" style={card}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
@@ -172,6 +206,46 @@ function CodeBuilder({
           {assembled.ok ? "VALID" : "INVALID"}
         </span>
       </div>
+      {/* Tier B: persist the assembled code as a new revision (A, B, C…) */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10 }}>
+        <input
+          data-testid="rev-reason"
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          placeholder={nodeStable ? "개정 사유 (rev_reason, p24)" : "프로젝트 노드를 선택하면 저장할 수 있습니다"}
+          disabled={!nodeStable || !canEdit}
+          style={{ flex: 1, padding: "6px 8px", border: "1px solid var(--line)", borderRadius: "var(--radius-sm)", background: "var(--surface-1)", color: "var(--ink)", fontSize: "var(--fs-12)" }}
+        />
+        {canEdit && (
+          <button
+            type="button"
+            data-testid="rev-save"
+            disabled={busy || !nodeStable || !assembled.ok || !dirty}
+            onClick={save}
+            style={{ padding: "6px 12px", border: "1px solid var(--line)", borderRadius: "var(--radius-sm)", background: assembled.ok && dirty ? "var(--accent)" : "var(--surface-2)", color: assembled.ok && dirty ? "var(--accent-contrast)" : "var(--ink-muted)", fontSize: "var(--fs-12)", cursor: "pointer" }}
+          >
+            {busy ? "…" : dirty ? `Save · Rev ${nextRevLabel(revs.length)}` : `Saved · Rev ${rev?.rev}`}
+          </button>
+        )}
+        {msg && <span style={muted}>{msg}</span>}
+      </div>
+      {revs.length > 0 && (
+        <div data-testid="rev-list" style={{ marginTop: 10, borderTop: "1px solid var(--line)", paddingTop: 8 }}>
+          <span style={muted}>REVISIONS · 이 노드의 코드 개정 이력 (append-only)</span>
+          <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 4, fontSize: "var(--fs-12)" }}>
+            <tbody>
+              {revs.map((r) => (
+                <tr key={r.id} style={{ borderTop: "1px solid var(--line)" }}>
+                  <td style={{ padding: "4px 6px", fontFamily: "var(--font-mono)", color: r.revNo === rev?.revNo ? "var(--accent)" : "var(--ink-muted)", width: 56 }}>Rev {r.rev}</td>
+                  <td style={{ padding: "4px 6px", fontFamily: "var(--font-mono)" }}>{r.code}</td>
+                  <td style={{ padding: "4px 6px", color: "var(--ink-muted)" }}>{r.reason ?? "—"}</td>
+                  <td style={{ padding: "4px 6px", color: "var(--ink-muted)", whiteSpace: "nowrap" }}>{r.createdAt.slice(0, 16).replace("T", " ")}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
       {assembled.diagnostics.length > 0 && (
         <ul style={{ margin: "8px 0 0", paddingLeft: 18, fontSize: "var(--fs-12)" }}>
           {assembled.diagnostics.map((d, i) => (
@@ -183,6 +257,12 @@ function CodeBuilder({
       )}
     </div>
   );
+}
+
+function nextRevLabel(count: number): string {
+  let s = "", x = count + 1;
+  while (x > 0) { s = String.fromCharCode(65 + ((x - 1) % 26)) + s; x = Math.floor((x - 1) / 26); }
+  return s;
 }
 
 /* ───────────── Design canvas (SVG, driven by slots) ───────────── */

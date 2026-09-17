@@ -44,6 +44,9 @@ export interface MainFormShellProps {
   project: WorkbenchProject | null;
   canEdit: boolean;
   canDecide: boolean;
+  /** Tier B: saved revision of the selected node (null = never saved). */
+  initialSlots?: SlotValues | null;
+  initialRev?: { revNo: number; rev: string; code: string } | null;
 }
 
 const DEFAULT_SLOTS: SlotValues = { A: "EU", B: "55", C: "2123", D: "", E: "", F: "" };
@@ -70,9 +73,12 @@ export function MainFormShell({
   project,
   canEdit,
   canDecide,
+  initialSlots = null,
+  initialRev = null,
 }: MainFormShellProps) {
   const [tab, setTab] = useState<WorkTab>("code");
-  const [slots, setSlots] = useState<SlotValues>(DEFAULT_SLOTS);
+  const [slots, setSlots] = useState<SlotValues>(initialSlots ?? DEFAULT_SLOTS);
+  const [rev, setRev] = useState<{ revNo: number; rev: string; code: string } | null>(initialRev);
   const [runs, setRuns] = useState<RunResult[]>([]);
   const assembled = assembleCode(slots);
 
@@ -187,6 +193,8 @@ export function MainFormShell({
             nodeStable={selectedNode}
             canEdit={canEdit}
             canDecide={canDecide}
+            rev={rev}
+            onRev={setRev}
           />
         </main>
 
@@ -211,6 +219,7 @@ export function MainFormShell({
             <Inspector
               project={project}
               code={assembled.code}
+              rev={rev && rev.code === assembled.code ? rev.rev : null}
               canEdit={canEdit}
               canDecide={canDecide}
             />

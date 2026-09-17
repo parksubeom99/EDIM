@@ -34,8 +34,9 @@ pnpm dev                   # http://localhost:3000  (pnpm start 아님)
 ```powershell
 pnpm typecheck             # 10 패키지 Done
 pnpm -r test               # 147 passed
+pnpm --filter @edim/db revision:test   # Tier B 8/8 (append-only · RLS · 감사)
 pip install playwright --break-system-packages ; playwright install chromium
-python scripts\demo_e2e.py http://localhost:3000 shots   # ★ 11/11 PASS면 발표 가능
+python scripts\demo_e2e.py http://localhost:3000 shots   # ★ 13/13 PASS면 발표 가능
 ```
 
 `demo_e2e.py`가 11/11이면 아래 시연 7장면은 **기계적으로 재현이 보장된** 상태다. 발표 당일 아침에 한 번 더 돌린다.
@@ -49,7 +50,7 @@ python scripts\demo_e2e.py http://localhost:3000 shots   # ★ 11/11 PASS면 발
 | # | 화면 | 하는 것 | 말하는 것 | 청사진 |
 |---|---|---|---|---|
 | 1 | 작업대 | 좌측 Work Hierarchy에서 **PS-61313-5** 클릭 | "Inspector에 프로젝트 사양·승인 단계가 붙습니다. 화면 5구역은 청사진 p56 그대로입니다." | p56·p59 |
-| 2 | Code Builder | D=**630 열회수 로터**, E=**SS** 선택 → `EU-55-2123-630SS VALID` | "RCCS는 제품 속성의 코드화입니다. 조립 규칙이 틀리면 VALID가 안 뜹니다." | p5·p29~34 |
+| 2 | Code Builder | D=**630 열회수 로터**, E=**SS** 선택 → `EU-55-2123-630SS VALID` → 사유 입력 → **Save · Rev A** → 새로고침해도 남음. E=AL로 바꿔 **Rev B** 저장 → 이력 A·B 표시 | "RCCS는 제품 속성의 코드화입니다. 조립 규칙이 틀리면 VALID가 안 뜨고, 저장은 개정으로만 쌓입니다(p24 Revisions). 지운 적이 없는 이력입니다." | p5·p12·p24·p29~34 |
 | 3 | Macro | Verify → **Save draft** 시 일부러 `Table9(...)` 같은 미지 참조를 넣어 **거부** 시연 → 원본 DSL로 복구 | "틀린 규칙은 승인 전에 차단됩니다. 정적검증 + 런타임 dry-run 이중 게이트." | p27·p60 |
 | 4 | Macro | 승인(이미 r1 승인 탑재; 라이브 승인 시 r2로 상승·이전 superseded) | "승인된 매크로만 공식 Run이 가능합니다. 승인 이력은 감사 로그에 남습니다." | p55·p62 |
 | 5 | Action Bar | **EDIM Run** → 455.4 | "실행에 LLM이 없습니다. 같은 코드면 같은 값. 청사진 p65 EDIM RUN입니다." | p65 |
@@ -80,7 +81,7 @@ python scripts\demo_e2e.py http://localhost:3000 shots   # ★ 11/11 PASS면 발
 | "도면이 이게 다냐" | 평면 배치 1장. 승인도·제작도·상세는 청사진 p37~44 범위이며 다음 단계다. 지금 도면은 코드의 순수 함수라는 점이 핵심 |
 | "AI가 틀리면?" | 실행에 AI가 없다. AI는 설계 시점에 규칙을 쓰는 데만 쓰이고, 그 규칙은 검증·승인 후에만 실행된다 |
 | "혼자 만들었나" | 설계 회장님 + 구현 AI 에이전트 협업. 테스트 147건·결정론 검증으로 품질을 보증한다 |
-| "저장은 되나 (새로고침하면?)" | 매크로·승인·프로젝트는 DB 영속. 조립 코드 슬롯 영속과 Revision 모델은 결정 대기(Tier B) — 정직하게 말한다 |
+| "저장은 되나 (새로고침하면?)" | 된다. 조립 코드는 `code_revision`에 Rev A, B, C…로 append-only 저장(UPDATE/DELETE 권한 자체가 없음), 테넌트 RLS, 감사 로그. 화면에서 새로고침해 보여주면 끝 |
 | "청사진 70장 중 얼마나 됐나" | 표면적 25~30%, 시연 등뼈 100%. 나머지 구간(CPQ 문서 템플릿·Print·PLM 도면 관리·ERP 4테이블)은 이 등뼈 위에 얹는다 |
 
 ---
@@ -99,5 +100,5 @@ python scripts\demo_e2e.py http://localhost:3000 shots   # ★ 11/11 PASS면 발
 
 ## 6. 이 문서의 검증 상태
 
-- 2026-09-17 엘 샌드박스(Ubuntu · PG16 · Node 22 · pnpm 9.15)에서 §1 절차 그대로 fresh clone → 147 tests → `demo_e2e.py` 11/11 PASS.
+- 2026-09-17 엘 샌드박스(Ubuntu · PG16 · Node 22 · pnpm 9.15)에서 §1 절차 그대로 fresh clone → 147 tests + revision:test 8/8 → `demo_e2e.py` 13/13 PASS (Tier B 포함).
 - 회장님 Windows 로컬 실행은 **아직 0회**. §1을 회장님이 한 번 통과하는 순간이 발표 준비 완료 시점이다.

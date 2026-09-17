@@ -54,3 +54,5 @@ export type {
   UpdateProjectPatch,
   AddAttachmentInput,
 } from "./project";
+export { listRevisions, getCurrentRevision, saveRevision, revLabel } from "./code-revision";
+export type { SaveRevisionInput } from "./code-revision";

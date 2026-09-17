@@ -40,11 +40,14 @@ function Section({ name, children }: { name: string; children: ReactNode }) {
 export function Inspector({
   project,
   code,
+  rev,
   canEdit,
   canDecide,
 }: {
   project: WorkbenchProject | null;
   code: string;
+  /** Tier B: revision letter when the shown code equals the saved current revision. */
+  rev?: string | null;
   canEdit: boolean;
   canDecide: boolean;
 }) {
@@ -86,7 +89,7 @@ export function Inspector({
     return (
       <div style={{ color: "var(--ink-muted)", fontSize: "var(--fs-13)" }}>
         <Section name="Code">
-          <CodeChip code={code || "—"} />
+          <CodeChip code={code || "—"} />{rev ? <span data-testid="code-rev" style={{ marginLeft: 6, fontFamily: "var(--font-mono)", fontSize: "var(--fs-12)", color: "var(--accent)" }}>Rev {rev}</span> : null}
         </Section>
         <p style={{ margin: 0 }}>프로젝트 노드를 선택하면 Spec · Data Up-Load · Schedule · Approval · Description이 바인딩됩니다.</p>
       </div>
@@ -98,7 +101,7 @@ export function Inspector({
     <div data-testid="inspector-bound" data-project={project.id}>
       <Section name="Code">
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <CodeChip code={code || "—"} />
+          <CodeChip code={code || "—"} />{rev ? <span data-testid="code-rev" style={{ marginLeft: 6, fontFamily: "var(--font-mono)", fontSize: "var(--fs-12)", color: "var(--accent)" }}>Rev {rev}</span> : null}
           <span style={{ fontSize: "var(--fs-12)", color: "var(--ink-muted)" }}>
             item: {project.itemType ?? "—"}
           </span>
