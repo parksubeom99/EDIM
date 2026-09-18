@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""EDIM 발표 덱 생성기 (점검 초안 v0.2)
+"""EDIM 발표 덱 생성기 (점검 초안 v0.3)
 - 왼쪽: 청사진(EDIM.pdf 70장) 원본 페이지  /  오른쪽: 실동 화면(shots/*.png)
 - shots 가 없으면 '주입 대기' 슬롯으로 렌더 → 토큰 확보 후 demo_e2e 산출물을 넣고 재빌드만 하면 됨
 usage: python3 build_deck.py <corpus_dir> <shots_dir> <out.html>
@@ -66,8 +66,8 @@ MAP = [
  dict(no="08", page=62, tag="E-4 · Sub Work Place / BOM", title="BOM Run — 코드에서 하위 코드 전부",
       quote="“BOM Run“ > Product Main Code를 시작으로 Code Relationship으로 연결된 모든 하위 Code를 추출",
       screen="BOM 11행 · EBOM 6섹션", shot="bom.png",
-      facts=["EBOM 소계 합 = 자재비 (테스트로 고정)", "방진구 사양은 매크로 결과값에서 파생"],
-      say="코드 한 줄이 자재 목록 11행으로 펼쳐집니다."),
+      facts=["현재: 코드 슬롯 → 규칙 함수로 11행 산출 (EBOM 소계 합 = 자재비, 테스트 고정)", "아직: 청사진의 Code Relationship 테이블(p33–34) 기반 하위 코드 추출은 다음 범위"],
+      say="코드 한 줄이 자재 목록 11행으로 펼쳐집니다. 관계 테이블 연결이 다음 단계입니다."),
  dict(no="09", page=14, tag="공기조화기 사양", title="사양 — 우리 제품의 말로",
       quote="외판 칼라강판 0.8T · 보온재 G/Wool 48K 50T · FRAME Steel 1.6t Forming",
       screen="BOM 사양 열 = p14 사양표 그대로", shot="bom_spec.png",
@@ -128,7 +128,7 @@ def build():
   <div class="kick">EDIM · CTO Business Platform — Beta</div>
   <h1>청사진이<br><em>움직입니다</em></h1>
   <p class="sub">코드 한 줄 → BOM · 도면 · 원가.&nbsp; 70장 설계도와 실제 화면을 나란히 놓고 보여드립니다.</p>
-  <div class="meta">점검 초안 v0.2 · 2026-09-18</div></div></section>''')
+  <div class="meta">점검 초안 v0.3 · 2026-09-18</div></div></section>''')
     S.append(f'''<section class="slide full"><div class="stage">
   <header><span class="no">p5</span><h2>출발점 — 코드 한 줄이 회사를 관통한다</h2></header>
   <img class="hero" src="{p5}" alt="">
@@ -146,8 +146,9 @@ def build():
   <div class="honest">
    <div class="h ha"><b>숫자</b><p>단가 · 원가 배율 · Table1/NS 값은 <u>샘플</u>입니다. 구조는 검증됐고, 회사 표가 들어오면 값만 교체됩니다.</p></div>
    <div class="h hb"><b>도면</b><p>평면 배치도 1장. 승인도 · 제작도 · 3D는 다음 범위입니다 (청사진 p17 · p36 · p62).</p></div>
-   <div class="h hb"><b>범위</b><p>CPQ 문서 템플릿 · Print (p16–17 · p45–48), 단가 4테이블 (p67), ERP 구매 흐름 (p51–52)은 청사진 단계입니다.</p></div>
-   <div class="h hc"><b>환경</b><p>검증은 개발 샌드박스 기준입니다. 시연 PC에서의 리허설 통과가 발표 준비 완료 시점입니다.</p></div>
+   <div class="h hb"><b>범위</b><p>Code · Drawing Set-Up 등록 화면 (p29–44), Toolbox의 UI Tool · 함수/그래프 마법사 (p25–26 · p57), CPQ 문서 · Print (p16–17 · p45–48), 단가 4테이블 · 구매 (p51–52 · p67)는 청사진 단계입니다. 자연어→Macro AI 번역은 엔진만 있고 화면 연결 전입니다.</p></div>
+   <div class="h hb"><b>관리자 영역</b><p>학습 AI · Special tool · DB① → DB② 이중 구조 (p6 · p23)는 미착수입니다. 지금 보신 것은 사용자 영역의 한 줄기입니다.</p></div>
+   <div class="h hc" style="grid-column:1/-1"><b>환경</b><p>검증은 개발 샌드박스 기준입니다. 시연 PC에서의 리허설 통과가 발표 준비 완료 시점입니다.</p></div>
   </div><footer>“된 것과 안 된 것의 경계를 저희가 먼저 긋겠습니다.”</footer></div></section>''')
     css = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "deck.css")).read()
     if THEME == "light": css += open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "deck_light.css")).read()
