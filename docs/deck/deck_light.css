@@ -1,0 +1,5 @@
+:root{--bg:#ffffff;--panel:#f6f8fb;--line:#d5dce6;--ink:#15233B;--mut:#5E6B82;--teal:#0e7c6b;--teal2:#0e7c6b;--amber:#b7791f;--coral:#c0392b}
+html{scroll-snap-type:none}.slide{height:1080px;width:1920px;page-break-after:always;break-after:page}.stage{width:1920px}
+blockquote{color:#2b4a73}.bp .lab b{background:#e3eaf4;color:#2b4a73}.live .lab b{color:#fff}.shot{background:#fff;border:1px solid var(--line)}
+.bp img,.hero{border:1px solid var(--line)}.c{background:#f1f4f8;color:#9aa7b8}.c.live{background:var(--teal);color:#fff}.h p{color:#33445e}.no2{color:#8b98aa}
+.slot{background:#f6f8fb}
