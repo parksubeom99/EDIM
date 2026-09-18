@@ -15,6 +15,7 @@
     "migrate:dev": "dotenv -e ../../.env -- prisma migrate dev",
     "seed": "dotenv -e ../../.env -- tsx prisma/seed.ts",
     "seed:demo": "dotenv -e ../../.env -- tsx prisma/seed-demo.ts",
+    "reset:demo": "dotenv -e ../../.env -- tsx prisma/reset-demo.ts",
     "rls:test": "dotenv -e ../../.env -- tsx prisma/rls-isolation-test.ts",
     "hierarchy:test": "dotenv -e ../../.env -- tsx prisma/hierarchy-test.ts",
     "macro:test": "dotenv -e ../../.env -- tsx prisma/macro-registry-test.ts",

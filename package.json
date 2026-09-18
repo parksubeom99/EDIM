@@ -16,6 +16,7 @@
     "db:migrate": "pnpm --filter @edim/db migrate",
     "db:seed": "pnpm --filter @edim/db seed",
     "db:seed:demo": "pnpm --filter @edim/db seed:demo",
+    "db:reset:demo": "pnpm --filter @edim/db reset:demo",
     "demo:e2e": "python3 scripts/demo_e2e.py",
     "db:up": "docker compose up -d db",
     "db:down": "docker compose down",

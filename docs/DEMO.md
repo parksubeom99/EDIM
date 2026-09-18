@@ -36,10 +36,16 @@ pnpm typecheck             # 10 패키지 Done
 pnpm -r test               # 147 passed
 pnpm --filter @edim/db revision:test   # Tier B 8/8 (append-only · RLS · 감사)
 pip install playwright --break-system-packages ; playwright install chromium
-python scripts\demo_e2e.py http://localhost:3000 shots   # ★ 13/13 PASS면 발표 가능
+pnpm db:reset:demo         # ★ 리허설 흔적 제거 (테스트·이전 e2e가 남긴 Rev·매크로 revision)
+python scripts\demo_e2e.py http://localhost:3000 shots   # ★ 14/14 PASS면 발표 가능
+pnpm db:reset:demo         # ★ e2e 자신도 흔적을 남긴다 → 시연 직전 반드시 한 번 더
 ```
 
-`demo_e2e.py`가 11/11이면 아래 시연 7장면은 **기계적으로 재현이 보장된** 상태다. 발표 당일 아침에 한 번 더 돌린다.
+`demo_e2e.py`가 14/14이면 아래 시연 7장면은 **기계적으로 재현이 보장된** 상태다.
+
+**리허설 잔재 규칙** — `code_revision`은 append-only라 앱에서 지울 수 없다. e2e·`revision:test`·손 리허설을 한 번이라도 돌린 DB에서는 본 시연의 첫 저장이 "Rev A"가 아니라 "Rev C/E…"로 찍히고, 매크로 revision도 r2가 아니라 r3+로 보인다. e2e의 `S2d`가 이 상태를 FAIL로 잡아준다.
+
+**발표 당일 아침 순서 (이 순서 그대로):** `docker ps` healthy → `pnpm db:reset:demo` → `demo_e2e.py` 14/14 → **`pnpm db:reset:demo` 한 번 더** → 브라우저 강력 새로고침(Ctrl+Shift+R) → 이후 시연 시작 전까지 화면 클릭·저장 금지.
 
 ---
 
@@ -67,6 +73,7 @@ python scripts\demo_e2e.py http://localhost:3000 shots   # ★ 13/13 PASS면 발
 |---|---|
 | dev 서버 안 뜸 | `pnpm db:up` 상태 확인 → `docker ps` 에 edim-db healthy인지. 포트 5433 충돌 시 docker-compose.yml 포트만 바꾸고 .env 동기화 |
 | 첫 Run이 no-macro | `pnpm db:seed:demo` 재실행 (멱등) |
+| 첫 저장이 Rev A가 아님 · 매크로가 r3 이상 · e2e `S2d` FAIL | 리허설 잔재. `pnpm db:reset:demo` (멱등, 데모 테넌트 한정, admin 역할로만 삭제) → 새로고침 |
 | 브라우저 dev 오버레이가 클릭 가림 | 우하단 N 아이콘 닫기. 리허설에선 `pnpm build && pnpm start`도 가능하나 발표는 dev로 검증된 경로를 쓴다 |
 | 네트워크·프로젝터 사고 | `shots/` 스크린샷 7장(demo_e2e.py 산출) + `edim_sample.dxf`를 USB에 둔다. 최악엔 스크린샷으로 7장면을 그대로 진행 |
 | DXF 열 프로그램 없음 | 무료 뷰어(예: LibreCAD/ODA Viewer) 사전 설치, 또는 `shots/m3_dxf_render.png` 로 대체 |
@@ -101,4 +108,5 @@ python scripts\demo_e2e.py http://localhost:3000 shots   # ★ 13/13 PASS면 발
 ## 6. 이 문서의 검증 상태
 
 - 2026-09-17 엘 샌드박스(Ubuntu · PG16 · Node 22 · pnpm 9.15)에서 §1 절차 그대로 fresh clone → 147 tests + revision:test 8/8 → `demo_e2e.py` 13/13 PASS (Tier B 포함).
+- 2026-09-18 엘 샌드박스 재현(fresh clone, main a9f81dc) + 리허설 잔재 실측: e2e 2회 연속 시 Rev A~D 누적 확인 → `db:reset:demo` 추가, e2e에 잔재 탐지 단언 `S2d` 추가(14단계). reset → e2e 14/14 → (reset 없이) 재실행 시 S2d FAIL → reset → 14/14 확인.
 - 회장님 Windows 로컬 실행은 **아직 0회**. §1을 회장님이 한 번 통과하는 순간이 발표 준비 완료 시점이다.
