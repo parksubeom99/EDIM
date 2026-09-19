@@ -14,6 +14,9 @@ export interface RunResult {
   lines?: unknown;
   groups?: unknown;
   cost?: unknown;
+  /** P1: per line — registered child code + p34 resolved code */
+  trace?: { no: number; childCode: string; resolvedCode: string }[];
+  mainCode?: string;
 }
 
 const RUNS: { kind: "bom" | "edim" | "ebom" | "cost"; label: string }[] = [
@@ -85,6 +88,8 @@ export function ActionBar({
         lines: body.lines,
         groups: body.groups,
         cost: body.cost,
+        trace: body.trace,
+        mainCode: body.mainCode,
       };
       setLast(r);
       onResult(r);

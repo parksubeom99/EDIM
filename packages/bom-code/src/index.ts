@@ -30,12 +30,34 @@ export interface SubCode {
   description: string;
 }
 
-/** p32/p33 "Table 참조": rows keyed by the value of one slot. */
+/**
+ * p32/p33 "Table 참조 / Edit Table" — the blueprint's own shape (unified 2026-09-19):
+ *   numbered table (Table 1, Table 12 …) · lettered columns A, B, C … · Item rows.
+ * ONE registered table serves both readers:
+ *   BOM    `{cap.fanKw}` / `{cap.A}`  → row whose Item = the chosen value of slot `by`
+ *   Macro  `Table1(A,4:4)`            → table no 1, column A, row NUMBERS 4..4 (1-based, in order)
+ */
+export interface TableColumn {
+  /** column letter as the Macro addresses it: A, B, C … */
+  key: string;
+  /** short name used in BOM templates/refs, e.g. fanKw */
+  name: string;
+  /** 회사 말 이름 — shown in the editor and in the back-translation */
+  label?: string;
+}
+export interface TableRow {
+  /** the Item: a value of slot `by` ("" = the none choice) */
+  item: string;
+  cells: Record<string, Cell>; // by column key
+}
 export interface TechTable {
+  /** the N of `TableN(...)` — unique within a product code */
+  no: number;
   by: SlotKey;
-  /** row key used when the slot is EMPTY (a chosen value without a row is an error) */
+  /** Item used when the slot is EMPTY (a chosen value without a row is an error) */
   default: string;
-  rows: Record<string, Record<string, Cell>>;
+  cols: TableColumn[];
+  rows: TableRow[];
 }
 
 export type Cond = { slot: SlotKey; eq: string } | { macro: true };
@@ -94,6 +116,12 @@ export interface BomLine {
 
 export interface BomCodeLine extends BomLine {
   childCode: string;
+  /**
+   * p34 "Part List Running Test": child code + the sequence numbers of the parent's
+   * chosen Sub Items for the slots this child actually reads (KDP 1-21 → KDP 1-21-13-15).
+   * Confirmed reading (owner, 2026-09-19). An empty slot contributes 0.
+   */
+  resolvedCode: string;
   relSeq: number;
   remarks: string | null;
 }
@@ -104,7 +132,7 @@ export type BomCodeError =
   | { code: "UNKNOWN_REF"; message: string };
 
 export type BomCodeResult =
-  | { ok: true; parent: string; sections: string[]; lines: BomCodeLine[] }
+  | { ok: true; parent: string; mainCode: string; sections: string[]; lines: BomCodeLine[] }
   | { ok: false; error: BomCodeError };
 
 function holds(c: Cond | undefined, slots: SlotValues, macroValue: number | null): boolean {
@@ -119,32 +147,47 @@ export function sectionsFor(product: ProductCode, slots: SlotValues, macroValue:
 
 class RefError extends Error {}
 
-function lookup(ref: string, child: ProductCode, parent: ProductCode, slots: SlotValues): Cell {
+/** Records which slots a line reads, so the child's resolved code can carry them. */
+type Used = Set<SlotKey>;
+
+function lookup(ref: string, child: ProductCode, parent: ProductCode, slots: SlotValues, used?: Used): Cell {
   const dot = ref.indexOf(".");
   const tName = dot < 0 ? ref : ref.slice(0, dot);
-  const col = dot < 0 ? "" : ref.slice(dot + 1);
+  const colRef = dot < 0 ? "" : ref.slice(dot + 1);
   const table = child.tables[tName] ?? parent.tables[tName];
   if (!table) throw new RefError(`table '${tName}' is not registered on ${child.code} or ${parent.code}`);
+  used?.add(table.by);
   const key = slots[table.by] ?? "";
   // `default` covers an EMPTY slot only. A chosen value with no row is a gap in
   // the registration and must surface — never borrow another size's numbers.
-  const row = table.rows[key] ?? (key === "" ? table.rows[table.default] : undefined);
-  if (!row) throw new RefError(`table '${tName}' has no row for ${table.by}='${key}' — register it in Set-Up ▸ Product Code ▸ Table`);
-  const cell = row[col];
+  const want = key === "" ? table.default : key;
+  const row = table.rows.find((r) => r.item === want);
+  if (!row) throw new RefError(`table '${tName}' (Table${table.no}) has no row for ${table.by}='${key}' — register it in Set-Up ▸ Product Code ▸ Table`);
+  const col = table.cols.find((c) => c.name === colRef || c.key === colRef);
+  const cell = col ? row.cells[col.key] : undefined;
   if (cell === undefined) throw new RefError(`'${ref}' has no value for ${table.by}='${key}'`);
   return cell;
 }
 
-function num(ref: string, child: ProductCode, parent: ProductCode, slots: SlotValues): number {
-  const v = lookup(ref, child, parent, slots);
+function num(ref: string, child: ProductCode, parent: ProductCode, slots: SlotValues, used?: Used): number {
+  const v = lookup(ref, child, parent, slots, used);
   if (typeof v !== "number") throw new RefError(`'${ref}' is not a number`);
   return v;
 }
 
-function fill(tpl: string, child: ProductCode, parent: ProductCode, slots: SlotValues, macroValue: number | null): string {
+function fill(tpl: string, child: ProductCode, parent: ProductCode, slots: SlotValues, macroValue: number | null, used?: Used): string {
   return tpl.replace(/\{([^}]+)\}/g, (_m, ref: string) =>
-    ref === "macro" ? String(Math.round(macroValue ?? 0)) : String(lookup(ref, child, parent, slots)),
+    ref === "macro" ? String(Math.round(macroValue ?? 0)) : String(lookup(ref, child, parent, slots, used)),
   );
+}
+
+const SLOT_ORDER: readonly SlotKey[] = ["A", "B", "C", "D", "E", "F"];
+
+/** seq of the chosen Sub Item of a slot (p31 registration order); 0 when the slot is empty/unregistered. */
+function seqOf(catalog: Catalog, key: SlotKey, slots: SlotValues): number {
+  const v = slots[key] ?? "";
+  if (v === "") return 0;
+  return catalog.subCodes.find((s) => s.itemKey === key && s.value === v)?.seq ?? 0;
 }
 
 /**
@@ -175,19 +218,25 @@ export function runBomCode(catalog: Catalog, slots: SlotValues, macroValue: numb
     for (const r of rows) {
       const child = byCode.get(r.child);
       if (!child) return { ok: false, error: { code: "UNKNOWN_CHILD", message: `child code '${r.child}' is not registered` } };
-      const qty = "lit" in r.qty ? r.qty.lit : num(r.qty.ref, child, parent, slots);
-      const base = "lit" in r.unitCost ? r.unitCost.lit : num(r.unitCost.ref, child, parent, slots);
-      const unitCost = Math.round(r.unitCost.scale ? base * num(r.unitCost.scale, child, parent, slots) : base);
+      const used: Used = new Set();
+      if (r.when && "slot" in r.when) used.add(r.when.slot);
+      const qty = "lit" in r.qty ? r.qty.lit : num(r.qty.ref, child, parent, slots, used);
+      const base = "lit" in r.unitCost ? r.unitCost.lit : num(r.unitCost.ref, child, parent, slots, used);
+      const unitCost = Math.round(r.unitCost.scale ? base * num(r.unitCost.scale, child, parent, slots, used) : base);
+      const spec = fill(child.specTemplate, child, parent, slots, mv, used);
+      const material = fill(child.materialTemplate, child, parent, slots, mv, used);
+      const seqs = SLOT_ORDER.filter((k) => used.has(k)).map((k) => seqOf(catalog, k, slots));
       lines.push({
         no: lines.length + 1,
         section: r.section,
         part: child.name,
-        spec: fill(child.specTemplate, child, parent, slots, mv),
+        spec,
         qty,
         unit: child.unit,
-        material: fill(child.materialTemplate, child, parent, slots, mv),
+        material,
         unitCost,
         childCode: child.code,
+        resolvedCode: seqs.length ? `${child.code}-${seqs.join("-")}` : child.code,
         relSeq: r.seq,
         remarks: r.remarks ?? null,
       });
@@ -196,7 +245,9 @@ export function runBomCode(catalog: Catalog, slots: SlotValues, macroValue: numb
     if (e instanceof RefError) return { ok: false, error: { code: "UNKNOWN_REF", message: e.message } };
     throw e;
   }
-  return { ok: true, parent: parent.code, sections, lines };
+  // Main code of the run = product code + seq of every registered slot choice after A (A IS the code).
+  const mainSeqs = (["B", "C", "D", "E"] as SlotKey[]).map((k) => seqOf(catalog, k, slots));
+  return { ok: true, parent: parent.code, mainCode: `${parent.code}-${mainSeqs.join("-")}`, sections, lines };
 }
 
 /** Strip the code-trace fields → the plain BOM line the panels already render. */
@@ -218,4 +269,27 @@ export function catalogFingerprint(catalog: Catalog): string {
     h = Math.imul(h, 0x01000193) >>> 0;
   }
   return h.toString(16).padStart(8, "0");
+}
+
+/**
+ * The Macro's view of the SAME registered tables: `TableN(col, r0:r1)` reads table
+ * no N, column letter `col`, row NUMBERS r0..r1 (1-based, registration order).
+ * Returns the `${no}!${col}` → { rowNumber → value } map the DSL provider expects;
+ * non-numeric cells are left out (a Macro is arithmetic). Also returns the labels
+ * for the back-translation glossary.
+ */
+export function macroTablesOf(product: ProductCode): { tables: Record<string, Record<number, number>>; labels: Record<string, string> } {
+  const tables: Record<string, Record<number, number>> = {};
+  const labels: Record<string, string> = {};
+  for (const t of Object.values(product.tables)) {
+    for (const c of t.cols) {
+      const column: Record<number, number> = {};
+      t.rows.forEach((r, i) => { const v = r.cells[c.key]; if (typeof v === "number") column[i + 1] = v; });
+      if (Object.keys(column).length === t.rows.length && t.rows.length > 0) {
+        tables[`${t.no}!${c.key}`] = column;
+        labels[`${t.no}!${c.key}`] = c.label ?? c.name;
+      }
+    }
+  }
+  return { tables, labels };
 }

@@ -5,6 +5,7 @@ import { getServerSession } from "../session";
 import { getTreeForSession } from "../hierarchy";
 import type { SlotValues } from "../rccs";
 import { providerFromSlots } from "./provider";
+import { loadMacroTables } from "../catalog";
 
 /** Baseline slots used to probe a draft at runtime (all code refs defined). */
 const BASELINE_SLOTS: SlotValues = { A: "EU", B: "55", C: "2123", D: "630", E: "SS", F: "1-21-13-15" };
@@ -32,7 +33,8 @@ export async function runApprovedForSession(stableId: string, slots: SlotValues)
   if (!macro) return { ok: false, status: "no-macro", message: "승인된 매크로 없음 — Macro 탭에서 초안 → 승인" };
   const parsed = parse(macro.dsl);
   if (!parsed.ok) return { ok: false, status: "parse-error", macroId: macro.id, dsl: macro.dsl, message: parsed.error.message };
-  const r = dryRun(parsed.value, providerFromSlots(slots));
+  const reg = await loadMacroTables(session.tenantId, slots.A ?? "");
+  const r = dryRun(parsed.value, providerFromSlots(slots, reg?.tables));
   if (!r.ok)
     return { ok: false, status: "eval-error", macroId: macro.id, revision: macro.revision, dsl: macro.dsl, message: r.diagnostic?.message ?? "evaluation failed" };
   return {
@@ -62,7 +64,8 @@ export async function draftDslForSession(
     // baseline provider so an unknown symbol is caught *before* it can be approved.
     const parsed = parse(dsl);
     if (parsed.ok) {
-      const probe = dryRun(parsed.value, providerFromSlots(BASELINE_SLOTS));
+      const reg = await loadMacroTables(session.tenantId, BASELINE_SLOTS.A ?? "");
+      const probe = dryRun(parsed.value, providerFromSlots(BASELINE_SLOTS, reg?.tables));
       if (!probe.ok && probe.diagnostic) diagnostics.push(probe.diagnostic);
     }
   }

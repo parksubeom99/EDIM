@@ -1,6 +1,7 @@
 import type { Role } from "@edim/core-ontology";
 import { withTenant, loadCatalogRows, type CatalogRows } from "@edim/db";
 import { slotDefsFromSubCodes, type SlotDef } from "./rccs";
+import { macroTablesOf } from "@edim/bom-code";
 import type { Catalog, Cond, CostBind, QtyBind, SectionDef, SlotKey, TechTable, Cell } from "@edim/bom-code";
 
 /**
@@ -45,19 +46,33 @@ export function parseTables(v: unknown): Record<string, TechTable> | "invalid" {
   if (v === null || v === undefined) return {};
   if (!isObj(v)) return "invalid";
   const out: Record<string, TechTable> = {};
+  const nos = new Set<number>();
   for (const [name, t] of Object.entries(v)) {
-    if (!/^\w+$/.test(name) || !isObj(t) || !isSlot(t.by) || typeof t.default !== "string" || !isObj(t.rows)) return "invalid";
-    const rows: Record<string, Record<string, Cell>> = {};
-    for (const [k, row] of Object.entries(t.rows)) {
-      if (!isObj(row)) return "invalid";
-      const cells: Record<string, Cell> = {};
-      for (const [c, cell] of Object.entries(row)) {
-        if (!/^\w+$/.test(c) || !(typeof cell === "string" || (typeof cell === "number" && Number.isFinite(cell)))) return "invalid";
-        cells[c] = cell;
-      }
-      rows[k] = cells;
+    if (!/^\w+$/.test(name) || !isObj(t) || !isSlot(t.by) || typeof t.default !== "string") return "invalid";
+    if (typeof t.no !== "number" || !Number.isInteger(t.no) || t.no < 1 || nos.has(t.no)) return "invalid"; // TableN must be unique
+    nos.add(t.no);
+    if (!Array.isArray(t.cols) || !Array.isArray(t.rows) || t.cols.length === 0) return "invalid";
+    const cols: TechTable["cols"] = [];
+    const keys = new Set<string>();
+    for (const c of t.cols) {
+      if (!isObj(c) || typeof c.key !== "string" || !/^[A-Z]{1,2}$/.test(c.key) || keys.has(c.key)) return "invalid"; // lettered columns
+      if (typeof c.name !== "string" || !/^\w+$/.test(c.name)) return "invalid";
+      keys.add(c.key);
+      cols.push({ key: c.key, name: c.name, ...(typeof c.label === "string" && c.label ? { label: c.label.slice(0, 40) } : {}) });
     }
-    out[name] = { by: t.by, default: t.default, rows };
+    const rows: TechTable["rows"] = [];
+    const items = new Set<string>();
+    for (const r of t.rows) {
+      if (!isObj(r) || typeof r.item !== "string" || items.has(r.item) || !isObj(r.cells)) return "invalid";
+      items.add(r.item);
+      const cells: Record<string, Cell> = {};
+      for (const [k, cell] of Object.entries(r.cells)) {
+        if (!keys.has(k) || !(typeof cell === "string" || (typeof cell === "number" && Number.isFinite(cell)))) return "invalid";
+        cells[k] = cell;
+      }
+      rows.push({ item: r.item, cells });
+    }
+    out[name] = { no: t.no, by: t.by, default: t.default, cols, rows };
   }
   return out;
 }
@@ -111,4 +126,15 @@ export async function loadCatalog(tenantId: string): Promise<{ catalog: Catalog;
 export async function loadSlotDefs(tenantId: string): Promise<SlotDef[]> {
   const rows = await withTenant(tenantId, (tx) => tx.subCode.findMany({ orderBy: [{ itemKey: "asc" }, { seq: "asc" }] }));
   return slotDefsFromSubCodes(rows.map((r) => ({ itemKey: r.itemKey, itemName: r.itemName, seq: r.seq, value: r.value, description: r.description })));
+}
+
+/**
+ * Unified tables (2026-09-19): the Macro reads the SAME registered tables as the BOM.
+ * Returns the DSL-provider tables + back-translation labels of the product code `A`
+ * (null when the tenant has not registered that product → caller falls back to samples).
+ */
+export async function loadMacroTables(tenantId: string, productCode: string): Promise<ReturnType<typeof macroTablesOf> | null> {
+  const { catalog } = await loadCatalog(tenantId);
+  const p = catalog.productCodes.find((x) => x.code === productCode && x.kind === "product");
+  return p ? macroTablesOf(p) : null;
 }

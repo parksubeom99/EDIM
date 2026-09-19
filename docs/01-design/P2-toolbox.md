@@ -27,7 +27,7 @@ typecheck 11 패키지 · 테스트 **166**(역번역 6 추가) · `demo_e2e` **
 - **Prompt→Macro는 실제 모델로 한 번도 돌려 보지 못했다.** 샌드박스에 API 키가 없다. 연결 코드·검증 루프는 단위 테스트(스크립트 클라이언트)로만 확인됨. 발표에서 쓰려면 회장님 PC `.env`에 `ANTHROPIC_API_KEY`를 넣고 1회 확인 필요.
 - p27의 **Coding(AI)** 칸, **함수 마법사 · 그래프 마법사 · Data Information Call(주소 찾기)** 는 없다. 4-Way Sync 중 **Flowchart→Macro, Description→Macro 방향**(그림·글을 고쳐 식을 바꾸기)도 없다 — 지금은 Macro에서 나가는 방향만.
 - p25의 **Combo box set-up macro · Templet · Canvas Drag · UI 개발 AI**는 없다. UI Tool은 명령 버튼 설정 하나뿐.
-- p26 **Table 등록**(20→80 시나리오의 P2 항목)은 P1의 Product Code ▸ Table 편집으로 대신했다. Macro가 읽는 `Table1`·`Var(NS)`는 **아직 코드 상수(샘플)** 이고 Set-Up 표와 연결되지 않았다 → 다음 작업 후보(용어집도 같이 DB로).
+- **Table 등록**: Set-Up ▸ Product Code ▸ Table이 그 자리다. 2026-09-19 표 모양 통일로 Macro의 `TableN`이 등록 표를 직접 읽는다(P1 기록 §3-c). `Var(NS)`와 코드 이름 용어집만 아직 샘플 상수.
 - 흐름도는 상자 배치(CSS)다. 청사진의 도형 팔레트·연결선 편집기가 아니다.
 - 창 폭이 Inspector 폭(약 316px)일 때 끌 수 있는 곳은 왼쪽 그립(⠿)과 탭·버튼 사이 틈이다.
 - 기존 Macro 탭(`macro-panel.tsx`)은 그대로 둠(e2e S4가 사용). Toolbox와 기능이 겹친다 — 어느 쪽을 남길지는 회장님 결정.

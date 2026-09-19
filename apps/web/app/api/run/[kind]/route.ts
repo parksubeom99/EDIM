@@ -56,7 +56,7 @@ export async function POST(
   if (!result.ok)
     return NextResponse.json({ error: `${result.error.code}: ${result.error.message}`, rejected }, { status: 422 });
   const lines = result.lines.map(toBomLine);
-  const trace = result.lines.map((l) => ({ no: l.no, childCode: l.childCode, relSeq: l.relSeq, remarks: l.remarks }));
+  const trace = result.lines.map((l) => ({ no: l.no, childCode: l.childCode, resolvedCode: l.resolvedCode, relSeq: l.relSeq, remarks: l.remarks }));
   const catalogFp = catalogFingerprint(catalog);
   if (kind === "bom") {
     const cost = buildCost(lines);
@@ -70,7 +70,7 @@ export async function POST(
         catalogFp, lines: result.lines as unknown as object[], cost: cost as unknown as object, createdBy: session.userId,
       }),
     );
-    return NextResponse.json({ ...base, lines, trace, catalogFp, runId: snap.id, message: `BOM ${lines.length}행 · 코드 관계 ${result.parent} · 스냅샷 ${snap.id.slice(0, 8)}` });
+    return NextResponse.json({ ...base, lines, trace, mainCode: result.mainCode, catalogFp, runId: snap.id, message: `BOM ${lines.length}행 · 코드 관계 ${result.parent} · 스냅샷 ${snap.id.slice(0, 8)}` });
   }
   if (kind === "ebom") { const groups = buildEbom(lines, slots, result.sections); return NextResponse.json({ ...base, groups, catalogFp, message: `EBOM ${groups.length}섹션 · ${lines.length}행` }); }
   if (kind === "cost") { const cost = buildCost(lines); return NextResponse.json({ ...base, cost, catalogFp, value: cost.total, message: `원가 합계 ₩${cost.total.toLocaleString("ko-KR")}` }); }

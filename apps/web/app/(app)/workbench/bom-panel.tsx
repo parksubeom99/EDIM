@@ -30,11 +30,12 @@ export function BomPanel({ code, runs }: { code: string; runs: RunResult[] }) {
           <p style={{ ...muted, margin: 0 }}>아직 실행 결과 없음</p>
         ) : (
           <table data-testid="bom-table" style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead><tr><th style={th}>#</th><th style={th}>Section</th><th style={th}>Part</th><th style={th}>Spec</th><th style={{ ...th, textAlign: "right" }}>Qty</th><th style={th}>Mat.</th><th style={{ ...th, textAlign: "right" }}>Unit ₩</th><th style={{ ...th, textAlign: "right" }}>Amount ₩</th></tr></thead>
+            <thead><tr><th style={th}>#</th><th style={th}>Code</th><th style={th}>Section</th><th style={th}>Part</th><th style={th}>Spec</th><th style={{ ...th, textAlign: "right" }}>Qty</th><th style={th}>Mat.</th><th style={{ ...th, textAlign: "right" }}>Unit ₩</th><th style={{ ...th, textAlign: "right" }}>Amount ₩</th></tr></thead>
             <tbody>
               {lines.map((l) => (
                 <tr key={l.no} data-bom-row={l.no}>
                   <td style={{ ...td, fontFamily: "var(--font-mono)", color: "var(--ink-muted)" }}>{l.no}</td>
+                  <td data-bom-code={l.no} style={{ ...td, fontFamily: "var(--font-mono)", fontSize: "var(--fs-12)", color: "var(--accent)", whiteSpace: "nowrap" }}>{bom?.trace?.find((t) => t.no === l.no)?.resolvedCode ?? "—"}</td>
                   <td style={td}>{l.section}</td><td style={td}>{l.part}</td>
                   <td style={{ ...td, fontFamily: "var(--font-mono)", fontSize: "var(--fs-12)" }}>{l.spec}</td>
                   <td style={{ ...td, textAlign: "right", fontFamily: "var(--font-mono)" }}>{l.qty} {l.unit}</td>

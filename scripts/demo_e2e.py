@@ -64,13 +64,20 @@ with sync_playwright() as p:
     nrel=len(pg.query_selector_all("[data-testid=rel-table] tbody tr")); ok("S9b Relationship screen: EU Child Group = 13 rows", nrel, nrel==13)
     pg.click("[data-testid=plr-run]"); pg.wait_for_selector("[data-testid=plr-table]"); time.sleep(0.8)
     nrow=len(pg.query_selector_all("[data-plr-row]")); rotor=pg.query_selector("[data-plr-row='KHR 1']"); ok("S9c Part List Running Test: 10 rows incl. rotor (D=630), no isolator without macro", (nrow,bool(rotor)), nrow==10 and bool(rotor) and not pg.query_selector("[data-plr-row='PVI 1']")); pg.screenshot(path=f"{OUT}/22_setup_relationship.png",full_page=True)
+    main=pg.inner_text("[data-testid=plr-main]"); fanc=pg.inner_text("[data-plr-code='KFP 1']"); pnl=pg.inner_text("[data-plr-code='KCP 1']")
+    ok("S9d p34 code inheritance: Main EU-4-2-1-1 · Plug fan KFP 1-4 · Panel KCP 1-4-1-1 (child code + parent's chosen seq)", (main,fanc,pnl), main=="EU-4-2-1-1" and fanc=="KFP 1-4" and pnl=="KCP 1-4-1-1")
     # S10 표 한 칸을 고치면 BOM이 바뀐다 — 코드 수정 0 (p33 Edit Table)
     pg.click("[data-tab=product]"); pg.wait_for_selector("[data-pc='EU']"); pg.click("[data-pc='EU']"); time.sleep(0.8); nuke(pg)
     cell=pg.locator("[data-cell='cap:55:fanKw']"); ok("S10a Product Code table shows the registered value (22)", cell.input_value(), cell.input_value()=="22")
     cell.fill("30"); pg.click("[data-testid=pc-save]"); time.sleep(1.5); pg.screenshot(path=f"{OUT}/21_setup_product_table.png",full_page=True)
     j=ctx.request.post(BASE+"/api/setup/part-list-run",headers=J,data=json.dumps({"slots":S55})).json(); fan=[l for l in j.get("lines",[]) if l["childCode"]=="KFP 1"]
     ok("S10b table edit 22→30 changes the Plug fan line with no code change", fan[0]["spec"][:4] if fan else None, bool(fan) and fan[0]["spec"].startswith("30kW"))
+    # 같은 등록 표를 Macro도 읽는다: Table1(A,4:4) = 그 칸 → 30 × 1.15 × 18 = 621
+    r=ctx.request.post(BASE+"/api/run/edim",headers=J,data=json.dumps({"node":"a0000000-0000-4000-8000-000000000004","slots":S55})).json()
+    ok("S10d unified table: the approved macro reads the SAME edited cell (455.4 → 621)", r.get("value"), abs((r.get("value") or 0)-621)<1e-6)
     cell=pg.locator("[data-cell='cap:55:fanKw']"); cell.fill("22"); pg.click("[data-testid=pc-save]"); time.sleep(1.5)
+    r=ctx.request.post(BASE+"/api/run/edim",headers=J,data=json.dumps({"node":"a0000000-0000-4000-8000-000000000004","slots":S55})).json()
+    ok("S10e restored: macro back to 455.4", r.get("value"), abs((r.get("value") or 0)-455.4)<1e-6)
     j=ctx.request.post(BASE+"/api/setup/part-list-run",headers=J,data=json.dumps({"slots":S55})).json(); fan=[l for l in j.get("lines",[]) if l["childCode"]=="KFP 1"]
     ok("S10c restored to 22kW", fan[0]["spec"][:4] if fan else None, bool(fan) and fan[0]["spec"].startswith("22kW"))
     # S12 Sub Code 등록 → Code Builder 선택지에 나타난다 (p31 → p61) · 표에 행이 없으면 BOM은 거부된다

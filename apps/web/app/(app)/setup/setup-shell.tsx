@@ -143,34 +143,37 @@ function ProductTab({ cat, reload, say }: TabProps) {
     say(r.ok, r.ok ? `Product Code 저장: ${draft.code}` : String(r.data.error ?? "실패"));
     if (r.ok) { await reload(); setSel(draft.code); }
   }
-  function setCell(t: string, rowKey: string, col: string, raw: string) {
+  function setCell(t: string, item: string, colKey: string, raw: string) {
     if (!draft) return;
     const d = JSON.parse(JSON.stringify(draft)) as ProductCode;
     const n = Number(raw);
-    d.tables[t]!.rows[rowKey]![col] = raw.trim() !== "" && Number.isFinite(n) ? n : raw;
+    d.tables[t]!.rows.find((r) => r.item === item)!.cells[colKey] = raw.trim() !== "" && Number.isFinite(n) ? n : raw;
     setDraft(d);
   }
   function addTable() {
     if (!draft) return;
-    const name = `t${Object.keys(draft.tables).length + 1}`;
-    setDraft({ ...draft, tables: { ...draft.tables, [name]: { by: "B", default: "", rows: { "": { value: 0 } } } } });
+    const no = Math.max(0, ...Object.values(draft.tables).map((t) => t.no)) + 1;
+    setDraft({ ...draft, tables: { ...draft.tables, [`t${no}`]: { no, by: "B", default: "", cols: [{ key: "A", name: "value" }], rows: [{ item: "", cells: { A: 0 } }] } } });
   }
   function addRow(t: string) {
     if (!draft) return;
     const d = JSON.parse(JSON.stringify(draft)) as ProductCode;
     const tbl = d.tables[t]!;
-    const cols = Object.keys(Object.values(tbl.rows)[0] ?? { value: 0 });
-    const key = window.prompt(`새 행의 ${tbl.by} 슬롯 값`) ?? "";
-    if (key in tbl.rows) return;
-    tbl.rows[key] = Object.fromEntries(cols.map((c) => [c, 0]));
+    const item = window.prompt(`새 행의 Item (${tbl.by} 슬롯 값)`) ?? "";
+    if (tbl.rows.some((r) => r.item === item)) return;
+    tbl.rows.push({ item, cells: Object.fromEntries(tbl.cols.map((c) => [c.key, 0])) });
     setDraft(d);
   }
   function addCol(t: string) {
     if (!draft) return;
-    const col = (window.prompt("새 열 이름 (영문·숫자·_)") ?? "").trim();
-    if (!/^\w+$/.test(col)) return;
+    const name = (window.prompt("새 열 이름 (영문·숫자·_) — 열 글자는 자동으로 다음 글자") ?? "").trim();
+    if (!/^\w+$/.test(name)) return;
     const d = JSON.parse(JSON.stringify(draft)) as ProductCode;
-    for (const row of Object.values(d.tables[t]!.rows)) if (!(col in row)) row[col] = 0;
+    const tbl = d.tables[t]!;
+    if (tbl.cols.some((c) => c.name === name) || tbl.cols.length >= 26) return;
+    const key = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[tbl.cols.length]!;
+    tbl.cols.push({ key, name });
+    for (const row of tbl.rows) row.cells[key] = 0;
     setDraft(d);
   }
 
@@ -214,31 +217,32 @@ function ProductTab({ cat, reload, say }: TabProps) {
               {cat.canEdit && <button type="button" onClick={addTable} style={{ ...btn(), marginLeft: "auto" }}>Add Table</button>}
             </div>
             {Object.keys(draft.tables).length === 0 && <p style={{ ...muted, margin: 0 }}>이 코드에 등록된 표 없음 — 상위 Product Code의 표를 참조한다.</p>}
-            {Object.entries(draft.tables).map(([tName, t]: [string, TechTable]) => {
-              const cols = [...new Set(Object.values(t.rows).flatMap((r) => Object.keys(r)))];
-              return (
-                <div key={tName} data-table={tName} style={{ marginTop: 10, overflowX: "auto" }}>
-                  <div style={{ display: "flex", gap: 8, alignItems: "baseline", marginBottom: 4 }}>
-                    <span style={{ ...mono, color: "var(--accent)" }}>{tName}</span><span style={muted}>by 슬롯 {t.by} · 기본 행 “{t.default || "(없음)"}”</span>
-                    {cat.canEdit && <><button type="button" onClick={() => addRow(tName)} style={{ ...btn(), padding: "2px 8px", marginLeft: "auto" }}>+ 행</button><button type="button" onClick={() => addCol(tName)} style={{ ...btn(), padding: "2px 8px" }}>+ 열</button></>}
-                  </div>
-                  <table style={{ borderCollapse: "collapse", width: "100%" }}>
-                    <thead><tr><th style={th}>{t.by}</th>{cols.map((c) => <th key={c} style={{ ...th, ...mono }}>{c}</th>)}</tr></thead>
-                    <tbody>
-                      {Object.entries(t.rows).map(([rk, row]) => (
-                        <tr key={rk}><td style={{ ...td, ...mono, color: "var(--accent)" }}>{rk || "(없음)"}</td>
-                          {cols.map((c) => (
-                            <td key={c} style={{ ...td, padding: 2 }}>
-                              <input data-cell={`${tName}:${rk}:${c}`} value={String((row[c] as Cell | undefined) ?? "")} disabled={!cat.canEdit} onChange={(e) => setCell(tName, rk, c, e.target.value)} style={{ ...input, ...mono, width: "100%", minWidth: 64, boxSizing: "border-box", border: "1px solid transparent", background: "transparent" }} />
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+            {Object.entries(draft.tables).sort((a, b) => a[1].no - b[1].no).map(([tName, t]: [string, TechTable]) => (
+              <div key={tName} data-table={tName} style={{ marginTop: 10, overflowX: "auto" }}>
+                <div style={{ display: "flex", gap: 8, alignItems: "baseline", marginBottom: 4 }}>
+                  <span style={{ ...mono, color: "var(--accent)" }}>Table{t.no}</span><span style={mono}>{tName}</span>
+                  <span style={muted}>Item = 슬롯 {t.by} 값 · 빈 슬롯이면 “{t.default || "(없음)"}” 행 · Macro에서는 <span style={mono}>Table{t.no}(열글자, 행번호:행번호)</span></span>
+                  {cat.canEdit && <><button type="button" onClick={() => addRow(tName)} style={{ ...btn(), padding: "2px 8px", marginLeft: "auto" }}>+ 행</button><button type="button" onClick={() => addCol(tName)} style={{ ...btn(), padding: "2px 8px" }}>+ 열</button></>}
                 </div>
-              );
-            })}
+                <table style={{ borderCollapse: "collapse", width: "100%" }}>
+                  <thead>
+                    <tr><th style={th}>#</th><th style={th}>Item</th>{t.cols.map((c) => <th key={c.key} style={{ ...th, ...mono, color: "var(--accent)" }}>{c.key}</th>)}</tr>
+                    <tr><th style={th} /><th style={th} />{t.cols.map((c) => <th key={c.key} title={c.label ?? ""} style={{ ...th, ...mono, fontWeight: 400 }}>{c.name}{c.label ? <div style={{ fontFamily: "var(--font-body)", fontSize: 11 }}>{c.label}</div> : null}</th>)}</tr>
+                  </thead>
+                  <tbody>
+                    {t.rows.map((row, ri) => (
+                      <tr key={row.item}><td style={{ ...td, ...mono, color: "var(--ink-muted)" }}>{ri + 1}</td><td style={{ ...td, ...mono, color: "var(--accent)" }}>{row.item || "(없음)"}</td>
+                        {t.cols.map((c) => (
+                          <td key={c.key} style={{ ...td, padding: 2 }}>
+                            <input data-cell={`${tName}:${row.item}:${c.name}`} value={String((row.cells[c.key] as Cell | undefined) ?? "")} disabled={!cat.canEdit} onChange={(e) => setCell(tName, row.item, c.key, e.target.value)} style={{ ...input, ...mono, width: "100%", minWidth: 64, boxSizing: "border-box", border: "1px solid transparent", background: "transparent" }} />
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ))}
           </div>
           {cat.canEdit && <div><button type="button" data-testid="pc-save" onClick={save} disabled={!draft.code || !draft.name} style={btn(true)}>저장</button></div>}
         </div>
@@ -272,10 +276,10 @@ function RelationshipTab({ cat, reload, say }: TabProps) {
   const optionsOf = (k: SlotKey) => cat.subCodes.filter((s) => s.itemKey === k).sort((a, b) => a.seq - b.seq);
   const [slots, setSlots] = useState<Partial<Record<SlotKey, string>>>({ B: "55", C: "2123", D: "630", E: "SS" });
   const [macro, setMacro] = useState("");
-  const [run, setRun] = useState<{ lines: BomCodeLine[]; sections: string[] } | null>(null);
+  const [run, setRun] = useState<{ lines: BomCodeLine[]; sections: string[]; mainCode: string } | null>(null);
   async function runTest() {
     const r = await api("/api/setup/part-list-run", "POST", { slots: { ...slots, A: parent }, macroValue: macro.trim() === "" ? null : Number(macro) });
-    if (r.ok) { setRun({ lines: r.data.lines as BomCodeLine[], sections: r.data.sections as string[] }); say(true, `Part List Run: ${(r.data.lines as unknown[]).length}행`); }
+    if (r.ok) { setRun({ lines: r.data.lines as BomCodeLine[], sections: r.data.sections as string[], mainCode: String(r.data.mainCode ?? "") }); say(true, `Part List Run: ${(r.data.lines as unknown[]).length}행`); }
     else { setRun(null); const e = r.data.error as { code?: string; message?: string } | undefined; say(false, `${e?.code ?? "오류"}: ${e?.message ?? ""}`); }
   }
   const total = run ? run.lines.reduce((a, l) => a + l.qty * l.unitCost, 0) : 0;
@@ -335,12 +339,12 @@ function RelationshipTab({ cat, reload, say }: TabProps) {
         </div>
         {run && (
           <>
-            <p style={{ ...muted, margin: "10px 0 4px" }}>Main <span style={{ ...mono, color: "var(--accent)" }}>{[parent, slots.B, slots.C, `${slots.D ?? ""}${slots.E ?? ""}`].filter(Boolean).join("-")}</span> · Section {run.sections.join(" → ")}</p>
+            <p style={{ ...muted, margin: "10px 0 4px" }}>Main <span data-testid="plr-main" style={{ ...mono, color: "var(--accent)" }}>{run.mainCode}</span> <span style={mono}>({[parent, slots.B, slots.C, `${slots.D ?? ""}${slots.E ?? ""}`].filter(Boolean).join("-")})</span> · Section {run.sections.join(" → ")}</p>
             <table data-testid="plr-table" style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead><tr><th style={th}>No.</th><th style={th}>Code</th><th style={th}>Name · Spec</th><th style={{ ...th, textAlign: "right" }}>Q’ty</th><th style={{ ...th, textAlign: "right" }}>Amount</th></tr></thead>
               <tbody>
                 {run.lines.map((l) => (
-                  <tr key={l.no} data-plr-row={l.childCode}><td style={{ ...td, ...mono, color: "var(--ink-muted)" }}>{l.no}</td><td style={{ ...td, ...mono, color: "var(--accent)", whiteSpace: "nowrap" }}>{l.childCode}</td>
+                  <tr key={l.no} data-plr-row={l.childCode}><td style={{ ...td, ...mono, color: "var(--ink-muted)" }}>{l.no}</td><td data-plr-code={l.childCode} style={{ ...td, ...mono, color: "var(--accent)", whiteSpace: "nowrap" }}>{l.resolvedCode}</td>
                     <td style={td}>{l.part}<div style={{ ...mono, color: "var(--ink-muted)" }}>{l.spec}</div></td>
                     <td style={{ ...td, ...mono, textAlign: "right", whiteSpace: "nowrap" }}>{l.qty} {l.unit}</td><td style={{ ...td, ...mono, textAlign: "right" }}>{won(l.qty * l.unitCost)}</td></tr>
                 ))}
