@@ -33,7 +33,7 @@ export interface SubCode {
 /** p32/p33 "Table 참조": rows keyed by the value of one slot. */
 export interface TechTable {
   by: SlotKey;
-  /** key used when the slot is empty or not in the table */
+  /** row key used when the slot is EMPTY (a chosen value without a row is an error) */
   default: string;
   rows: Record<string, Record<string, Cell>>;
 }
@@ -126,8 +126,11 @@ function lookup(ref: string, child: ProductCode, parent: ProductCode, slots: Slo
   const table = child.tables[tName] ?? parent.tables[tName];
   if (!table) throw new RefError(`table '${tName}' is not registered on ${child.code} or ${parent.code}`);
   const key = slots[table.by] ?? "";
-  const row = table.rows[key] ?? table.rows[table.default];
-  const cell = row?.[col];
+  // `default` covers an EMPTY slot only. A chosen value with no row is a gap in
+  // the registration and must surface — never borrow another size's numbers.
+  const row = table.rows[key] ?? (key === "" ? table.rows[table.default] : undefined);
+  if (!row) throw new RefError(`table '${tName}' has no row for ${table.by}='${key}' — register it in Set-Up ▸ Product Code ▸ Table`);
+  const cell = row[col];
   if (cell === undefined) throw new RefError(`'${ref}' has no value for ${table.by}='${key}'`);
   return cell;
 }

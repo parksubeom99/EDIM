@@ -7,6 +7,7 @@ import { derivePipeline } from "@/app/lib/approval-state";
 import { MainFormShell, type WorkbenchProject } from "./mainform-shell";
 import { withTenant, getCurrentRevision, revLabel } from "@edim/db";
 import type { SlotValues } from "@/app/lib/rccs";
+import { loadSlotDefs } from "@/app/lib/catalog";
 
 /**
  * EDIM MainForm workbench (p56 · 5 regions): Toolbar(3 tiers) · Work Hierarchy ·
@@ -24,6 +25,8 @@ export default async function WorkbenchPage({
   const detail = node ? await getProjectDetailByStable(node) : null;
   // Tier B: the node's current assembled code (highest rev) seeds the Code Builder.
   const current = node && session ? await withTenant(session.tenantId, (tx) => getCurrentRevision(tx, node)) : null;
+  // P1: Code Builder choices = the tenant's registered Sub Codes (p31), not constants.
+  const slotDefs = session ? await loadSlotDefs(session.tenantId) : undefined;
   const initialSlots = (current?.slots as SlotValues | undefined) ?? null;
   const initialRev = current ? { revNo: current.revNo, rev: revLabel(current.revNo), code: current.code } : null;
 
@@ -83,6 +86,7 @@ export default async function WorkbenchPage({
       modules={session ? modulesForRole(session.role) : []}
       tree={tree}
       selectedNode={node ?? null}
+      slotDefs={slotDefs}
       initialSlots={initialSlots}
       initialRev={initialRev}
       project={project}

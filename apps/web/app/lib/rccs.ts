@@ -115,11 +115,11 @@ export interface AssembleResult {
 const SEQ_RE = /^\d+(-\d+)*$/;
 
 /** Deterministic: same slots → same code. No side effects, no I/O. */
-export function assembleCode(values: SlotValues): AssembleResult {
+export function assembleCode(values: SlotValues, slotDefs: readonly SlotDef[] = RCCS_SLOTS): AssembleResult {
   const diagnostics: AssembleDiagnostic[] = [];
   const get = (k: SlotKey) => (values[k] ?? "").trim();
 
-  for (const s of RCCS_SLOTS) {
+  for (const s of slotDefs) {
     const v = get(s.key);
     if (s.required && v === "") {
       diagnostics.push({
@@ -164,6 +164,25 @@ export function assembleCode(values: SlotValues): AssembleResult {
     ok: !diagnostics.some((d) => d.severity === "error"),
     diagnostics,
   };
+}
+
+export interface RegisteredSubCode { itemKey: string; itemName: string; seq: number; value: string; description: string }
+
+/**
+ * P1 — the Code Builder's choices come from the Set-Up DB (p31 Sub Code), not
+ * from this file. Item name = the registered item name; options = registered
+ * sub items in seq order. `required`/`hint` stay grammar facts (A·B·C required).
+ * An item with no registered sub items keeps the sample options, so an empty
+ * tenant still gets a working builder (documented fallback, sample only).
+ */
+export function slotDefsFromSubCodes(subCodes: readonly RegisteredSubCode[]): SlotDef[] {
+  return RCCS_SLOTS.map((base) => {
+    const rows = subCodes.filter((s) => s.itemKey === base.key).sort((a, b) => a.seq - b.seq);
+    if (rows.length === 0) return base;
+    const options: SlotOption[] = rows.map((r) => ({ value: r.value, label: r.description && r.description !== r.value ? `${r.value} · ${r.description}` : r.value }));
+    const none = base.options.find((o) => o.value === "");
+    return { ...base, name: rows[0]!.itemName || base.name, options: base.required || !none ? options : [none, ...options] };
+  });
 }
 
 /** Parse a code back into slots (best effort; used for tests + inspector). */

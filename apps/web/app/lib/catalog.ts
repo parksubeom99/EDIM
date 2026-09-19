@@ -1,5 +1,6 @@
 import type { Role } from "@edim/core-ontology";
 import { withTenant, loadCatalogRows, type CatalogRows } from "@edim/db";
+import { slotDefsFromSubCodes, type SlotDef } from "./rccs";
 import type { Catalog, Cond, CostBind, QtyBind, SectionDef, SlotKey, TechTable, Cell } from "@edim/bom-code";
 
 /**
@@ -104,4 +105,10 @@ export function rowsToCatalog(rows: CatalogRows): { catalog: Catalog; rejected: 
 export async function loadCatalog(tenantId: string): Promise<{ catalog: Catalog; rejected: string[]; rows: CatalogRows }> {
   const rows = await withTenant(tenantId, (tx) => loadCatalogRows(tx));
   return { ...rowsToCatalog(rows), rows };
+}
+
+/** Code Builder slot catalog for a tenant = its registered Sub Codes (p31). */
+export async function loadSlotDefs(tenantId: string): Promise<SlotDef[]> {
+  const rows = await withTenant(tenantId, (tx) => tx.subCode.findMany({ orderBy: [{ itemKey: "asc" }, { seq: "asc" }] }));
+  return slotDefsFromSubCodes(rows.map((r) => ({ itemKey: r.itemKey, itemName: r.itemName, seq: r.seq, value: r.value, description: r.description })));
 }

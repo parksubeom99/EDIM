@@ -44,6 +44,12 @@ describe("bom-code engine (p34 Part List Run)", () => {
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error.code).toBe("UNKNOWN_REF");
   });
+  it("a chosen slot value with no table row is an error — never another size's numbers", () => {
+    const r = runBomCode(catalog, { A: "EU", B: "80", C: "2123" });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.message).toContain("B='80'");
+    expect(runBomCode(catalog, { A: "EU", C: "2123" }).ok).toBe(true); // empty slot → default row
+  });
   it("sections follow the product code's registered section list", () => {
     const eu = catalog.productCodes.find((p) => p.code === "EU")!;
     expect(sectionsFor(eu, S55)).toEqual(["Mixing", "Filter", "Rotor", "Coil", "Fan"]);
