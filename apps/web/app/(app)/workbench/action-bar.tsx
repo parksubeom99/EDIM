@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties, type MutableRefObject } from "react";
+import type { CommandDef } from "./toolbox-window";
 import type { WorkbenchProject } from "./mainform-shell";
 import type { SlotValues } from "@/app/lib/rccs";
 
@@ -43,7 +44,15 @@ export function ActionBar({
   onResult,
   nodeStable,
   slots,
+  commands,
+  runRef,
+  onBusy,
 }: {
+  /** P2: the button set is the Toolbox's "Command button set-up" (order · label · visible). */
+  commands?: CommandDef[];
+  /** P2: the Toolbox runs THROUGH the Action Bar — one run path, one result stream. */
+  runRef?: MutableRefObject<((kind: string) => void) | null>;
+  onBusy?: (kind: string | null) => void;
   project: WorkbenchProject | null;
   code: string;
   codeOk: boolean;
@@ -58,7 +67,8 @@ export function ActionBar({
   const runDisabled = !canEdit || !codeOk;
 
   async function run(kind: string) {
-    setBusy(kind);
+    if (runDisabled || busy !== null) return;
+    setBusy(kind); onBusy?.(kind);
     try {
       const res = await fetch(`/api/run/${kind}`, {
         method: "POST",
@@ -79,9 +89,12 @@ export function ActionBar({
       setLast(r);
       onResult(r);
     } finally {
-      setBusy(null);
+      setBusy(null); onBusy?.(null);
     }
   }
+
+  useEffect(() => { if (runRef) runRef.current = run; });
+  const shown = (commands ?? RUNS.map((r) => ({ ...r, visible: true }))).filter((c) => c.visible);
 
   return (
     <footer
@@ -95,7 +108,7 @@ export function ActionBar({
         background: "var(--surface-1)",
       }}
     >
-      {RUNS.map((r) => (
+      {shown.map((r) => (
         <button
           key={r.kind}
           type="button"

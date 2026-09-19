@@ -47,3 +47,10 @@ export function providerFromSlots(slots: SlotValues): DataProvider {
     codes: codesFromSlots(slots),
   });
 }
+
+/** 회사 말 이름(용어집) — STEP 5 역번역이 기호 대신 보여 준다. 표와 함께 등록될 데이터(지금은 샘플). */
+export const SAMPLE_GLOSSARY = {
+  tables: { "1!A": "팬 모터 kW", "1!B": "코일 열수", "1!C": "패널 두께 mm" },
+  vars: { "NS|10": "면풍속 m/s", "NS|15": "안전율", "NS|20": "kW당 kg" },
+  codes: { A: "제품군", B: "용량", C: "시리즈", D: "옵션", E: "재질", F: "슬롯 순번", CAP: "용량", CMH: "풍량 CMH", ROW: "용량 행" },
+} as const;
