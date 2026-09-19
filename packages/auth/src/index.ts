@@ -15,6 +15,10 @@ export {
   decodeSession,
   SESSION_COOKIE,
   type SessionData,
+  encodePlatformSession,
+  decodePlatformSession,
+  PLATFORM_SESSION_COOKIE,
+  type PlatformSessionData,
 } from "./session";
 export {
   resolveUser,

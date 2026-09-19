@@ -2,11 +2,15 @@ import Link from "next/link";
 import { getServerSession } from "@/app/lib/session";
 import { getModule, canAccessModule } from "@/app/lib/modules";
 import { listProjectsForSession } from "@/app/lib/project";
+import { CompanyAdmin } from "../company-admin";
 
 /**
  * Module routing stub (STEP 5). Guarded server-side: an unpermitted role sees a
  * forbidden notice, never module content. The 'project' module lists the
  * tenant's projects, each linking into the Main Work Panel detail (?node=).
+ *
+ * P3-a: 'company' 모듈이 회사 관리자 영역이 된다 — User Management(2층→3층)와
+ * 플랫폼 요청 통로(2층→1층). 역할 변경·의뢰 제출은 서버에서 owner 만 통과한다.
  */
 export default async function ModulePage({
   params,
@@ -39,7 +43,9 @@ export default async function ModulePage({
           >
             {mod!.label}
           </h1>
-          {key === "project" ? (
+          {key === "company" ? (
+            <CompanyAdmin myRole={session!.role} />
+          ) : key === "project" ? (
             <ul style={{ listStyle: "none", padding: 0 }}>
               {(projects ?? []).map((p) => (
                 <li

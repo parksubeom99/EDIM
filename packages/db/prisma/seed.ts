@@ -20,6 +20,8 @@ export const IDS = {
   ownerA: "10000000-0000-4000-8000-00000000000a",
   viewerA: "20000000-0000-4000-8000-00000000000a",
   ownerB: "10000000-0000-4000-8000-00000000000b",
+  // P3-a 플랫폼 관리자 — 테넌트 밖의 주체(멤버십 없음)
+  platformAdmin: "30000000-0000-4000-8000-00000000000f",
   // hierarchy (tenant A)
   a_root: "a0000000-0000-4000-8000-000000000001",
   a_mod: "a0000000-0000-4000-8000-000000000002",
@@ -177,8 +179,26 @@ export async function seedAll(): Promise<void> {
     },
   });
 
+  // P3-a 플랫폼 관리자 ---------------------------------------------------------
+  // 회사 owner 와 **다른 사람**임이 화면에서 보이도록 별도 계정으로 둔다.
+  // 멤버십을 주지 않는다 — 테넌트 밖의 주체이기 때문이다.
+  await adminPrisma.appUser.upsert({
+    where: { id: IDS.platformAdmin },
+    create: {
+      id: IDS.platformAdmin,
+      email: "platform@edim.test",
+      name: "EDIM Platform Admin",
+    },
+    update: { email: "platform@edim.test", name: "EDIM Platform Admin" },
+  });
+  // platform 스키마는 Prisma 모델이 아니므로(multiSchema 미사용) raw 로 넣는다.
+  await adminPrisma.$executeRaw`
+    INSERT INTO platform.admin_user (user_id, title)
+    VALUES (${IDS.platformAdmin}::uuid, '플랫폼 관리자')
+    ON CONFLICT (user_id) DO UPDATE SET title = EXCLUDED.title`;
+
   console.log(
-    "Seed complete: 2 tenants, 3 users, 3 memberships, 7 nodes, 1 project.",
+    "Seed complete: 2 tenants, 4 users (1 platform admin), 3 memberships, 7 nodes, 1 project.",
   );
 }
 

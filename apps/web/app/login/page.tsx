@@ -23,7 +23,8 @@ export default function LoginPage() {
     });
     setBusy(false);
     if (res.ok) {
-      window.location.href = "/";
+      const data = (await res.json().catch(() => ({}))) as { redirect?: string };
+      window.location.href = data.redirect ?? "/";
     } else {
       const data = (await res.json().catch(() => ({}))) as { error?: string };
       setError(data.error ?? "login failed");
@@ -58,6 +59,8 @@ export default function LoginPage() {
       {error && <p style={{ color: "#B45309" }}>{error}</p>}
       <p style={{ color: "#5B6675", fontSize: 12, marginTop: 24 }}>
         seeded: owner@acme.test, viewer@acme.test, owner@globex.test
+        <br />
+        platform: platform@edim.test
       </p>
     </main>
   );

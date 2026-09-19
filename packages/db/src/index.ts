@@ -9,7 +9,7 @@
  */
 export const DB_PACKAGE = "@edim/db" as const;
 
-export { adminPrisma, appPrisma, Prisma } from "./client";
+export { adminPrisma, appPrisma, platformDb, Prisma } from "./client";
 export type { PrismaClient } from "./client";
 export { withTenant, currentTenantOf, requireTenant } from "./tenant";
 export type { TenantClient } from "./tenant";
@@ -73,3 +73,21 @@ export type {
   RelationshipInput,
   BomCodeRunInput,
 } from "./code-catalog";
+export {
+  findPlatformAdmin,
+  platformAdminByEmail,
+  listTenantsForPlatform,
+  listPlatformRequests,
+  decidePlatformRequest,
+  platformDbStatus,
+  createPlatformRequest,
+  listPlatformRequestsForTenant,
+} from "./platform";
+export type {
+  PlatformAdmin,
+  PlatformTenantRow,
+  PlatformRequestRow,
+  PlatformRequestInput,
+} from "./platform";
+export { listMembers, setMemberRole, LastOwnerError } from "./membership";
+export type { MemberRow } from "./membership";

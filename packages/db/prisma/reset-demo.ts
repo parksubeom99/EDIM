@@ -5,6 +5,7 @@
  *   - code_revision  : append-only라 앱에서는 지울 수 없다 → 본 시연의 첫 저장이 'Rev A'가 아니라 'Rev E'가 된다
  *   - macro_registry : 승인할 때마다 revision이 오른다(r2 → r7 …)
  *   - project_approval / task / attachment, audit_log
+ *   - platform_request : 시연 중 올린 Special 의뢰 · 멤버 역할 변경(User Management)
  * 앱 역할(edim_app)에는 code_revision DELETE 권한이 없다(의도된 설계). 그래서 이 스크립트만
  * 스키마 소유자(adminPrisma)로 지운다. 대상은 데모 테넌트(tenantA) 한정.
  *
@@ -23,8 +24,12 @@ async function resetDemo(): Promise<void> {
   const rev = await adminPrisma.codeRevision.deleteMany({ where: { tenantId: t } });
   const mac = await adminPrisma.macroRegistry.deleteMany({ where: { tenantId: t } });
   const run = await adminPrisma.bomCodeRun.deleteMany({ where: { tenantId: t } });
+  const req = await adminPrisma.platformRequest.deleteMany({ where: { tenantId: t } });
   const aud = await adminPrisma.auditLog.deleteMany({ where: { tenantId: t } });
-  console.log(`Demo reset: removed ${rev.count} code revisions, ${mac.count} macros, ${run.count} BOM run snapshots, ${aud.count} audit rows.`);
+  // 리허설이 역할을 바꿔 놓았을 수 있다(User Management 시연) → 시드 역할로 되돌린다.
+  await adminPrisma.membership.updateMany({ where: { tenantId: t, userId: IDS.viewerA }, data: { role: "viewer" } });
+  await adminPrisma.membership.updateMany({ where: { tenantId: t, userId: IDS.ownerA }, data: { role: "owner" } });
+  console.log(`Demo reset: removed ${rev.count} code revisions, ${mac.count} macros, ${run.count} BOM run snapshots, ${req.count} platform requests, ${aud.count} audit rows; memberships restored.`);
   await seedAll();
   await seedDemo({ forceCatalog: true }); // 시연 중 고친 표·관계를 원상 복구
   console.log("Demo reset complete — first save will be Rev A, approved macro is back to the seeded revision.");

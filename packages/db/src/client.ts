@@ -7,6 +7,11 @@ import { PrismaClient } from "@prisma/client";
  *    migrations, seeding, and the auth bootstrap (resolving "which tenants does
  *    this user belong to" before any tenant context exists).
  *
+ *  - platformDb   → PLATFORM_DATABASE_URL, the `edim_platform` role (P3-a). It
+ *    owns the `platform` schema (DB①) and may read ONLY tenant metadata and the
+ *    platform_request queue in public — it has no grant on any business table,
+ *    so 역류(DB②→DB①) is refused by Postgres, not by app code.
+ *
  *  - appPrisma    → APP_DATABASE_URL, the non-superuser `edim_app` role. RLS is
  *    ENFORCED. All tenant-scoped domain work goes through this client, wrapped
  *    in withTenant() (see tenant.ts) so the tenant GUC is set on the same
@@ -22,6 +27,7 @@ import { PrismaClient } from "@prisma/client";
 const globalForPrisma = globalThis as unknown as {
   adminPrisma?: PrismaClient;
   appPrisma?: PrismaClient;
+  platformDb?: PrismaClient;
 };
 
 function makeClient(url: string | undefined, label: string): PrismaClient {
@@ -34,8 +40,8 @@ function makeClient(url: string | undefined, label: string): PrismaClient {
 }
 
 function lazyClient(
-  slot: "adminPrisma" | "appPrisma",
-  envKey: "DATABASE_URL" | "APP_DATABASE_URL",
+  slot: "adminPrisma" | "appPrisma" | "platformDb",
+  envKey: "DATABASE_URL" | "APP_DATABASE_URL" | "PLATFORM_DATABASE_URL",
 ): PrismaClient {
   const resolve = (): PrismaClient => {
     const existing = globalForPrisma[slot];
@@ -62,6 +68,10 @@ export const adminPrisma: PrismaClient = lazyClient(
 export const appPrisma: PrismaClient = lazyClient(
   "appPrisma",
   "APP_DATABASE_URL",
+);
+export const platformDb: PrismaClient = lazyClient(
+  "platformDb",
+  "PLATFORM_DATABASE_URL",
 );
 
 export type { PrismaClient } from "@prisma/client";

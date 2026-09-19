@@ -36,6 +36,7 @@ model Tenant {
   productCodes    ProductCode[]
   codeRelations   CodeRelationship[]
   bomCodeRuns     BomCodeRun[]
+  platformReqs    PlatformRequest[]
 
   @@map("tenant")
 }
@@ -60,6 +61,7 @@ model AppUser {
   productCodes       ProductCode[]
   codeRelations      CodeRelationship[]
   bomCodeRuns        BomCodeRun[]
+  platformReqs       PlatformRequest[]
 
   @@map("app_user")
 }
@@ -346,4 +348,28 @@ model BomCodeRun {
 
   @@index([tenantId, hierarchyStable, createdAt(sort: Desc)], map: "bom_code_run_tenant_node_idx")
   @@map("bom_code_run")
+}
+
+/// P3-a — 회사 → 플랫폼으로 올라가는 **유일한** 통로(요청서). 업무 데이터가 아니다.
+/// 회사 역할(edim_app)은 SELECT/INSERT 만, 결정 컬럼은 플랫폼 역할만 UPDATE 한다
+/// (권한은 Prisma 로 표현할 수 없어 migration 0007_platform 에 있음).
+model PlatformRequest {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  kind         String
+  subject      String
+  payload      Json      @default("{}") @db.JsonB
+  state        String    @default("requested")
+  requestedBy  String    @map("requested_by") @db.Uuid
+  requestedAt  DateTime  @default(now()) @map("requested_at") @db.Timestamptz(6)
+  decidedBy    String?   @map("decided_by") @db.Uuid
+  decidedAt    DateTime? @map("decided_at") @db.Timestamptz(6)
+  decisionNote String    @default("") @map("decision_note")
+
+  tenant    Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  requester AppUser @relation(fields: [requestedBy], references: [id])
+
+  @@index([tenantId, requestedAt(sort: Desc)], map: "platform_request_tenant_idx")
+  @@index([state, requestedAt(sort: Desc)], map: "platform_request_state_idx")
+  @@map("platform_request")
 }
