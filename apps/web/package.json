@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@edim/auth": "workspace:*",
+    "@edim/bom-code": "workspace:*",
     "@edim/core-ontology": "workspace:*",
     "@edim/db": "workspace:*",
     "@edim/hierarchy-address": "workspace:*",
