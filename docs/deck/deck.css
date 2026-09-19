@@ -42,3 +42,6 @@ blockquote{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:1.02cqw
 .honest{flex:1;display:grid;grid-template-columns:1fr 1fr;gap:1.1cqw;align-content:center}
 .h{min-width:0;background:var(--panel);border:.1cqw solid var(--line);border-left:.45cqw solid var(--amber);border-radius:.8cqw;padding:1.6cqw 1.8cqw}.h.hb{border-left-color:#3D6FA8}.h.hc{border-left-color:var(--coral)}
 .h b{font-size:1.8cqw}.h p{margin-top:.5cqw;font-size:1.2cqw;line-height:1.55;color:#c6d3e6}.h u{text-decoration-color:var(--amber);text-underline-offset:.25cqw}
+
+.bpw{flex:1;min-height:0;position:relative;display:flex}.bpw>img:first-child{flex:1;min-height:0;min-width:0;width:100%;object-fit:contain;background:#fff;border-radius:.5cqw}
+.bp .bpw img.thumb{flex:none;min-height:auto;height:auto;object-fit:initial;background:none;position:absolute;right:.6cqw;bottom:.6cqw;width:9cqw;border:.12cqw solid var(--line);border-radius:.3cqw;box-shadow:0 .3cqw 1cqw rgba(0,0,0,.45);opacity:.95}

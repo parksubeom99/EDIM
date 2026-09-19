@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""EDIM 발표 덱 생성기 (점검 초안 v0.3)
+"""EDIM 발표 덱 생성기 (점검 초안 v0.4)
 - 왼쪽: 청사진(EDIM.pdf 70장) 원본 페이지  /  오른쪽: 실동 화면(shots/*.png)
 - shots 가 없으면 '주입 대기' 슬롯으로 렌더 → 토큰 확보 후 demo_e2e 산출물을 넣고 재빌드만 하면 됨
 usage: python3 build_deck.py <corpus_dir> <shots_dir> <out.html>
@@ -17,8 +17,25 @@ def b64img(path, maxw=1316, q=82):
     buf = io.BytesIO(); im.save(buf, "JPEG", quality=q)
     return "data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode()
 
-def bp(page):  # blueprint page image
+CROPS = {56: (0, 0.08, 1, 0.72), 59: (0.42, 0.17, 0.97, 0.76), 61: (0.03, 0.22, 0.5, 0.62), 24: (0.25, 0.1, 0.62, 0.47), 27: (0.25, 0.2, 0.72, 0.92), 60: (0.03, 0.22, 0.5, 0.5), 55: (0.03, 0.2, 0.48, 0.62), 62: (0.02, 0.22, 0.5, 0.62), 14: (0.45, 0.16, 0.98, 0.88), 65: (0.02, 0.2, 0.98, 0.62), 66: (0.02, 0.2, 0.72, 0.66)}  # 청사진 해당 부위 확대 (x0,y0,x1,y1 비율) — 회장님 결정 2026-09-19
+
+def bp(page):  # blueprint page image (full)
     return b64img(os.path.join(CORPUS, f"{page}.jpeg"))
+
+def _b64(im, q=85):
+    buf = io.BytesIO(); im.save(buf, "JPEG", quality=q)
+    return "data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode()
+
+def bp_crop(page):  # (확대 크롭, 위치 표시 썸네일)
+    im = Image.open(os.path.join(CORPUS, f"{page}.jpeg")).convert("RGB")
+    x0, y0, x1, y1 = CROPS[page]; W, H = im.size
+    box = (int(x0*W), int(y0*H), int(x1*W), int(y1*H))
+    c = im.crop(box); k = 1400 / c.width
+    c = c.resize((1400, int(c.height*k)), Image.LANCZOS)
+    t = im.resize((300, int(300*H/W))); from PIL import ImageDraw
+    d = ImageDraw.Draw(t); r = 300 / W
+    d.rectangle([box[0]*r, box[1]*r, box[2]*r, box[3]*r], outline=(224, 169, 62), width=4)
+    return _b64(c), _b64(t, 70)
 
 def shot(name):
     p = os.path.join(SHOTS, name) if name else None
@@ -104,7 +121,7 @@ def slide_map(m):
   <header><span class="no">{m["no"]}</span><h2>{esc(m["title"])}</h2></header>
   <div class="pair">
     <figure class="bp"><div class="lab"><b>청사진</b> p{m["page"]} <i>{esc(m["tag"])}</i></div>
-      <img src="{bp(m["page"])}" alt=""><blockquote>{esc(m["quote"])}</blockquote></figure>
+      <div class="bpw"><img src="{bp_crop(m["page"])[0]}" alt=""><img class="thumb" src="{bp_crop(m["page"])[1]}" alt=""></div><blockquote>{esc(m["quote"])}</blockquote></figure>
     <div class="arrow">→</div>
     <figure class="live"><div class="lab"><b>실동</b> <i>{esc(m["screen"])}</i></div>{right}<ul>{facts}</ul></figure>
   </div>
@@ -128,7 +145,7 @@ def build():
   <div class="kick">EDIM · CTO Business Platform — Beta</div>
   <h1>청사진이<br><em>움직입니다</em></h1>
   <p class="sub">코드 한 줄 → BOM · 도면 · 원가.&nbsp; 70장 설계도와 실제 화면을 나란히 놓고 보여드립니다.</p>
-  <div class="meta">점검 초안 v0.3 · 2026-09-18</div></div></section>''')
+  <div class="meta">점검 초안 v0.4 · 2026-09-18</div></div></section>''')
     S.append(f'''<section class="slide full"><div class="stage">
   <header><span class="no">p5</span><h2>출발점 — 코드 한 줄이 회사를 관통한다</h2></header>
   <img class="hero" src="{p5}" alt="">
@@ -147,7 +164,7 @@ def build():
    <div class="h ha"><b>숫자</b><p>단가 · 원가 배율 · Table1/NS 값은 <u>샘플</u>입니다. 구조는 검증됐고, 회사 표가 들어오면 값만 교체됩니다.</p></div>
    <div class="h hb"><b>도면</b><p>평면 배치도 1장. 승인도 · 제작도 · 3D는 다음 범위입니다 (청사진 p17 · p36 · p62).</p></div>
    <div class="h hb"><b>범위</b><p>Code · Drawing Set-Up 등록 화면 (p29–44), Toolbox의 UI Tool · 함수/그래프 마법사 (p25–26 · p57), CPQ 문서 · Print (p16–17 · p45–48), 단가 4테이블 · 구매 (p51–52 · p67)는 청사진 단계입니다. 자연어→Macro AI 번역은 엔진만 있고 화면 연결 전입니다.</p></div>
-   <div class="h hb"><b>관리자 영역</b><p>학습 AI · Special tool · DB① → DB② 이중 구조 (p6 · p23)는 미착수입니다. 지금 보신 것은 사용자 영역의 한 줄기입니다.</p></div>
+   <div class="h hb"><b>관리자 영역</b><p>엑셀 매크로 수준까지는 고객사가 직접, 그 이상은 저희가 만들어 제공하는 <u>Special Tool Box</u> — 그리고 학습 AI · DB① → DB② 이중 구조 (p6 · p23). <u>설계는 확정, 제공 슬롯은 아직 미구현</u>입니다. 오늘 보신 것은 사용자 영역의 한 줄기입니다.</p></div>
    <div class="h hc" style="grid-column:1/-1"><b>환경</b><p>검증은 개발 샌드박스 기준입니다. 시연 PC에서의 리허설 통과가 발표 준비 완료 시점입니다.</p></div>
   </div><footer>“된 것과 안 된 것의 경계를 저희가 먼저 긋겠습니다.”</footer></div></section>''')
     css = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "deck.css")).read()
