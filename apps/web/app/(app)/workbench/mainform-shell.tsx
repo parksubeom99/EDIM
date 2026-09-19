@@ -4,7 +4,7 @@ import { useState, type CSSProperties } from "react";
 import type { HierarchyTreeNode } from "@edim/core-ontology";
 import { ThemeToggle } from "@edim/ui";
 import type { ModuleDef } from "@/app/lib/modules";
-import { assembleCode, type SlotValues } from "@/app/lib/rccs";
+import { assembleCode, RCCS_SLOTS, type SlotDef, type SlotValues } from "@/app/lib/rccs";
 import type { PipelineState } from "@/app/lib/approval-state";
 import { HierarchyTree } from "../hierarchy-tree";
 import { SignOutButton } from "../sign-out-button";
@@ -45,6 +45,8 @@ export interface MainFormShellProps {
   canEdit: boolean;
   canDecide: boolean;
   /** Tier B: saved revision of the selected node (null = never saved). */
+  /** P1: slot catalog built from the registered Sub Codes (falls back to samples). */
+  slotDefs?: readonly SlotDef[];
   initialSlots?: SlotValues | null;
   initialRev?: { revNo: number; rev: string; code: string } | null;
 }
@@ -73,6 +75,7 @@ export function MainFormShell({
   project,
   canEdit,
   canDecide,
+  slotDefs = RCCS_SLOTS,
   initialSlots = null,
   initialRev = null,
 }: MainFormShellProps) {
@@ -80,7 +83,7 @@ export function MainFormShell({
   const [slots, setSlots] = useState<SlotValues>(initialSlots ?? DEFAULT_SLOTS);
   const [rev, setRev] = useState<{ revNo: number; rev: string; code: string } | null>(initialRev);
   const [runs, setRuns] = useState<RunResult[]>([]);
-  const assembled = assembleCode(slots);
+  const assembled = assembleCode(slots, slotDefs);
 
   return (
     <div
@@ -189,6 +192,7 @@ export function MainFormShell({
             slots={slots}
             onSlots={setSlots}
             assembled={assembled}
+            slotDefs={slotDefs}
             runs={runs}
             nodeStable={selectedNode}
             canEdit={canEdit}

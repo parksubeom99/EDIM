@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type CSSProperties } from "react";
 import { CodeChip } from "@edim/ui";
-import { RCCS_SLOTS, type SlotValues, type AssembleResult } from "@/app/lib/rccs";
+import type { SlotDef, SlotValues, AssembleResult } from "@/app/lib/rccs";
 import type { WorkTab } from "./toolbar";
 import type { WorkbenchProject } from "./mainform-shell";
 import type { RunResult } from "./action-bar";
@@ -29,6 +29,7 @@ export function WorkPlace({
   slots,
   onSlots,
   assembled,
+  slotDefs,
   runs,
   nodeStable,
   canEdit,
@@ -41,6 +42,7 @@ export function WorkPlace({
   slots: SlotValues;
   onSlots: (s: SlotValues) => void;
   assembled: AssembleResult;
+  slotDefs: readonly SlotDef[];
   runs: RunResult[];
   nodeStable: string | null;
   canEdit: boolean;
@@ -61,7 +63,7 @@ export function WorkPlace({
             </p>
           </div>
         )}
-        {tab === "code" && <CodeBuilder slots={slots} onSlots={onSlots} assembled={assembled} nodeStable={nodeStable} canEdit={canEdit} rev={rev} onRev={onRev} />}
+        {tab === "code" && <CodeBuilder slotDefs={slotDefs} slots={slots} onSlots={onSlots} assembled={assembled} nodeStable={nodeStable} canEdit={canEdit} rev={rev} onRev={onRev} />}
         {tab === "design" && <DesignCanvas code={assembled.code} slots={slots} />}
         {tab === "bom" && <BomPanel code={assembled.code} runs={runs} />}
         {tab === "macro" && <MacroPanel project={project} nodeStable={nodeStable} canEdit={canEdit} canDecide={canDecide} runs={runs} />}
@@ -101,6 +103,7 @@ export interface RevInfo { revNo: number; rev: string; code: string }
 interface RevRow extends RevInfo { id: string; reason: string | null; createdAt: string }
 
 function CodeBuilder({
+  slotDefs,
   slots,
   onSlots,
   assembled,
@@ -109,6 +112,7 @@ function CodeBuilder({
   rev,
   onRev,
 }: {
+  slotDefs: readonly SlotDef[];
   slots: SlotValues;
   onSlots: (s: SlotValues) => void;
   assembled: AssembleResult;
@@ -140,10 +144,10 @@ function CodeBuilder({
     <div data-testid="code-builder" style={card}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
         <div style={h}>Code Builder · RCCS™ 조립</div>
-        <span style={muted}>SubCode → ProductCode → Relationship → Arrangement (p61)</span>
+        <span style={muted}>SubCode → ProductCode → Relationship → Arrangement (p61) · 선택지 = <a href="/setup" style={{ color: "var(--accent)" }}>Set-Up ▸ Sub Code</a> 등록값</span>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
-        {RCCS_SLOTS.map((s) => {
+        {slotDefs.map((s) => {
           const err = assembled.diagnostics.find((d) => d.slot === s.key);
           return (
             <label key={s.key} style={{ display: "flex", flexDirection: "column", gap: 4 }}>

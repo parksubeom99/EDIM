@@ -1,0 +1,1320 @@
+{
+  "subCodes": [
+    {
+      "group": "AHU Code",
+      "itemKey": "A",
+      "itemName": "제품군",
+      "seq": 1,
+      "value": "EU",
+      "description": "AHU (공기조화기)"
+    },
+    {
+      "group": "AHU Code",
+      "itemKey": "A",
+      "itemName": "제품군",
+      "seq": 2,
+      "value": "ER",
+      "description": "환기 유닛"
+    },
+    {
+      "group": "AHU Code",
+      "itemKey": "A",
+      "itemName": "제품군",
+      "seq": 3,
+      "value": "EC",
+      "description": "냉각 코일 유닛"
+    },
+    {
+      "group": "AHU Code",
+      "itemKey": "B",
+      "itemName": "용량",
+      "seq": 1,
+      "value": "10",
+      "description": "10,000 CMH"
+    },
+    {
+      "group": "AHU Code",
+      "itemKey": "B",
+      "itemName": "용량",
+      "seq": 2,
+      "value": "12",
+      "description": "12,000 CMH"
+    },
+    {
+      "group": "AHU Code",
+      "itemKey": "B",
+      "itemName": "용량",
+      "seq": 3,
+      "value": "25",
+      "description": "25,000 CMH"
+    },
+    {
+      "group": "AHU Code",
+      "itemKey": "B",
+      "itemName": "용량",
+      "seq": 4,
+      "value": "55",
+      "description": "55,000 CMH"
+    },
+    {
+      "group": "AHU Code",
+      "itemKey": "C",
+      "itemName": "시리즈",
+      "seq": 1,
+      "value": "0480",
+      "description": "표준 단열 패널"
+    },
+    {
+      "group": "AHU Code",
+      "itemKey": "C",
+      "itemName": "시리즈",
+      "seq": 2,
+      "value": "2123",
+      "description": "이중 단열 패널"
+    },
+    {
+      "group": "AHU Code",
+      "itemKey": "C",
+      "itemName": "시리즈",
+      "seq": 3,
+      "value": "3110",
+      "description": "위생형"
+    },
+    {
+      "group": "AHU Code",
+      "itemKey": "D",
+      "itemName": "옵션",
+      "seq": 1,
+      "value": "630",
+      "description": "열회수 로터"
+    },
+    {
+      "group": "AHU Code",
+      "itemKey": "D",
+      "itemName": "옵션",
+      "seq": 2,
+      "value": "A1",
+      "description": "가습 모듈"
+    },
+    {
+      "group": "AHU Code",
+      "itemKey": "D",
+      "itemName": "옵션",
+      "seq": 3,
+      "value": "H2",
+      "description": "히트 펌프"
+    },
+    {
+      "group": "AHU Code",
+      "itemKey": "E",
+      "itemName": "재질",
+      "seq": 1,
+      "value": "SS",
+      "description": "스테인리스"
+    },
+    {
+      "group": "AHU Code",
+      "itemKey": "E",
+      "itemName": "재질",
+      "seq": 2,
+      "value": "AL",
+      "description": "알루미늄"
+    },
+    {
+      "group": "AHU Code",
+      "itemKey": "F",
+      "itemName": "슬롯 순번",
+      "seq": 1,
+      "value": "1-21-13-15",
+      "description": "1-21-13-15"
+    },
+    {
+      "group": "AHU Code",
+      "itemKey": "F",
+      "itemName": "슬롯 순번",
+      "seq": 2,
+      "value": "1-21-13-16",
+      "description": "1-21-13-16"
+    },
+    {
+      "group": "AHU Code",
+      "itemKey": "F",
+      "itemName": "슬롯 순번",
+      "seq": 3,
+      "value": "2-11-08-04",
+      "description": "2-11-08-04"
+    }
+  ],
+  "productCodes": [
+    {
+      "code": "EU",
+      "name": "AHU (공기조화기)",
+      "kind": "product",
+      "category": "Product Code/AHU",
+      "unit": "set",
+      "specTemplate": "",
+      "materialTemplate": "",
+      "tables": {
+        "cap": {
+          "by": "B",
+          "default": "10",
+          "rows": {
+            "10": {
+              "fanKw": 3.7,
+              "coilRows": 4,
+              "panelMm": 25,
+              "face": 1054,
+              "face08": 843,
+              "filterQty": 4,
+              "panelCost": 48000,
+              "coilCost": 860000,
+              "fanCost": 872400,
+              "vfdCost": 387700,
+              "rotorDia": 1159,
+              "rotorCost": 1580000,
+              "humidKgh": 6,
+              "humidCost": 610000,
+              "hpCost": 1130000
+            },
+            "12": {
+              "fanKw": 5.5,
+              "coilRows": 4,
+              "panelMm": 25,
+              "face": 1155,
+              "face08": 924,
+              "filterQty": 4,
+              "panelCost": 48000,
+              "coilCost": 872000,
+              "fanCost": 966000,
+              "vfdCost": 425500,
+              "rotorDia": 1271,
+              "rotorCost": 1616000,
+              "humidKgh": 7,
+              "humidCost": 628000,
+              "hpCost": 1160000
+            },
+            "25": {
+              "fanKw": 11,
+              "coilRows": 6,
+              "panelMm": 50,
+              "face": 1667,
+              "face08": 1334,
+              "filterQty": 8,
+              "panelCost": 96000,
+              "coilCost": 1140000,
+              "fanCost": 1252000,
+              "vfdCost": 541000,
+              "rotorDia": 1834,
+              "rotorCost": 1850000,
+              "humidKgh": 15,
+              "humidCost": 745000,
+              "hpCost": 1355000
+            },
+            "55": {
+              "fanKw": 22,
+              "coilRows": 8,
+              "panelMm": 50,
+              "face": 2472,
+              "face08": 1978,
+              "filterQty": 18,
+              "panelCost": 96000,
+              "coilCost": 1510000,
+              "fanCost": 1824000,
+              "vfdCost": 772000,
+              "rotorDia": 2719,
+              "rotorCost": 2390000,
+              "humidKgh": 33,
+              "humidCost": 1015000,
+              "hpCost": 1805000
+            }
+          }
+        },
+        "opt": {
+          "by": "D",
+          "default": "",
+          "rows": {
+            "630": {
+              "sections": 5,
+              "length": 4500,
+              "frameCost": 322500,
+              "panelQty": 20
+            },
+            "": {
+              "sections": 4,
+              "length": 3600,
+              "frameCost": 282000,
+              "panelQty": 16
+            },
+            "A1": {
+              "sections": 5,
+              "length": 4500,
+              "frameCost": 322500,
+              "panelQty": 20
+            },
+            "H2": {
+              "sections": 5,
+              "length": 4500,
+              "frameCost": 322500,
+              "panelQty": 20
+            }
+          }
+        },
+        "mat": {
+          "by": "E",
+          "default": "",
+          "rows": {
+            "": {
+              "label": "GI",
+              "mf": 1
+            },
+            "SS": {
+              "label": "SUS304",
+              "mf": 1.6
+            },
+            "AL": {
+              "label": "AL",
+              "mf": 1.35
+            }
+          }
+        }
+      },
+      "sections": [
+        {
+          "name": "Mixing"
+        },
+        {
+          "name": "Filter"
+        },
+        {
+          "name": "Rotor",
+          "when": {
+            "slot": "D",
+            "eq": "630"
+          }
+        },
+        {
+          "name": "Coil"
+        },
+        {
+          "name": "Humid.",
+          "when": {
+            "slot": "D",
+            "eq": "A1"
+          }
+        },
+        {
+          "name": "HeatPump",
+          "when": {
+            "slot": "D",
+            "eq": "H2"
+          }
+        },
+        {
+          "name": "Fan"
+        }
+      ]
+    },
+    {
+      "code": "ER",
+      "name": "환기 유닛",
+      "kind": "product",
+      "category": "Product Code/AHU",
+      "unit": "set",
+      "specTemplate": "",
+      "materialTemplate": "",
+      "tables": {
+        "cap": {
+          "by": "B",
+          "default": "10",
+          "rows": {
+            "10": {
+              "fanKw": 3.7,
+              "coilRows": 4,
+              "panelMm": 25,
+              "face": 1054,
+              "face08": 843,
+              "filterQty": 4,
+              "panelCost": 48000,
+              "coilCost": 860000,
+              "fanCost": 872400,
+              "vfdCost": 387700,
+              "rotorDia": 1159,
+              "rotorCost": 1580000,
+              "humidKgh": 6,
+              "humidCost": 610000,
+              "hpCost": 1130000
+            },
+            "12": {
+              "fanKw": 5.5,
+              "coilRows": 4,
+              "panelMm": 25,
+              "face": 1155,
+              "face08": 924,
+              "filterQty": 4,
+              "panelCost": 48000,
+              "coilCost": 872000,
+              "fanCost": 966000,
+              "vfdCost": 425500,
+              "rotorDia": 1271,
+              "rotorCost": 1616000,
+              "humidKgh": 7,
+              "humidCost": 628000,
+              "hpCost": 1160000
+            },
+            "25": {
+              "fanKw": 11,
+              "coilRows": 6,
+              "panelMm": 50,
+              "face": 1667,
+              "face08": 1334,
+              "filterQty": 8,
+              "panelCost": 96000,
+              "coilCost": 1140000,
+              "fanCost": 1252000,
+              "vfdCost": 541000,
+              "rotorDia": 1834,
+              "rotorCost": 1850000,
+              "humidKgh": 15,
+              "humidCost": 745000,
+              "hpCost": 1355000
+            },
+            "55": {
+              "fanKw": 22,
+              "coilRows": 8,
+              "panelMm": 50,
+              "face": 2472,
+              "face08": 1978,
+              "filterQty": 18,
+              "panelCost": 96000,
+              "coilCost": 1510000,
+              "fanCost": 1824000,
+              "vfdCost": 772000,
+              "rotorDia": 2719,
+              "rotorCost": 2390000,
+              "humidKgh": 33,
+              "humidCost": 1015000,
+              "hpCost": 1805000
+            }
+          }
+        },
+        "opt": {
+          "by": "D",
+          "default": "",
+          "rows": {
+            "630": {
+              "sections": 5,
+              "length": 4500,
+              "frameCost": 322500,
+              "panelQty": 20
+            },
+            "": {
+              "sections": 4,
+              "length": 3600,
+              "frameCost": 282000,
+              "panelQty": 16
+            },
+            "A1": {
+              "sections": 5,
+              "length": 4500,
+              "frameCost": 322500,
+              "panelQty": 20
+            },
+            "H2": {
+              "sections": 5,
+              "length": 4500,
+              "frameCost": 322500,
+              "panelQty": 20
+            }
+          }
+        },
+        "mat": {
+          "by": "E",
+          "default": "",
+          "rows": {
+            "": {
+              "label": "GI",
+              "mf": 1
+            },
+            "SS": {
+              "label": "SUS304",
+              "mf": 1.6
+            },
+            "AL": {
+              "label": "AL",
+              "mf": 1.35
+            }
+          }
+        }
+      },
+      "sections": [
+        {
+          "name": "Mixing"
+        },
+        {
+          "name": "Filter"
+        },
+        {
+          "name": "Rotor",
+          "when": {
+            "slot": "D",
+            "eq": "630"
+          }
+        },
+        {
+          "name": "Coil"
+        },
+        {
+          "name": "Humid.",
+          "when": {
+            "slot": "D",
+            "eq": "A1"
+          }
+        },
+        {
+          "name": "HeatPump",
+          "when": {
+            "slot": "D",
+            "eq": "H2"
+          }
+        },
+        {
+          "name": "Fan"
+        }
+      ]
+    },
+    {
+      "code": "EC",
+      "name": "냉각 코일 유닛",
+      "kind": "product",
+      "category": "Product Code/AHU",
+      "unit": "set",
+      "specTemplate": "",
+      "materialTemplate": "",
+      "tables": {
+        "cap": {
+          "by": "B",
+          "default": "10",
+          "rows": {
+            "10": {
+              "fanKw": 3.7,
+              "coilRows": 4,
+              "panelMm": 25,
+              "face": 1054,
+              "face08": 843,
+              "filterQty": 4,
+              "panelCost": 48000,
+              "coilCost": 860000,
+              "fanCost": 872400,
+              "vfdCost": 387700,
+              "rotorDia": 1159,
+              "rotorCost": 1580000,
+              "humidKgh": 6,
+              "humidCost": 610000,
+              "hpCost": 1130000
+            },
+            "12": {
+              "fanKw": 5.5,
+              "coilRows": 4,
+              "panelMm": 25,
+              "face": 1155,
+              "face08": 924,
+              "filterQty": 4,
+              "panelCost": 48000,
+              "coilCost": 872000,
+              "fanCost": 966000,
+              "vfdCost": 425500,
+              "rotorDia": 1271,
+              "rotorCost": 1616000,
+              "humidKgh": 7,
+              "humidCost": 628000,
+              "hpCost": 1160000
+            },
+            "25": {
+              "fanKw": 11,
+              "coilRows": 6,
+              "panelMm": 50,
+              "face": 1667,
+              "face08": 1334,
+              "filterQty": 8,
+              "panelCost": 96000,
+              "coilCost": 1140000,
+              "fanCost": 1252000,
+              "vfdCost": 541000,
+              "rotorDia": 1834,
+              "rotorCost": 1850000,
+              "humidKgh": 15,
+              "humidCost": 745000,
+              "hpCost": 1355000
+            },
+            "55": {
+              "fanKw": 22,
+              "coilRows": 8,
+              "panelMm": 50,
+              "face": 2472,
+              "face08": 1978,
+              "filterQty": 18,
+              "panelCost": 96000,
+              "coilCost": 1510000,
+              "fanCost": 1824000,
+              "vfdCost": 772000,
+              "rotorDia": 2719,
+              "rotorCost": 2390000,
+              "humidKgh": 33,
+              "humidCost": 1015000,
+              "hpCost": 1805000
+            }
+          }
+        },
+        "opt": {
+          "by": "D",
+          "default": "",
+          "rows": {
+            "630": {
+              "sections": 5,
+              "length": 4500,
+              "frameCost": 322500,
+              "panelQty": 20
+            },
+            "": {
+              "sections": 4,
+              "length": 3600,
+              "frameCost": 282000,
+              "panelQty": 16
+            },
+            "A1": {
+              "sections": 5,
+              "length": 4500,
+              "frameCost": 322500,
+              "panelQty": 20
+            },
+            "H2": {
+              "sections": 5,
+              "length": 4500,
+              "frameCost": 322500,
+              "panelQty": 20
+            }
+          }
+        },
+        "mat": {
+          "by": "E",
+          "default": "",
+          "rows": {
+            "": {
+              "label": "GI",
+              "mf": 1
+            },
+            "SS": {
+              "label": "SUS304",
+              "mf": 1.6
+            },
+            "AL": {
+              "label": "AL",
+              "mf": 1.35
+            }
+          }
+        }
+      },
+      "sections": [
+        {
+          "name": "Mixing"
+        },
+        {
+          "name": "Filter"
+        },
+        {
+          "name": "Rotor",
+          "when": {
+            "slot": "D",
+            "eq": "630"
+          }
+        },
+        {
+          "name": "Coil"
+        },
+        {
+          "name": "Humid.",
+          "when": {
+            "slot": "D",
+            "eq": "A1"
+          }
+        },
+        {
+          "name": "HeatPump",
+          "when": {
+            "slot": "D",
+            "eq": "H2"
+          }
+        },
+        {
+          "name": "Fan"
+        }
+      ]
+    },
+    {
+      "code": "KCP 1",
+      "name": "Panel (double skin)",
+      "kind": "part",
+      "category": "Specification/Casing",
+      "unit": "ea",
+      "specTemplate": "{cap.panelMm}T {cap.face}×{cap.face} · 칼라강판 0.8T/아연도(G.I) 강판 0.8T · G/Wool 48K 50T",
+      "materialTemplate": "{mat.label}",
+      "tables": {}
+    },
+    {
+      "code": "KCB 1",
+      "name": "Base frame",
+      "kind": "part",
+      "category": "Specification/Casing",
+      "unit": "set",
+      "specTemplate": "L{opt.length} C-channel · Steel 1.6t Forming 분체소부도장 · AL 다이케스팅",
+      "materialTemplate": "SS400",
+      "tables": {}
+    },
+    {
+      "code": "KMD 1",
+      "name": "Mixing damper",
+      "kind": "part",
+      "category": "Specification/Damper",
+      "unit": "ea",
+      "specTemplate": "{cap.face}×600 opposed · OA/EA/BYPASS Link식 SGCC 1.6T/AL 1.2T · 5~7 m/s 이하",
+      "materialTemplate": "{mat.label}",
+      "tables": {}
+    },
+    {
+      "code": "PFP 1",
+      "name": "Pre filter",
+      "kind": "purchase",
+      "category": "General Purchase items/Filter",
+      "unit": "ea",
+      "specTemplate": "MERV 8 592×592×50",
+      "materialTemplate": "Synthetic",
+      "tables": {}
+    },
+    {
+      "code": "PFB 1",
+      "name": "Bag filter",
+      "kind": "purchase",
+      "category": "General Purchase items/Filter",
+      "unit": "ea",
+      "specTemplate": "MERV 13 592×592×600",
+      "materialTemplate": "Glass fiber",
+      "tables": {}
+    },
+    {
+      "code": "KCC 1",
+      "name": "Cooling coil",
+      "kind": "part",
+      "category": "Specification/Coil",
+      "unit": "ea",
+      "specTemplate": "{cap.coilRows}R {cap.face}×{cap.face08} · AL Fin 8FPI 0.12mmT · Cu 1/2\"×0.5mmT · Frame SGCC 1.6T",
+      "materialTemplate": "Cu/Al",
+      "tables": {}
+    },
+    {
+      "code": "KCD 1",
+      "name": "Drain pan",
+      "kind": "part",
+      "category": "Specification/Coil",
+      "unit": "ea",
+      "specTemplate": "{cap.face}×600 SUS",
+      "materialTemplate": "SUS304",
+      "tables": {}
+    },
+    {
+      "code": "KFP 1",
+      "name": "Plug fan",
+      "kind": "part",
+      "category": "Specification/Fan",
+      "unit": "ea",
+      "specTemplate": "{cap.fanKw}kW 380V 4P IE3 · EURUS 에어포일 · AMCA Seal · 효성모터",
+      "materialTemplate": "AL impeller",
+      "tables": {}
+    },
+    {
+      "code": "PVF 1",
+      "name": "Inverter",
+      "kind": "purchase",
+      "category": "General Purchase items/Drive",
+      "unit": "ea",
+      "specTemplate": "{cap.fanKw}kW VFD",
+      "materialTemplate": "—",
+      "tables": {}
+    },
+    {
+      "code": "KHR 1",
+      "name": "Heat recovery rotor",
+      "kind": "part",
+      "category": "Specification/Rotor",
+      "unit": "ea",
+      "specTemplate": "Ø{cap.rotorDia} sensible",
+      "materialTemplate": "AL",
+      "tables": {}
+    },
+    {
+      "code": "PSH 1",
+      "name": "Steam humidifier",
+      "kind": "purchase",
+      "category": "General Purchase items/Humidifier",
+      "unit": "ea",
+      "specTemplate": "{cap.humidKgh} kg/h",
+      "materialTemplate": "SUS304",
+      "tables": {}
+    },
+    {
+      "code": "KHP 1",
+      "name": "DX heat pump coil",
+      "kind": "part",
+      "category": "Specification/Coil",
+      "unit": "ea",
+      "specTemplate": "{cap.coilRows}R {cap.face}×{cap.face08}",
+      "materialTemplate": "Cu/Al",
+      "tables": {}
+    },
+    {
+      "code": "PVI 1",
+      "name": "Vibration isolator",
+      "kind": "purchase",
+      "category": "General Purchase items/Mount",
+      "unit": "ea",
+      "specTemplate": "for {macro} kg (macro)",
+      "materialTemplate": "Rubber/SS",
+      "tables": {}
+    }
+  ],
+  "relationships": [
+    {
+      "parent": "EU",
+      "child": "KCP 1",
+      "seq": 10,
+      "section": "Casing",
+      "qty": {
+        "ref": "opt.panelQty"
+      },
+      "unitCost": {
+        "ref": "cap.panelCost",
+        "scale": "mat.mf"
+      },
+      "remarks": "섹션 수 × 4"
+    },
+    {
+      "parent": "EU",
+      "child": "KCB 1",
+      "seq": 20,
+      "section": "Casing",
+      "qty": {
+        "lit": 1
+      },
+      "unitCost": {
+        "ref": "opt.frameCost"
+      }
+    },
+    {
+      "parent": "EU",
+      "child": "KMD 1",
+      "seq": 30,
+      "section": "Mixing",
+      "qty": {
+        "lit": 2
+      },
+      "unitCost": {
+        "lit": 85000,
+        "scale": "mat.mf"
+      }
+    },
+    {
+      "parent": "EU",
+      "child": "PFP 1",
+      "seq": 40,
+      "section": "Filter",
+      "qty": {
+        "ref": "cap.filterQty"
+      },
+      "unitCost": {
+        "lit": 18000
+      }
+    },
+    {
+      "parent": "EU",
+      "child": "PFB 1",
+      "seq": 50,
+      "section": "Filter",
+      "qty": {
+        "ref": "cap.filterQty"
+      },
+      "unitCost": {
+        "lit": 62000
+      }
+    },
+    {
+      "parent": "EU",
+      "child": "KHR 1",
+      "seq": 55,
+      "section": "Rotor",
+      "qty": {
+        "lit": 1
+      },
+      "unitCost": {
+        "ref": "cap.rotorCost"
+      },
+      "when": {
+        "slot": "D",
+        "eq": "630"
+      },
+      "remarks": "옵션 630"
+    },
+    {
+      "parent": "EU",
+      "child": "KCC 1",
+      "seq": 60,
+      "section": "Coil",
+      "qty": {
+        "lit": 1
+      },
+      "unitCost": {
+        "ref": "cap.coilCost"
+      }
+    },
+    {
+      "parent": "EU",
+      "child": "KCD 1",
+      "seq": 70,
+      "section": "Coil",
+      "qty": {
+        "lit": 1
+      },
+      "unitCost": {
+        "lit": 68000
+      }
+    },
+    {
+      "parent": "EU",
+      "child": "PSH 1",
+      "seq": 72,
+      "section": "Humid.",
+      "qty": {
+        "lit": 1
+      },
+      "unitCost": {
+        "ref": "cap.humidCost"
+      },
+      "when": {
+        "slot": "D",
+        "eq": "A1"
+      },
+      "remarks": "옵션 A1"
+    },
+    {
+      "parent": "EU",
+      "child": "KHP 1",
+      "seq": 74,
+      "section": "HeatPump",
+      "qty": {
+        "lit": 1
+      },
+      "unitCost": {
+        "ref": "cap.hpCost"
+      },
+      "when": {
+        "slot": "D",
+        "eq": "H2"
+      },
+      "remarks": "옵션 H2"
+    },
+    {
+      "parent": "EU",
+      "child": "KFP 1",
+      "seq": 80,
+      "section": "Fan",
+      "qty": {
+        "lit": 1
+      },
+      "unitCost": {
+        "ref": "cap.fanCost"
+      }
+    },
+    {
+      "parent": "EU",
+      "child": "PVF 1",
+      "seq": 90,
+      "section": "Fan",
+      "qty": {
+        "lit": 1
+      },
+      "unitCost": {
+        "ref": "cap.vfdCost"
+      }
+    },
+    {
+      "parent": "EU",
+      "child": "PVI 1",
+      "seq": 100,
+      "section": "Fan",
+      "qty": {
+        "lit": 4
+      },
+      "unitCost": {
+        "lit": 12000
+      },
+      "when": {
+        "macro": true
+      },
+      "remarks": "승인 매크로 값이 있을 때"
+    },
+    {
+      "parent": "ER",
+      "child": "KCP 1",
+      "seq": 10,
+      "section": "Casing",
+      "qty": {
+        "ref": "opt.panelQty"
+      },
+      "unitCost": {
+        "ref": "cap.panelCost",
+        "scale": "mat.mf"
+      },
+      "remarks": "섹션 수 × 4"
+    },
+    {
+      "parent": "ER",
+      "child": "KCB 1",
+      "seq": 20,
+      "section": "Casing",
+      "qty": {
+        "lit": 1
+      },
+      "unitCost": {
+        "ref": "opt.frameCost"
+      }
+    },
+    {
+      "parent": "ER",
+      "child": "KMD 1",
+      "seq": 30,
+      "section": "Mixing",
+      "qty": {
+        "lit": 2
+      },
+      "unitCost": {
+        "lit": 85000,
+        "scale": "mat.mf"
+      }
+    },
+    {
+      "parent": "ER",
+      "child": "PFP 1",
+      "seq": 40,
+      "section": "Filter",
+      "qty": {
+        "ref": "cap.filterQty"
+      },
+      "unitCost": {
+        "lit": 18000
+      }
+    },
+    {
+      "parent": "ER",
+      "child": "PFB 1",
+      "seq": 50,
+      "section": "Filter",
+      "qty": {
+        "ref": "cap.filterQty"
+      },
+      "unitCost": {
+        "lit": 62000
+      }
+    },
+    {
+      "parent": "ER",
+      "child": "KHR 1",
+      "seq": 55,
+      "section": "Rotor",
+      "qty": {
+        "lit": 1
+      },
+      "unitCost": {
+        "ref": "cap.rotorCost"
+      },
+      "when": {
+        "slot": "D",
+        "eq": "630"
+      },
+      "remarks": "옵션 630"
+    },
+    {
+      "parent": "ER",
+      "child": "KCC 1",
+      "seq": 60,
+      "section": "Coil",
+      "qty": {
+        "lit": 1
+      },
+      "unitCost": {
+        "ref": "cap.coilCost"
+      }
+    },
+    {
+      "parent": "ER",
+      "child": "KCD 1",
+      "seq": 70,
+      "section": "Coil",
+      "qty": {
+        "lit": 1
+      },
+      "unitCost": {
+        "lit": 68000
+      }
+    },
+    {
+      "parent": "ER",
+      "child": "PSH 1",
+      "seq": 72,
+      "section": "Humid.",
+      "qty": {
+        "lit": 1
+      },
+      "unitCost": {
+        "ref": "cap.humidCost"
+      },
+      "when": {
+        "slot": "D",
+        "eq": "A1"
+      },
+      "remarks": "옵션 A1"
+    },
+    {
+      "parent": "ER",
+      "child": "KHP 1",
+      "seq": 74,
+      "section": "HeatPump",
+      "qty": {
+        "lit": 1
+      },
+      "unitCost": {
+        "ref": "cap.hpCost"
+      },
+      "when": {
+        "slot": "D",
+        "eq": "H2"
+      },
+      "remarks": "옵션 H2"
+    },
+    {
+      "parent": "ER",
+      "child": "KFP 1",
+      "seq": 80,
+      "section": "Fan",
+      "qty": {
+        "lit": 1
+      },
+      "unitCost": {
+        "ref": "cap.fanCost"
+      }
+    },
+    {
+      "parent": "ER",
+      "child": "PVF 1",
+      "seq": 90,
+      "section": "Fan",
+      "qty": {
+        "lit": 1
+      },
+      "unitCost": {
+        "ref": "cap.vfdCost"
+      }
+    },
+    {
+      "parent": "ER",
+      "child": "PVI 1",
+      "seq": 100,
+      "section": "Fan",
+      "qty": {
+        "lit": 4
+      },
+      "unitCost": {
+        "lit": 12000
+      },
+      "when": {
+        "macro": true
+      },
+      "remarks": "승인 매크로 값이 있을 때"
+    },
+    {
+      "parent": "EC",
+      "child": "KCP 1",
+      "seq": 10,
+      "section": "Casing",
+      "qty": {
+        "ref": "opt.panelQty"
+      },
+      "unitCost": {
+        "ref": "cap.panelCost",
+        "scale": "mat.mf"
+      },
+      "remarks": "섹션 수 × 4"
+    },
+    {
+      "parent": "EC",
+      "child": "KCB 1",
+      "seq": 20,
+      "section": "Casing",
+      "qty": {
+        "lit": 1
+      },
+      "unitCost": {
+        "ref": "opt.frameCost"
+      }
+    },
+    {
+      "parent": "EC",
+      "child": "KMD 1",
+      "seq": 30,
+      "section": "Mixing",
+      "qty": {
+        "lit": 2
+      },
+      "unitCost": {
+        "lit": 85000,
+        "scale": "mat.mf"
+      }
+    },
+    {
+      "parent": "EC",
+      "child": "PFP 1",
+      "seq": 40,
+      "section": "Filter",
+      "qty": {
+        "ref": "cap.filterQty"
+      },
+      "unitCost": {
+        "lit": 18000
+      }
+    },
+    {
+      "parent": "EC",
+      "child": "PFB 1",
+      "seq": 50,
+      "section": "Filter",
+      "qty": {
+        "ref": "cap.filterQty"
+      },
+      "unitCost": {
+        "lit": 62000
+      }
+    },
+    {
+      "parent": "EC",
+      "child": "KHR 1",
+      "seq": 55,
+      "section": "Rotor",
+      "qty": {
+        "lit": 1
+      },
+      "unitCost": {
+        "ref": "cap.rotorCost"
+      },
+      "when": {
+        "slot": "D",
+        "eq": "630"
+      },
+      "remarks": "옵션 630"
+    },
+    {
+      "parent": "EC",
+      "child": "KCC 1",
+      "seq": 60,
+      "section": "Coil",
+      "qty": {
+        "lit": 1
+      },
+      "unitCost": {
+        "ref": "cap.coilCost"
+      }
+    },
+    {
+      "parent": "EC",
+      "child": "KCD 1",
+      "seq": 70,
+      "section": "Coil",
+      "qty": {
+        "lit": 1
+      },
+      "unitCost": {
+        "lit": 68000
+      }
+    },
+    {
+      "parent": "EC",
+      "child": "PSH 1",
+      "seq": 72,
+      "section": "Humid.",
+      "qty": {
+        "lit": 1
+      },
+      "unitCost": {
+        "ref": "cap.humidCost"
+      },
+      "when": {
+        "slot": "D",
+        "eq": "A1"
+      },
+      "remarks": "옵션 A1"
+    },
+    {
+      "parent": "EC",
+      "child": "KHP 1",
+      "seq": 74,
+      "section": "HeatPump",
+      "qty": {
+        "lit": 1
+      },
+      "unitCost": {
+        "ref": "cap.hpCost"
+      },
+      "when": {
+        "slot": "D",
+        "eq": "H2"
+      },
+      "remarks": "옵션 H2"
+    },
+    {
+      "parent": "EC",
+      "child": "KFP 1",
+      "seq": 80,
+      "section": "Fan",
+      "qty": {
+        "lit": 1
+      },
+      "unitCost": {
+        "ref": "cap.fanCost"
+      }
+    },
+    {
+      "parent": "EC",
+      "child": "PVF 1",
+      "seq": 90,
+      "section": "Fan",
+      "qty": {
+        "lit": 1
+      },
+      "unitCost": {
+        "ref": "cap.vfdCost"
+      }
+    },
+    {
+      "parent": "EC",
+      "child": "PVI 1",
+      "seq": 100,
+      "section": "Fan",
+      "qty": {
+        "lit": 4
+      },
+      "unitCost": {
+        "lit": 12000
+      },
+      "when": {
+        "macro": true
+      },
+      "remarks": "승인 매크로 값이 있을 때"
+    }
+  ]
+}

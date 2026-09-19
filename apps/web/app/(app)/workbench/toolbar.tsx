@@ -72,7 +72,8 @@ export function Toolbar({
           {primary.map((m) => (
             <Link
               key={m.key}
-              href={`/m/${m.key}`}
+              href={m.key === "plm" ? "/setup" : `/m/${m.key}`}
+              data-nav={m.key}
               style={{
                 fontSize: "var(--fs-13)",
                 color: ["cpq", "plm"].includes(m.key) ? "var(--ink)" : "var(--ink-muted)",

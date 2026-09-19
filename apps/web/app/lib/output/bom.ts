@@ -2,7 +2,12 @@ import type { SlotValues } from "../rccs";
 import { SAMPLE_TABLES, SAMPLE_VARS, codesFromSlots } from "../macro/provider";
 
 /**
- * M3 — deterministic output layer. Given the assembled RCCS slots (and, when
+ * M3 — deterministic output layer.
+ *
+ * P1 (2026-09-19): `buildBom` is NO LONGER the runtime BOM. The BOM now comes from
+ * registered codes (@edim/bom-code + Set-Up DB). This function is kept only as the
+ * regression oracle (test/bom-code-regression.test.ts). buildEbom/buildCost stay in use.
+ * Given the assembled RCCS slots (and, when
  * present, the approved-macro value), produce the Item BOM, the section-grouped
  * EBOM, and the cost roll-up. Pure: same slots → same BOM → same cost.
  * Unit costs are SAMPLE values (KRW); real price tables bind later.
@@ -97,8 +102,9 @@ export function buildBom(slots: SlotValues, macroValue?: number | null): BomLine
 }
 
 export interface EbomGroup { section: string; items: BomLine[]; subtotal: number }
-export function buildEbom(lines: BomLine[], slots: SlotValues): EbomGroup[] {
-  const order = ["Casing", ...sectionsOf(slots)];
+/** `sections` = the registered section order of the product code (P1); falls back to the M3 slot rule. */
+export function buildEbom(lines: BomLine[], slots: SlotValues, sections?: string[]): EbomGroup[] {
+  const order = ["Casing", ...(sections ?? sectionsOf(slots))];
   const groups = new Map<string, BomLine[]>();
   for (const l of lines) groups.set(l.section, [...(groups.get(l.section) ?? []), l]);
   return order.filter((s) => groups.has(s)).map((section) => {

@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getServerSession } from "@/app/lib/session";
 import { canEditProject } from "@/app/lib/project-perms";
 import { assembleCode, type SlotValues } from "@/app/lib/rccs";
+import { loadSlotDefs } from "@/app/lib/catalog";
 import { withTenant, listRevisions, saveRevision, revLabel } from "@edim/db";
 
 /**
@@ -35,7 +36,7 @@ export async function POST(req: NextRequest) {
   const node = typeof body.node === "string" ? body.node : "";
   if (!UUID.test(node)) return NextResponse.json({ error: "node required" }, { status: 400 });
   const slots = (body.slots && typeof body.slots === "object" ? body.slots : {}) as SlotValues;
-  const assembled = assembleCode(slots);
+  const assembled = assembleCode(slots, await loadSlotDefs(session.tenantId));
   if (!assembled.ok) return NextResponse.json({ error: "invalid code", diagnostics: assembled.diagnostics }, { status: 422 });
   const clean: Record<string, string> = {};
   for (const [k, v] of Object.entries(slots)) if (typeof v === "string" && v) clean[k] = v;

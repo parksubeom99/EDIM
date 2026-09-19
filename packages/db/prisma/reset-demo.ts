@@ -22,10 +22,11 @@ async function resetDemo(): Promise<void> {
   const t = IDS.tenantA;
   const rev = await adminPrisma.codeRevision.deleteMany({ where: { tenantId: t } });
   const mac = await adminPrisma.macroRegistry.deleteMany({ where: { tenantId: t } });
+  const run = await adminPrisma.bomCodeRun.deleteMany({ where: { tenantId: t } });
   const aud = await adminPrisma.auditLog.deleteMany({ where: { tenantId: t } });
-  console.log(`Demo reset: removed ${rev.count} code revisions, ${mac.count} macros, ${aud.count} audit rows.`);
+  console.log(`Demo reset: removed ${rev.count} code revisions, ${mac.count} macros, ${run.count} BOM run snapshots, ${aud.count} audit rows.`);
   await seedAll();
-  await seedDemo();
+  await seedDemo({ forceCatalog: true }); // 시연 중 고친 표·관계를 원상 복구
   console.log("Demo reset complete — first save will be Rev A, approved macro is back to the seeded revision.");
 }
 

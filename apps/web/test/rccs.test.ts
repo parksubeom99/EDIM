@@ -53,3 +53,23 @@ describe("parseCode", () => {
     expect(parseCode("EU-55-2123-A1SS-1-21-13-15")).toEqual({ A: "EU", B: "55", C: "2123", D: "A1", E: "SS", F: "1-21-13-15" });
   });
 });
+
+import { slotDefsFromSubCodes } from "../app/lib/rccs";
+import demo from "@edim/bom-code/catalog/ahu-demo.json";
+
+describe("P1 — Code Builder choices come from registered Sub Codes (p31)", () => {
+  const defs = slotDefsFromSubCodes(demo.subCodes);
+  it("the demo registration reproduces the sample catalog exactly (labels included)", () => {
+    expect(defs).toEqual(RCCS_SLOTS);
+  });
+  it("a newly registered sub item becomes a valid choice; an unregistered one stays an error", () => {
+    const more = slotDefsFromSubCodes([...demo.subCodes, { itemKey: "B", itemName: "용량", seq: 5, value: "80", description: "80,000 CMH" }]);
+    expect(assembleCode({ A: "EU", B: "80", C: "2123" }, more).ok).toBe(true);
+    expect(assembleCode({ A: "EU", B: "80", C: "2123" }, defs).ok).toBe(false);
+    expect(more.find((d) => d.key === "B")?.options.at(-1)).toEqual({ value: "80", label: "80 · 80,000 CMH" });
+  });
+  it("optional items keep the 'none' choice; an empty tenant falls back to the samples", () => {
+    expect(defs.find((d) => d.key === "D")?.options[0]?.value).toBe("");
+    expect(slotDefsFromSubCodes([])).toEqual(RCCS_SLOTS);
+  });
+});

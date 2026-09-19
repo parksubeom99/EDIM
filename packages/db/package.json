@@ -20,7 +20,9 @@
     "hierarchy:test": "dotenv -e ../../.env -- tsx prisma/hierarchy-test.ts",
     "macro:test": "dotenv -e ../../.env -- tsx prisma/macro-registry-test.ts",
     "project:test": "dotenv -e ../../.env -- tsx prisma/project-test.ts",
-    "revision:test": "dotenv -e ../../.env -- tsx prisma/code-revision-test.ts"
+    "revision:test": "dotenv -e ../../.env -- tsx prisma/code-revision-test.ts",
+    "seed:catalog": "dotenv -e ../../.env -- tsx prisma/seed-catalog.ts",
+    "backbone:test": "dotenv -e ../../.env -- tsx prisma/code-backbone-test.ts"
   },
   "dependencies": {
     "@edim/core-ontology": "workspace:*",
