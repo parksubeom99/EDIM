@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""EDIM beta demo E2E — 발표 시나리오 완주 스크립트 (M1 D·M2 E·M3 F + P1 코드 기반 등뼈 통합).
+"""EDIM beta demo E2E — 발표 시나리오 완주 스크립트 (M1 D·M2 E·M3 F + P1 코드 기반 등뼈 + P2 Toolbox 통합).
 사용: python3 demo_e2e.py [base_url] [shots_dir]"""
 import sys,time,json,re
 from playwright.sync_api import sync_playwright
@@ -79,6 +79,31 @@ with sync_playwright() as p:
     opt=pg.query_selector("select[data-slot=B] option[value='80']"); ok("S12a newly registered Sub Code (B:80) appears in the Code Builder", bool(opt), opt); pg.screenshot(path=f"{OUT}/23_codebuilder_from_subcode.png")
     r=ctx.request.post(BASE+"/api/setup/part-list-run",headers=J,data=json.dumps({"slots":{"A":"EU","B":"80","C":"2123"}})); ok("S12b B=80 has no table row yet → BOM refused with the reason (422), not borrowed numbers", r.status, r.status==422 and "B='80'" in r.text())
     if sid: ctx.request.delete(BASE+"/api/setup/sub-codes?id="+sid)
+    # ── P2 EDIM Toolbox = 별도 플로팅 창 (p25 UI Tool · p27 Program Tool) ─────────────────
+    pg.goto(BASE+"/workbench?node=a0000000-0000-4000-8000-000000000004",wait_until="domcontentloaded"); pg.wait_for_selector("text=Code Builder",timeout=30000); time.sleep(1.5); nuke(pg)
+    pg.evaluate("['edim.toolbox.geo.v1','edim.toolbox.commands.v1','edim.toolbox.open.v1'].forEach(k=>localStorage.removeItem(k))")
+    pg.click("[data-testid=toolbox-toggle]"); pg.wait_for_selector("[data-testid=toolbox-window]"); time.sleep(0.8)
+    tb=pg.locator("[data-testid=toolbox-window]").bounding_box(); ctr=pg.locator("[data-testid=code-builder]").bounding_box()
+    clear=tb["x"]>=ctr["x"]+ctr["width"]-4; ok("S13a Toolbox opens as a floating window that does not cover the centre work area", (round(tb["x"]),round(ctr["x"]+ctr["width"])), clear)
+    txt=pg.inner_text("[data-testid=tb-description]"); ok("S13b Description = deterministic back-translation of the macro (회사 말 이름 포함)", txt[:40], "용량(CAP)" in txt and "팬 모터 kW" in txt and "안전율" in txt)
+    nflow=len(pg.query_selector_all("[data-testid=tb-flow] [data-flow=decision]")); ok("S13c Flowchart drawn from the same macro (1 decision, 2 branches)", nflow, nflow==1 and len(pg.query_selector_all("[data-testid=tb-flow] [data-flow=process]"))==2)
+    pg.fill("[data-testid=tb-dsl]","=IF(CAP>25, 1"); time.sleep(1.0); txt=pg.inner_text("[data-testid=tb-description]"); ok("S13d a broken macro is reported, not guessed", txt[:30], "읽을 수 없습니다" in txt)
+    pg.fill("[data-testid=tb-dsl]","=IF(CAP,CAP>25, SUM(Table1(A,4:4))*Var(NS,15)*Var(NS,20), SUM(Table1(A,1:1))*Var(NS,20))"); time.sleep(0.8)
+    pg.click("[data-testid=tb-run]"); time.sleep(3); v=pg.inner_text("[data-testid=tb-value]"); st=pg.inner_text("[data-testid=run-status]")
+    ok("S13e Run in the Toolbox IS the MainForm run: value 455.4 in both", (v, st[:24]), "455.4" in v and "455.4" in st); pg.screenshot(path=f"{OUT}/30_toolbox_program.png")
+    pg.fill("[data-testid=tb-prompt]","용량이 25를 넘으면 4행 팬 kW에 안전율을 곱한다"); pg.click("[data-testid=tb-translate]"); time.sleep(2.5); pm=pg.inner_text("[data-testid=tb-prompt-msg]")
+    ok("S13f Prompt→Macro: translated, or says plainly that no model is connected (never a canned answer)", pm[:30], ("번역됨" in pm) or ("연결되지 않았습니다" in pm))
+    # S14 UI Tool: 명령 버튼 설정이 Action Bar에 즉시 반영
+    pg.click("[data-toolbox-tab=ui]"); time.sleep(0.5); pg.fill("[data-cmd-label=cost]","원가 계산"); pg.uncheck("[data-cmd-visible=ebom]"); time.sleep(0.5)
+    bar=pg.inner_text("[data-testid=region-actionbar]"); ok("S14a command set-up is live on the Action Bar (renamed Cost, hidden EBOM)", bar[:60].replace("\n"," "), "원가 계산" in bar and "EBOM Run" not in bar); pg.screenshot(path=f"{OUT}/31_toolbox_ui_tool.png")
+    pg.click("[data-testid=cmd-reset]"); time.sleep(0.4); bar=pg.inner_text("[data-testid=region-actionbar]"); ok("S14b reset restores the default commands", "EBOM Run" in bar, "EBOM Run" in bar and "원가 계산" not in bar)
+    # S15 드래그 · 도킹
+    t=pg.locator("[data-testid=toolbox-titlebar]").bounding_box(); pg.mouse.move(t["x"]+12,t["y"]+14); pg.mouse.down(); pg.mouse.move(t["x"]-288,t["y"]+134,steps=8); pg.mouse.up(); time.sleep(0.4)
+    tb2=pg.locator("[data-testid=toolbox-window]").bounding_box(); ok("S15a window drags", (round(tb["x"]),round(tb2["x"])), abs((tb["x"]-tb2["x"])-300)<6 and abs((tb2["y"]-tb["y"])-120)<6)
+    pg.click("[data-testid=toolbox-dock]"); time.sleep(0.4); tb3=pg.locator("[data-testid=toolbox-window]").bounding_box(); vw=pg.evaluate("window.innerWidth")
+    ok("S15b dock toggle pins it to the right edge", round(tb3["x"]+tb3["width"]), abs(tb3["x"]+tb3["width"]-vw)<2 and pg.get_attribute("[data-testid=toolbox-window]","data-docked")=="1")
+    pg.reload(wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=toolbox-window]",timeout=30000); ok("S15c open + docked state survive a reload", True, pg.get_attribute("[data-testid=toolbox-window]","data-docked")=="1")
+    pg.click("[data-testid=toolbox-reset]"); pg.click("[data-testid=toolbox-close]"); time.sleep(0.3)
     # S11 권한: viewer는 등록을 못 한다 (서버에서 차단)
     v=b.new_context(); v.request.post(BASE+"/api/auth/login",data={"email":"viewer@acme.test"})
     r=v.request.post(BASE+"/api/setup/sub-codes",headers=J,data=json.dumps({"group":"AHU Code","itemKey":"B","itemName":"용량","value":"99"})); ok("S11 viewer cannot register codes (403)", r.status, r.status==403); v.close()

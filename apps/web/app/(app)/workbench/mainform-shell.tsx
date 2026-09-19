@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { ToolboxWindow, DEFAULT_COMMANDS, type CommandDef } from "./toolbox-window";
 import type { HierarchyTreeNode } from "@edim/core-ontology";
 import { ThemeToggle } from "@edim/ui";
 import type { ModuleDef } from "@/app/lib/modules";
@@ -84,6 +85,25 @@ export function MainFormShell({
   const [rev, setRev] = useState<{ revNo: number; rev: string; code: string } | null>(initialRev);
   const [runs, setRuns] = useState<RunResult[]>([]);
   const assembled = assembleCode(slots, slotDefs);
+  /* P2 — EDIM Toolbox: a floating window beside the MainForm. Its command set-up drives the
+     Action Bar live, and its Run goes through the Action Bar's own run (runRef). */
+  const [toolboxOpen, setToolboxOpen] = useState(false);
+  const [commands, setCommandsState] = useState<CommandDef[]>(DEFAULT_COMMANDS);
+  const [busyKind, setBusyKind] = useState<string | null>(null);
+  const runRef = useRef<((kind: string) => void) | null>(null);
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem("edim.toolbox.commands.v1");
+      if (raw) {
+        const saved = JSON.parse(raw) as CommandDef[];
+        const known = new Set(DEFAULT_COMMANDS.map((c) => c.kind));
+        if (Array.isArray(saved) && saved.length === known.size && saved.every((c) => known.has(c.kind))) setCommandsState(saved);
+      }
+      if (window.localStorage.getItem("edim.toolbox.open.v1") === "1") setToolboxOpen(true);
+    } catch { /* storage unavailable → defaults */ }
+  }, []);
+  const setCommands = (c: CommandDef[]) => { setCommandsState(c); try { window.localStorage.setItem("edim.toolbox.commands.v1", JSON.stringify(c)); } catch { /* ignore */ } };
+  const toggleToolbox = (open: boolean) => { setToolboxOpen(open); try { window.localStorage.setItem("edim.toolbox.open.v1", open ? "1" : "0"); } catch { /* ignore */ } };
 
   return (
     <div
@@ -105,6 +125,15 @@ export function MainFormShell({
         onTab={setTab}
         right={
           <>
+            <button
+              type="button"
+              data-testid="toolbox-toggle"
+              aria-pressed={toolboxOpen}
+              onClick={() => toggleToolbox(!toolboxOpen)}
+              style={{ fontSize: "var(--fs-12)", fontWeight: 600, color: toolboxOpen ? "var(--accent-contrast)" : "var(--accent)", background: toolboxOpen ? "var(--accent)" : "transparent", border: "1px solid var(--accent)", borderRadius: "var(--radius-sm)", padding: "2px 10px", cursor: "pointer" }}
+            >
+              Toolbox
+            </button>
             <span style={{ fontSize: "var(--fs-12)", color: "var(--ink-muted)" }}>
               {session?.email}
             </span>
@@ -240,7 +269,24 @@ export function MainFormShell({
         onResult={(r) => setRuns((xs) => [r, ...xs].slice(0, 20))}
         nodeStable={selectedNode}
         slots={slots}
+        commands={commands}
+        runRef={runRef}
+        onBusy={setBusyKind}
         macroValue={(() => { const r = runs.find((x) => x.kind === "edim" && x.status === "ran"); return typeof r?.value === "number" ? r.value : null; })()}
+      />
+      {/* ── EDIM Toolbox (floating, outside the 5 regions) ── */}
+      <ToolboxWindow
+        open={toolboxOpen}
+        onClose={() => toggleToolbox(false)}
+        commands={commands}
+        onCommands={setCommands}
+        onRun={(k) => runRef.current?.(k)}
+        runs={runs}
+        busyKind={busyKind}
+        nodeStable={selectedNode}
+        canEdit={canEdit}
+        canDecide={canDecide}
+        runDisabled={!canEdit || !assembled.ok}
       />
     </div>
   );
