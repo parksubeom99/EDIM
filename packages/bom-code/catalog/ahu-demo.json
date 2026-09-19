@@ -156,126 +156,273 @@
       "materialTemplate": "",
       "tables": {
         "cap": {
+          "no": 1,
           "by": "B",
           "default": "10",
-          "rows": {
-            "10": {
-              "fanKw": 3.7,
-              "coilRows": 4,
-              "panelMm": 25,
-              "face": 1054,
-              "face08": 843,
-              "filterQty": 4,
-              "panelCost": 48000,
-              "coilCost": 860000,
-              "fanCost": 872400,
-              "vfdCost": 387700,
-              "rotorDia": 1159,
-              "rotorCost": 1580000,
-              "humidKgh": 6,
-              "humidCost": 610000,
-              "hpCost": 1130000
+          "cols": [
+            {
+              "key": "A",
+              "name": "fanKw",
+              "label": "팬 모터 kW"
             },
-            "12": {
-              "fanKw": 5.5,
-              "coilRows": 4,
-              "panelMm": 25,
-              "face": 1155,
-              "face08": 924,
-              "filterQty": 4,
-              "panelCost": 48000,
-              "coilCost": 872000,
-              "fanCost": 966000,
-              "vfdCost": 425500,
-              "rotorDia": 1271,
-              "rotorCost": 1616000,
-              "humidKgh": 7,
-              "humidCost": 628000,
-              "hpCost": 1160000
+            {
+              "key": "B",
+              "name": "coilRows",
+              "label": "코일 열수"
             },
-            "25": {
-              "fanKw": 11,
-              "coilRows": 6,
-              "panelMm": 50,
-              "face": 1667,
-              "face08": 1334,
-              "filterQty": 8,
-              "panelCost": 96000,
-              "coilCost": 1140000,
-              "fanCost": 1252000,
-              "vfdCost": 541000,
-              "rotorDia": 1834,
-              "rotorCost": 1850000,
-              "humidKgh": 15,
-              "humidCost": 745000,
-              "hpCost": 1355000
+            {
+              "key": "C",
+              "name": "panelMm",
+              "label": "패널 두께 mm"
             },
-            "55": {
-              "fanKw": 22,
-              "coilRows": 8,
-              "panelMm": 50,
-              "face": 2472,
-              "face08": 1978,
-              "filterQty": 18,
-              "panelCost": 96000,
-              "coilCost": 1510000,
-              "fanCost": 1824000,
-              "vfdCost": 772000,
-              "rotorDia": 2719,
-              "rotorCost": 2390000,
-              "humidKgh": 33,
-              "humidCost": 1015000,
-              "hpCost": 1805000
+            {
+              "key": "D",
+              "name": "face",
+              "label": "단면 한 변 mm"
+            },
+            {
+              "key": "E",
+              "name": "face08",
+              "label": "코일 높이 mm"
+            },
+            {
+              "key": "F",
+              "name": "filterQty",
+              "label": "필터 수량"
+            },
+            {
+              "key": "G",
+              "name": "panelCost",
+              "label": "패널 단가"
+            },
+            {
+              "key": "H",
+              "name": "coilCost",
+              "label": "코일 단가"
+            },
+            {
+              "key": "I",
+              "name": "fanCost",
+              "label": "팬 단가"
+            },
+            {
+              "key": "J",
+              "name": "vfdCost",
+              "label": "인버터 단가"
+            },
+            {
+              "key": "K",
+              "name": "rotorDia",
+              "label": "로터 지름 mm"
+            },
+            {
+              "key": "L",
+              "name": "rotorCost",
+              "label": "로터 단가"
+            },
+            {
+              "key": "M",
+              "name": "humidKgh",
+              "label": "가습량 kg/h"
+            },
+            {
+              "key": "N",
+              "name": "humidCost",
+              "label": "가습기 단가"
+            },
+            {
+              "key": "O",
+              "name": "hpCost",
+              "label": "히트펌프 코일 단가"
             }
-          }
+          ],
+          "rows": [
+            {
+              "item": "10",
+              "cells": {
+                "A": 3.7,
+                "B": 4,
+                "C": 25,
+                "D": 1054,
+                "E": 843,
+                "F": 4,
+                "G": 48000,
+                "H": 860000,
+                "I": 872400,
+                "J": 387700,
+                "K": 1159,
+                "L": 1580000,
+                "M": 6,
+                "N": 610000,
+                "O": 1130000
+              }
+            },
+            {
+              "item": "12",
+              "cells": {
+                "A": 5.5,
+                "B": 4,
+                "C": 25,
+                "D": 1155,
+                "E": 924,
+                "F": 4,
+                "G": 48000,
+                "H": 872000,
+                "I": 966000,
+                "J": 425500,
+                "K": 1271,
+                "L": 1616000,
+                "M": 7,
+                "N": 628000,
+                "O": 1160000
+              }
+            },
+            {
+              "item": "25",
+              "cells": {
+                "A": 11,
+                "B": 6,
+                "C": 50,
+                "D": 1667,
+                "E": 1334,
+                "F": 8,
+                "G": 96000,
+                "H": 1140000,
+                "I": 1252000,
+                "J": 541000,
+                "K": 1834,
+                "L": 1850000,
+                "M": 15,
+                "N": 745000,
+                "O": 1355000
+              }
+            },
+            {
+              "item": "55",
+              "cells": {
+                "A": 22,
+                "B": 8,
+                "C": 50,
+                "D": 2472,
+                "E": 1978,
+                "F": 18,
+                "G": 96000,
+                "H": 1510000,
+                "I": 1824000,
+                "J": 772000,
+                "K": 2719,
+                "L": 2390000,
+                "M": 33,
+                "N": 1015000,
+                "O": 1805000
+              }
+            }
+          ]
         },
         "opt": {
+          "no": 2,
           "by": "D",
           "default": "",
-          "rows": {
-            "630": {
-              "sections": 5,
-              "length": 4500,
-              "frameCost": 322500,
-              "panelQty": 20
+          "cols": [
+            {
+              "key": "A",
+              "name": "sections",
+              "label": "섹션 수"
             },
-            "": {
-              "sections": 4,
-              "length": 3600,
-              "frameCost": 282000,
-              "panelQty": 16
+            {
+              "key": "B",
+              "name": "length",
+              "label": "전장 mm"
             },
-            "A1": {
-              "sections": 5,
-              "length": 4500,
-              "frameCost": 322500,
-              "panelQty": 20
+            {
+              "key": "C",
+              "name": "frameCost",
+              "label": "베이스 프레임 단가"
             },
-            "H2": {
-              "sections": 5,
-              "length": 4500,
-              "frameCost": 322500,
-              "panelQty": 20
+            {
+              "key": "D",
+              "name": "panelQty",
+              "label": "패널 수량"
             }
-          }
+          ],
+          "rows": [
+            {
+              "item": "630",
+              "cells": {
+                "A": 5,
+                "B": 4500,
+                "C": 322500,
+                "D": 20
+              }
+            },
+            {
+              "item": "",
+              "cells": {
+                "A": 4,
+                "B": 3600,
+                "C": 282000,
+                "D": 16
+              }
+            },
+            {
+              "item": "A1",
+              "cells": {
+                "A": 5,
+                "B": 4500,
+                "C": 322500,
+                "D": 20
+              }
+            },
+            {
+              "item": "H2",
+              "cells": {
+                "A": 5,
+                "B": 4500,
+                "C": 322500,
+                "D": 20
+              }
+            }
+          ]
         },
         "mat": {
+          "no": 3,
           "by": "E",
           "default": "",
-          "rows": {
-            "": {
-              "label": "GI",
-              "mf": 1
+          "cols": [
+            {
+              "key": "A",
+              "name": "label",
+              "label": "재질 표기"
             },
-            "SS": {
-              "label": "SUS304",
-              "mf": 1.6
-            },
-            "AL": {
-              "label": "AL",
-              "mf": 1.35
+            {
+              "key": "B",
+              "name": "mf",
+              "label": "재질 단가 배율"
             }
-          }
+          ],
+          "rows": [
+            {
+              "item": "",
+              "cells": {
+                "A": "GI",
+                "B": 1
+              }
+            },
+            {
+              "item": "SS",
+              "cells": {
+                "A": "SUS304",
+                "B": 1.6
+              }
+            },
+            {
+              "item": "AL",
+              "cells": {
+                "A": "AL",
+                "B": 1.35
+              }
+            }
+          ]
         }
       },
       "sections": [
@@ -324,126 +471,273 @@
       "materialTemplate": "",
       "tables": {
         "cap": {
+          "no": 1,
           "by": "B",
           "default": "10",
-          "rows": {
-            "10": {
-              "fanKw": 3.7,
-              "coilRows": 4,
-              "panelMm": 25,
-              "face": 1054,
-              "face08": 843,
-              "filterQty": 4,
-              "panelCost": 48000,
-              "coilCost": 860000,
-              "fanCost": 872400,
-              "vfdCost": 387700,
-              "rotorDia": 1159,
-              "rotorCost": 1580000,
-              "humidKgh": 6,
-              "humidCost": 610000,
-              "hpCost": 1130000
+          "cols": [
+            {
+              "key": "A",
+              "name": "fanKw",
+              "label": "팬 모터 kW"
             },
-            "12": {
-              "fanKw": 5.5,
-              "coilRows": 4,
-              "panelMm": 25,
-              "face": 1155,
-              "face08": 924,
-              "filterQty": 4,
-              "panelCost": 48000,
-              "coilCost": 872000,
-              "fanCost": 966000,
-              "vfdCost": 425500,
-              "rotorDia": 1271,
-              "rotorCost": 1616000,
-              "humidKgh": 7,
-              "humidCost": 628000,
-              "hpCost": 1160000
+            {
+              "key": "B",
+              "name": "coilRows",
+              "label": "코일 열수"
             },
-            "25": {
-              "fanKw": 11,
-              "coilRows": 6,
-              "panelMm": 50,
-              "face": 1667,
-              "face08": 1334,
-              "filterQty": 8,
-              "panelCost": 96000,
-              "coilCost": 1140000,
-              "fanCost": 1252000,
-              "vfdCost": 541000,
-              "rotorDia": 1834,
-              "rotorCost": 1850000,
-              "humidKgh": 15,
-              "humidCost": 745000,
-              "hpCost": 1355000
+            {
+              "key": "C",
+              "name": "panelMm",
+              "label": "패널 두께 mm"
             },
-            "55": {
-              "fanKw": 22,
-              "coilRows": 8,
-              "panelMm": 50,
-              "face": 2472,
-              "face08": 1978,
-              "filterQty": 18,
-              "panelCost": 96000,
-              "coilCost": 1510000,
-              "fanCost": 1824000,
-              "vfdCost": 772000,
-              "rotorDia": 2719,
-              "rotorCost": 2390000,
-              "humidKgh": 33,
-              "humidCost": 1015000,
-              "hpCost": 1805000
+            {
+              "key": "D",
+              "name": "face",
+              "label": "단면 한 변 mm"
+            },
+            {
+              "key": "E",
+              "name": "face08",
+              "label": "코일 높이 mm"
+            },
+            {
+              "key": "F",
+              "name": "filterQty",
+              "label": "필터 수량"
+            },
+            {
+              "key": "G",
+              "name": "panelCost",
+              "label": "패널 단가"
+            },
+            {
+              "key": "H",
+              "name": "coilCost",
+              "label": "코일 단가"
+            },
+            {
+              "key": "I",
+              "name": "fanCost",
+              "label": "팬 단가"
+            },
+            {
+              "key": "J",
+              "name": "vfdCost",
+              "label": "인버터 단가"
+            },
+            {
+              "key": "K",
+              "name": "rotorDia",
+              "label": "로터 지름 mm"
+            },
+            {
+              "key": "L",
+              "name": "rotorCost",
+              "label": "로터 단가"
+            },
+            {
+              "key": "M",
+              "name": "humidKgh",
+              "label": "가습량 kg/h"
+            },
+            {
+              "key": "N",
+              "name": "humidCost",
+              "label": "가습기 단가"
+            },
+            {
+              "key": "O",
+              "name": "hpCost",
+              "label": "히트펌프 코일 단가"
             }
-          }
+          ],
+          "rows": [
+            {
+              "item": "10",
+              "cells": {
+                "A": 3.7,
+                "B": 4,
+                "C": 25,
+                "D": 1054,
+                "E": 843,
+                "F": 4,
+                "G": 48000,
+                "H": 860000,
+                "I": 872400,
+                "J": 387700,
+                "K": 1159,
+                "L": 1580000,
+                "M": 6,
+                "N": 610000,
+                "O": 1130000
+              }
+            },
+            {
+              "item": "12",
+              "cells": {
+                "A": 5.5,
+                "B": 4,
+                "C": 25,
+                "D": 1155,
+                "E": 924,
+                "F": 4,
+                "G": 48000,
+                "H": 872000,
+                "I": 966000,
+                "J": 425500,
+                "K": 1271,
+                "L": 1616000,
+                "M": 7,
+                "N": 628000,
+                "O": 1160000
+              }
+            },
+            {
+              "item": "25",
+              "cells": {
+                "A": 11,
+                "B": 6,
+                "C": 50,
+                "D": 1667,
+                "E": 1334,
+                "F": 8,
+                "G": 96000,
+                "H": 1140000,
+                "I": 1252000,
+                "J": 541000,
+                "K": 1834,
+                "L": 1850000,
+                "M": 15,
+                "N": 745000,
+                "O": 1355000
+              }
+            },
+            {
+              "item": "55",
+              "cells": {
+                "A": 22,
+                "B": 8,
+                "C": 50,
+                "D": 2472,
+                "E": 1978,
+                "F": 18,
+                "G": 96000,
+                "H": 1510000,
+                "I": 1824000,
+                "J": 772000,
+                "K": 2719,
+                "L": 2390000,
+                "M": 33,
+                "N": 1015000,
+                "O": 1805000
+              }
+            }
+          ]
         },
         "opt": {
+          "no": 2,
           "by": "D",
           "default": "",
-          "rows": {
-            "630": {
-              "sections": 5,
-              "length": 4500,
-              "frameCost": 322500,
-              "panelQty": 20
+          "cols": [
+            {
+              "key": "A",
+              "name": "sections",
+              "label": "섹션 수"
             },
-            "": {
-              "sections": 4,
-              "length": 3600,
-              "frameCost": 282000,
-              "panelQty": 16
+            {
+              "key": "B",
+              "name": "length",
+              "label": "전장 mm"
             },
-            "A1": {
-              "sections": 5,
-              "length": 4500,
-              "frameCost": 322500,
-              "panelQty": 20
+            {
+              "key": "C",
+              "name": "frameCost",
+              "label": "베이스 프레임 단가"
             },
-            "H2": {
-              "sections": 5,
-              "length": 4500,
-              "frameCost": 322500,
-              "panelQty": 20
+            {
+              "key": "D",
+              "name": "panelQty",
+              "label": "패널 수량"
             }
-          }
+          ],
+          "rows": [
+            {
+              "item": "630",
+              "cells": {
+                "A": 5,
+                "B": 4500,
+                "C": 322500,
+                "D": 20
+              }
+            },
+            {
+              "item": "",
+              "cells": {
+                "A": 4,
+                "B": 3600,
+                "C": 282000,
+                "D": 16
+              }
+            },
+            {
+              "item": "A1",
+              "cells": {
+                "A": 5,
+                "B": 4500,
+                "C": 322500,
+                "D": 20
+              }
+            },
+            {
+              "item": "H2",
+              "cells": {
+                "A": 5,
+                "B": 4500,
+                "C": 322500,
+                "D": 20
+              }
+            }
+          ]
         },
         "mat": {
+          "no": 3,
           "by": "E",
           "default": "",
-          "rows": {
-            "": {
-              "label": "GI",
-              "mf": 1
+          "cols": [
+            {
+              "key": "A",
+              "name": "label",
+              "label": "재질 표기"
             },
-            "SS": {
-              "label": "SUS304",
-              "mf": 1.6
-            },
-            "AL": {
-              "label": "AL",
-              "mf": 1.35
+            {
+              "key": "B",
+              "name": "mf",
+              "label": "재질 단가 배율"
             }
-          }
+          ],
+          "rows": [
+            {
+              "item": "",
+              "cells": {
+                "A": "GI",
+                "B": 1
+              }
+            },
+            {
+              "item": "SS",
+              "cells": {
+                "A": "SUS304",
+                "B": 1.6
+              }
+            },
+            {
+              "item": "AL",
+              "cells": {
+                "A": "AL",
+                "B": 1.35
+              }
+            }
+          ]
         }
       },
       "sections": [
@@ -492,126 +786,273 @@
       "materialTemplate": "",
       "tables": {
         "cap": {
+          "no": 1,
           "by": "B",
           "default": "10",
-          "rows": {
-            "10": {
-              "fanKw": 3.7,
-              "coilRows": 4,
-              "panelMm": 25,
-              "face": 1054,
-              "face08": 843,
-              "filterQty": 4,
-              "panelCost": 48000,
-              "coilCost": 860000,
-              "fanCost": 872400,
-              "vfdCost": 387700,
-              "rotorDia": 1159,
-              "rotorCost": 1580000,
-              "humidKgh": 6,
-              "humidCost": 610000,
-              "hpCost": 1130000
+          "cols": [
+            {
+              "key": "A",
+              "name": "fanKw",
+              "label": "팬 모터 kW"
             },
-            "12": {
-              "fanKw": 5.5,
-              "coilRows": 4,
-              "panelMm": 25,
-              "face": 1155,
-              "face08": 924,
-              "filterQty": 4,
-              "panelCost": 48000,
-              "coilCost": 872000,
-              "fanCost": 966000,
-              "vfdCost": 425500,
-              "rotorDia": 1271,
-              "rotorCost": 1616000,
-              "humidKgh": 7,
-              "humidCost": 628000,
-              "hpCost": 1160000
+            {
+              "key": "B",
+              "name": "coilRows",
+              "label": "코일 열수"
             },
-            "25": {
-              "fanKw": 11,
-              "coilRows": 6,
-              "panelMm": 50,
-              "face": 1667,
-              "face08": 1334,
-              "filterQty": 8,
-              "panelCost": 96000,
-              "coilCost": 1140000,
-              "fanCost": 1252000,
-              "vfdCost": 541000,
-              "rotorDia": 1834,
-              "rotorCost": 1850000,
-              "humidKgh": 15,
-              "humidCost": 745000,
-              "hpCost": 1355000
+            {
+              "key": "C",
+              "name": "panelMm",
+              "label": "패널 두께 mm"
             },
-            "55": {
-              "fanKw": 22,
-              "coilRows": 8,
-              "panelMm": 50,
-              "face": 2472,
-              "face08": 1978,
-              "filterQty": 18,
-              "panelCost": 96000,
-              "coilCost": 1510000,
-              "fanCost": 1824000,
-              "vfdCost": 772000,
-              "rotorDia": 2719,
-              "rotorCost": 2390000,
-              "humidKgh": 33,
-              "humidCost": 1015000,
-              "hpCost": 1805000
+            {
+              "key": "D",
+              "name": "face",
+              "label": "단면 한 변 mm"
+            },
+            {
+              "key": "E",
+              "name": "face08",
+              "label": "코일 높이 mm"
+            },
+            {
+              "key": "F",
+              "name": "filterQty",
+              "label": "필터 수량"
+            },
+            {
+              "key": "G",
+              "name": "panelCost",
+              "label": "패널 단가"
+            },
+            {
+              "key": "H",
+              "name": "coilCost",
+              "label": "코일 단가"
+            },
+            {
+              "key": "I",
+              "name": "fanCost",
+              "label": "팬 단가"
+            },
+            {
+              "key": "J",
+              "name": "vfdCost",
+              "label": "인버터 단가"
+            },
+            {
+              "key": "K",
+              "name": "rotorDia",
+              "label": "로터 지름 mm"
+            },
+            {
+              "key": "L",
+              "name": "rotorCost",
+              "label": "로터 단가"
+            },
+            {
+              "key": "M",
+              "name": "humidKgh",
+              "label": "가습량 kg/h"
+            },
+            {
+              "key": "N",
+              "name": "humidCost",
+              "label": "가습기 단가"
+            },
+            {
+              "key": "O",
+              "name": "hpCost",
+              "label": "히트펌프 코일 단가"
             }
-          }
+          ],
+          "rows": [
+            {
+              "item": "10",
+              "cells": {
+                "A": 3.7,
+                "B": 4,
+                "C": 25,
+                "D": 1054,
+                "E": 843,
+                "F": 4,
+                "G": 48000,
+                "H": 860000,
+                "I": 872400,
+                "J": 387700,
+                "K": 1159,
+                "L": 1580000,
+                "M": 6,
+                "N": 610000,
+                "O": 1130000
+              }
+            },
+            {
+              "item": "12",
+              "cells": {
+                "A": 5.5,
+                "B": 4,
+                "C": 25,
+                "D": 1155,
+                "E": 924,
+                "F": 4,
+                "G": 48000,
+                "H": 872000,
+                "I": 966000,
+                "J": 425500,
+                "K": 1271,
+                "L": 1616000,
+                "M": 7,
+                "N": 628000,
+                "O": 1160000
+              }
+            },
+            {
+              "item": "25",
+              "cells": {
+                "A": 11,
+                "B": 6,
+                "C": 50,
+                "D": 1667,
+                "E": 1334,
+                "F": 8,
+                "G": 96000,
+                "H": 1140000,
+                "I": 1252000,
+                "J": 541000,
+                "K": 1834,
+                "L": 1850000,
+                "M": 15,
+                "N": 745000,
+                "O": 1355000
+              }
+            },
+            {
+              "item": "55",
+              "cells": {
+                "A": 22,
+                "B": 8,
+                "C": 50,
+                "D": 2472,
+                "E": 1978,
+                "F": 18,
+                "G": 96000,
+                "H": 1510000,
+                "I": 1824000,
+                "J": 772000,
+                "K": 2719,
+                "L": 2390000,
+                "M": 33,
+                "N": 1015000,
+                "O": 1805000
+              }
+            }
+          ]
         },
         "opt": {
+          "no": 2,
           "by": "D",
           "default": "",
-          "rows": {
-            "630": {
-              "sections": 5,
-              "length": 4500,
-              "frameCost": 322500,
-              "panelQty": 20
+          "cols": [
+            {
+              "key": "A",
+              "name": "sections",
+              "label": "섹션 수"
             },
-            "": {
-              "sections": 4,
-              "length": 3600,
-              "frameCost": 282000,
-              "panelQty": 16
+            {
+              "key": "B",
+              "name": "length",
+              "label": "전장 mm"
             },
-            "A1": {
-              "sections": 5,
-              "length": 4500,
-              "frameCost": 322500,
-              "panelQty": 20
+            {
+              "key": "C",
+              "name": "frameCost",
+              "label": "베이스 프레임 단가"
             },
-            "H2": {
-              "sections": 5,
-              "length": 4500,
-              "frameCost": 322500,
-              "panelQty": 20
+            {
+              "key": "D",
+              "name": "panelQty",
+              "label": "패널 수량"
             }
-          }
+          ],
+          "rows": [
+            {
+              "item": "630",
+              "cells": {
+                "A": 5,
+                "B": 4500,
+                "C": 322500,
+                "D": 20
+              }
+            },
+            {
+              "item": "",
+              "cells": {
+                "A": 4,
+                "B": 3600,
+                "C": 282000,
+                "D": 16
+              }
+            },
+            {
+              "item": "A1",
+              "cells": {
+                "A": 5,
+                "B": 4500,
+                "C": 322500,
+                "D": 20
+              }
+            },
+            {
+              "item": "H2",
+              "cells": {
+                "A": 5,
+                "B": 4500,
+                "C": 322500,
+                "D": 20
+              }
+            }
+          ]
         },
         "mat": {
+          "no": 3,
           "by": "E",
           "default": "",
-          "rows": {
-            "": {
-              "label": "GI",
-              "mf": 1
+          "cols": [
+            {
+              "key": "A",
+              "name": "label",
+              "label": "재질 표기"
             },
-            "SS": {
-              "label": "SUS304",
-              "mf": 1.6
-            },
-            "AL": {
-              "label": "AL",
-              "mf": 1.35
+            {
+              "key": "B",
+              "name": "mf",
+              "label": "재질 단가 배율"
             }
-          }
+          ],
+          "rows": [
+            {
+              "item": "",
+              "cells": {
+                "A": "GI",
+                "B": 1
+              }
+            },
+            {
+              "item": "SS",
+              "cells": {
+                "A": "SUS304",
+                "B": 1.6
+              }
+            },
+            {
+              "item": "AL",
+              "cells": {
+                "A": "AL",
+                "B": 1.35
+              }
+            }
+          ]
         }
       },
       "sections": [

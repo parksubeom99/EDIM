@@ -13,5 +13,5 @@ export async function POST(req: NextRequest) {
   const { catalog, rejected } = await loadCatalog(g.session.tenantId);
   const r = runBomCode(catalog, slots, macroValue);
   if (!r.ok) return NextResponse.json({ ok: false, error: r.error, rejected }, { status: 422 });
-  return NextResponse.json({ ok: true, parent: r.parent, sections: r.sections, lines: r.lines, fingerprint: catalogFingerprint(catalog), rejected });
+  return NextResponse.json({ ok: true, parent: r.parent, mainCode: r.mainCode, sections: r.sections, lines: r.lines, fingerprint: catalogFingerprint(catalog), rejected });
 }

@@ -40,9 +40,10 @@ export function codesFromSlots(slots: SlotValues): Record<string, number> {
   };
 }
 
-export function providerFromSlots(slots: SlotValues): DataProvider {
+/** `tables` = the tenant's registered tables (Set-Up ▸ Product Code ▸ Table); samples only when none are registered. */
+export function providerFromSlots(slots: SlotValues, tables?: Record<string, Record<number, number>> | null): DataProvider {
   return new InMemoryProvider({
-    tables: SAMPLE_TABLES as unknown as Record<string, Record<number, number>>,
+    tables: tables ?? (SAMPLE_TABLES as unknown as Record<string, Record<number, number>>),
     vars: SAMPLE_VARS as unknown as Record<string, number>,
     codes: codesFromSlots(slots),
   });
