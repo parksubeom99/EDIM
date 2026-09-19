@@ -8,6 +8,7 @@
  * Public surface:
  *   parse(source)            → Result<Macro>      (tokenizer + recursive descent)
  *   evaluate(macro, provider)→ Result<EvalValue>  (closed-world executor)
+ *   describe(macro, glossary?)→ MacroDescription (STEP 5 역번역: 설명 + 흐름도, 결정론)
  *   InMemoryProvider         → mock DataProvider for the direct-input path
  */
 export const MACRO_DSL_PACKAGE = "@edim/macro-dsl" as const;
@@ -15,6 +16,8 @@ export const GRAMMAR_VERSION = "1.0" as const;
 
 export { parse } from "./parser";
 export { evaluate } from "./executor";
+export { describe } from "./describe";
+export type { Glossary, FlowNode, MacroDescription } from "./describe";
 export type { EvalValue } from "./executor";
 export { InMemoryProvider } from "./provider";
 export type { DataProvider } from "./provider";
