@@ -32,6 +32,10 @@ model Tenant {
   tasks           ProjectTask[]
   approvals       ProjectApproval[]
   codeRevisions   CodeRevision[]
+  subCodes        SubCode[]
+  productCodes    ProductCode[]
+  codeRelations   CodeRelationship[]
+  bomCodeRuns     BomCodeRun[]
 
   @@map("tenant")
 }
@@ -52,6 +56,10 @@ model AppUser {
   approvalsRequested ProjectApproval[]   @relation("ApprovalRequester")
   approvalsToDecide  ProjectApproval[]   @relation("ApprovalApprover")
   codeRevisions      CodeRevision[]
+  subCodes           SubCode[]
+  productCodes       ProductCode[]
+  codeRelations      CodeRelationship[]
+  bomCodeRuns        BomCodeRun[]
 
   @@map("app_user")
 }
@@ -241,4 +249,101 @@ model CodeRevision {
   @@unique([tenantId, hierarchyStable, revNo])
   @@index([tenantId, hierarchyStable])
   @@map("code_revision")
+}
+
+/// P1 — BOM Code Set-Up (EDIM.pdf p30–34). GAP1 = code-based BOM.
+/// p31 Sub Code: one selectable value of one slot item (A..F) in a group.
+model SubCode {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  groupName   String   @map("group_name")
+  itemKey     String   @map("item_key")
+  itemName    String   @map("item_name")
+  seq         Int
+  value       String
+  description String   @default("")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdBy   String   @map("created_by") @db.Uuid
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  creator AppUser @relation(fields: [createdBy], references: [id])
+
+  @@unique([tenantId, groupName, itemKey, value], map: "sub_code_tenant_group_item_value_key")
+  @@unique([tenantId, groupName, itemKey, seq], map: "sub_code_tenant_group_item_seq_key")
+  @@map("sub_code")
+}
+
+/// p33 Product Code: a registered code + its "Table 참조" tech tables (keyed by a slot).
+model ProductCode {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId         String   @map("tenant_id") @db.Uuid
+  code             String
+  name             String
+  kind             String // 'product' | 'part' | 'purchase'
+  category         String   @default("")
+  unit             String   @default("ea")
+  specTemplate     String   @default("") @map("spec_template")
+  materialTemplate String   @default("") @map("material_template")
+  tables           Json     @default("{}") @db.JsonB
+  sections         Json?    @db.JsonB
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+  createdBy        String   @map("created_by") @db.Uuid
+
+  tenant   Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  creator  AppUser            @relation(fields: [createdBy], references: [id])
+  children CodeRelationship[] @relation("RelParent")
+  parents  CodeRelationship[] @relation("RelChild")
+
+  @@unique([tenantId, code], map: "product_code_tenant_code_key")
+  @@map("product_code")
+}
+
+/// p34 Product Code Relationship: one Child Group row.
+model CodeRelationship {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  parentCode String   @map("parent_code")
+  childCode  String   @map("child_code")
+  seq        Int
+  section    String
+  qty        Json     @db.JsonB
+  unitCost   Json     @map("unit_cost") @db.JsonB
+  whenCond   Json?    @map("when_cond") @db.JsonB
+  remarks    String?
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdBy  String   @map("created_by") @db.Uuid
+
+  tenant  Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  creator AppUser     @relation(fields: [createdBy], references: [id])
+  parent  ProductCode @relation("RelParent", fields: [tenantId, parentCode], references: [tenantId, code], onDelete: Cascade, map: "code_relationship_parent_fkey")
+  child   ProductCode @relation("RelChild", fields: [tenantId, childCode], references: [tenantId, code], onDelete: Restrict, map: "code_relationship_child_fkey")
+
+  @@unique([tenantId, parentCode, seq], map: "code_relationship_tenant_parent_seq_key")
+  @@index([tenantId, childCode], map: "code_relationship_tenant_child_idx")
+  @@map("code_relationship")
+}
+
+/// BomCodeRun — the BOM is a SNAPSHOT of a code run (DATA_MODEL BOM/BOMLine
+/// re-homed). Append-only: the app role has no UPDATE/DELETE on this table.
+model BomCodeRun {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  hierarchyStable String?  @map("hierarchy_stable") @db.Uuid
+  code            String
+  slots           Json     @db.JsonB
+  macroValue      Float?   @map("macro_value")
+  parentCode      String   @map("parent_code")
+  catalogFp       String   @map("catalog_fp")
+  lines           Json     @db.JsonB
+  cost            Json     @db.JsonB
+  source          String   @default("workbench")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdBy       String   @map("created_by") @db.Uuid
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  creator AppUser @relation(fields: [createdBy], references: [id])
+
+  @@index([tenantId, hierarchyStable, createdAt(sort: Desc)], map: "bom_code_run_tenant_node_idx")
+  @@map("bom_code_run")
 }

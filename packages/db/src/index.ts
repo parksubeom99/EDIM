@@ -56,3 +56,20 @@ export type {
 } from "./project";
 export { listRevisions, getCurrentRevision, saveRevision, revLabel } from "./code-revision";
 export type { SaveRevisionInput } from "./code-revision";
+export {
+  loadCatalogRows,
+  addSubCode,
+  deleteSubCode,
+  upsertProductCode,
+  addRelationship,
+  deleteRelationship,
+  saveBomCodeRun,
+  listBomCodeRuns,
+} from "./code-catalog";
+export type {
+  CatalogRows,
+  SubCodeInput,
+  ProductCodeInput,
+  RelationshipInput,
+  BomCodeRunInput,
+} from "./code-catalog";
