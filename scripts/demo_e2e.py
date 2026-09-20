@@ -184,7 +184,10 @@ with sync_playwright() as p:
     pg.click("text=PS-61313"); time.sleep(1.5); nuke(pg)
     pg.locator("button", has_text=re.compile(r"^Design$")).first.click(force=True); time.sleep(1.5); nuke(pg)
     body=pg.inner_text("[data-testid=design-canvas]")
-    ok("S21 Design 탭에 등록된 도면과 상태가 보인다", ("발행" in body, "Rev" in body), "Rev" in body and ("발행" in body or "작성중" in body))
+    ok("S21a Design 탭에 등록된 도면과 상태가 보인다", ("발행" in body, "Rev" in body), "Rev" in body and ("발행" in body or "작성중" in body))
+    pg.click("button:has-text('BOM Run')"); time.sleep(3); nuke(pg)
+    kd=pg.inner_text("body")
+    ok("S21b 핵심 치수가 등록 표 값을 그대로 보여 준다 (화면이 따로 계산하지 않는다)", "2600×2472" in kd, "2600×2472" in kd)
     pg.screenshot(path=f"{OUT}/43_drawings.png",full_page=True)
     # ── P3-a 플랫폼 관리자 계층 · DB①/DB② 소유 분리 (p54 User Management · p59 최종 승인 · p64 Admin.) ──
     # S16 회사 관리자가 Company Info.에서 Special 의뢰를 올린다 = 회사→플랫폼 유일 통로

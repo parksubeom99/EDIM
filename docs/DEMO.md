@@ -42,15 +42,15 @@ pnpm --filter @edim/db platform:test   # ★ P3-a 22/22 (DB①/DB② 권한 분�
 pnpm --filter @edim/db drawing:test    # ★ P4-a 12/12 (도면 개정·발행 잠금·스냅샷 연결)
 pip install playwright --break-system-packages ; playwright install chromium
 pnpm db:reset:demo         # ★ 리허설 흔적 제거 (테스트·이전 e2e가 남긴 Rev·매크로 revision)
-python scripts\demo_e2e.py http://localhost:3000 shots   # ★ 68/68 PASS면 발표 가능
+python scripts\demo_e2e.py http://localhost:3000 shots   # ★ 69/69 PASS면 발표 가능
 pnpm db:reset:demo         # ★ e2e 자신도 흔적을 남긴다 → 시연 직전 반드시 한 번 더
 ```
 
-`demo_e2e.py`가 68/68이면 아래 시연 9장면은 **기계적으로 재현이 보장된** 상태다.
+`demo_e2e.py`가 69/69이면 아래 시연 9장면은 **기계적으로 재현이 보장된** 상태다.
 
 **리허설 잔재 규칙** — `code_revision`은 append-only라 앱에서 지울 수 없다. e2e·`revision:test`·손 리허설을 한 번이라도 돌린 DB에서는 본 시연의 첫 저장이 "Rev A"가 아니라 "Rev C/E…"로 찍히고, 매크로 revision도 r2가 아니라 r3+로 보인다. e2e의 `S2d`가 이 상태를 FAIL로 잡아준다.
 
-**발표 당일 아침 순서 (이 순서 그대로):** `docker ps` healthy → `pnpm db:reset:demo` → `demo_e2e.py` 68/68 → **`pnpm db:reset:demo` 한 번 더** → 브라우저 강력 새로고침(Ctrl+Shift+R) → 이후 시연 시작 전까지 화면 클릭·저장 금지.
+**발표 당일 아침 순서 (이 순서 그대로):** `docker ps` healthy → `pnpm db:reset:demo` → `demo_e2e.py` 69/69 → **`pnpm db:reset:demo` 한 번 더** → 브라우저 강력 새로고침(Ctrl+Shift+R) → 이후 시연 시작 전까지 화면 클릭·저장 금지.
 
 ---
 

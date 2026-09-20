@@ -19,6 +19,8 @@ export interface RunResult {
   mainCode?: string;
   /** P4-a — BOM 실행이 남긴 스냅샷 id. 뒤따르는 산출물(EBOM·Cost·도면)의 입력이 된다. */
   runId?: string | null;
+  /** P4-a — 등록된 Key Dimension (mm). 화면은 치수를 계산하지 않는다. */
+  dims?: { W: number; H: number; L: number; item: string; sections: number } | null;
 }
 
 const RUNS: { kind: "bom" | "edim" | "ebom" | "cost"; label: string }[] = [
@@ -94,6 +96,7 @@ export function ActionBar({
         trace: body.trace,
         mainCode: body.mainCode,
         runId: body.runId ?? null,
+        dims: body.dims ?? null,
       };
       if (kind === "bom" && body.runId) setRunId(body.runId);
       setLast(r);

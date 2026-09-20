@@ -296,7 +296,7 @@ function DesignCanvas({ code, slots, runs, nodeStable, canEdit }: { code: string
         ))}
         <line x1="20" y1="180" x2={20 + w} y2="180" stroke="var(--accent)" strokeWidth="1" />
         <text x={20 + w / 2} y="200" textAnchor="middle" fontSize="12" fill="var(--accent)" fontFamily="var(--font-mono)">
-          L = {Math.round(w * 6.25)} mm · 용량 {slots.B ?? "—"}
+          개념도 · 용량 {slots.B ?? "—"} <tspan fill="var(--ink-muted)">(실제 치수는 아래 DXF — 등록 표 기준)</tspan>
         </text>
         <text x="20" y="28" fontSize="12" fill="var(--ink-muted)" fontFamily="var(--font-mono)">
           {slots.A ?? "—"} series {slots.C ?? "—"} {slots.E ? `· ${slots.E}` : ""}
@@ -306,7 +306,7 @@ function DesignCanvas({ code, slots, runs, nodeStable, canEdit }: { code: string
         <a
           data-testid="dxf-download"
           href={runId ? `/api/dxf?runId=${runId}&type=plan` : "#"}
-          style={{ fontSize: "var(--fs-12)", color: "var(--accent-contrast)", background: runId ? "var(--accent)" : "var(--surface-2)", border: "1px solid var(--line)", borderRadius: "var(--radius-sm)", padding: "5px 10px", textDecoration: "none", opacity: runId ? 1 : 0.5, pointerEvents: runId ? "auto" : "none" }}
+          style={{ fontSize: "var(--fs-12)", color: runId ? "var(--accent-contrast)" : "var(--ink)", background: runId ? "var(--accent)" : "var(--surface-2)", border: "1px solid var(--line)", borderRadius: "var(--radius-sm)", padding: "5px 10px", textDecoration: "none", opacity: runId ? 1 : 0.5, pointerEvents: runId ? "auto" : "none" }}
         >
           평면도 DXF
         </a>
@@ -350,10 +350,14 @@ function DocumentPanel({ project, code }: { project: WorkbenchProject | null; co
 
 function KeyDims({ slots, runs }: { slots: SlotValues; runs: RunResult[] }) {
   const last = runs.find((r) => r.kind === "edim" && r.status === "ran");
+  // P4-a: 단면은 **등록된 Key Dimension 표**에서 온다(BOM Run 이 함께 돌려준다).
+  // 화면이 자기 공식으로 만들어 낸 숫자를 보여 주면 도면과 어긋난다.
+  const d = runs.find((r) => r.kind === "bom" && r.dims)?.dims ?? null;
   const cap = Number(slots.B ?? 0) || 0;
   const dims = [
     ["풍량", cap ? `${cap * 1000} CMH` : "—"],
-    ["단면", cap ? `${Math.round(Math.sqrt(cap * 1000 / 2.5) * 10)}×${Math.round(Math.sqrt(cap * 1000 / 2.5) * 8)}` : "—"],
+    ["단면(등록)", d ? `${d.W}×${d.H}` : "BOM Run 필요"],
+    ["전장(등록)", d ? `${d.L * Math.max(d.sections, 1)}` : "—"],
     ["패널", slots.C === "2123" ? "이중 50T" : slots.C === "3110" ? "위생 50T" : "표준 25T"],
     ["매크로 산출", typeof last?.value === "number" ? String(Math.round(last.value * 1000) / 1000) : last?.value != null ? String(last.value) : "—"],
   ];

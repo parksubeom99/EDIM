@@ -4,7 +4,7 @@ import { canEditProject } from "@/app/lib/project-perms";
 import { runApprovedForSession } from "@/app/lib/macro/run";
 import type { SlotValues } from "@/app/lib/rccs";
 import { buildEbom, buildCost } from "@/app/lib/output/bom";
-import { runBomCode, toBomLine, catalogFingerprint } from "@edim/bom-code";
+import { runBomCode, toBomLine, catalogFingerprint, dimsFor } from "@edim/bom-code";
 import { loadCatalog } from "@/app/lib/catalog";
 import { withTenant, saveBomCodeRun, getBomRun, latestRevisionId } from "@edim/db";
 
@@ -109,7 +109,11 @@ export async function POST(
         createdBy: session.userId,
       }),
     );
-    return NextResponse.json({ ...base, lines, trace, mainCode: result.mainCode, catalogFp, runId: snap.id, macroValue, message: `BOM ${lines.length}행 · 코드 관계 ${result.parent} · 스냅샷 ${snap.id.slice(0, 8)}` });
+    // 등록된 Key Dimension 을 함께 돌려준다 — 화면이 치수를 따로 계산하지 않도록.
+    const product = catalog.productCodes.find((p) => p.code === result.parent && p.kind === "product");
+    const dr = product ? dimsFor(product, slots) : null;
+    const dims = dr && dr.ok ? { ...dr.dims, item: dr.item, sections: result.sections?.length ?? 0 } : null;
+    return NextResponse.json({ ...base, lines, trace, mainCode: result.mainCode, catalogFp, runId: snap.id, macroValue, dims, message: `BOM ${lines.length}행 · 코드 관계 ${result.parent} · 스냅샷 ${snap.id.slice(0, 8)}` });
   }
   return NextResponse.json({
     ok: true,
