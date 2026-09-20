@@ -37,6 +37,7 @@ model Tenant {
   codeRelations   CodeRelationship[]
   bomCodeRuns     BomCodeRun[]
   platformReqs    PlatformRequest[]
+  drawings        Drawing[]
 
   @@map("tenant")
 }
@@ -62,6 +63,7 @@ model AppUser {
   codeRelations      CodeRelationship[]
   bomCodeRuns        BomCodeRun[]
   platformReqs       PlatformRequest[]
+  drawings           Drawing[]
 
   @@map("app_user")
 }
@@ -245,8 +247,9 @@ model CodeRevision {
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   createdBy       String   @map("created_by") @db.Uuid
 
-  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  creator AppUser @relation(fields: [createdBy], references: [id])
+  tenant     Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  creator    AppUser      @relation(fields: [createdBy], references: [id])
+  bomRuns    BomCodeRun[]
 
   @@unique([tenantId, hierarchyStable, revNo])
   @@index([tenantId, hierarchyStable])
@@ -340,11 +343,15 @@ model BomCodeRun {
   lines           Json     @db.JsonB
   cost            Json     @db.JsonB
   source          String   @default("workbench")
+  /// P4-a: 이 BOM 을 어느 코드 개정으로 돌렸는지. null = 개정 저장 전 실행.
+  codeRevisionId  String?  @map("code_revision_id") @db.Uuid
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   createdBy       String   @map("created_by") @db.Uuid
 
-  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  creator AppUser @relation(fields: [createdBy], references: [id])
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  creator      AppUser       @relation(fields: [createdBy], references: [id])
+  codeRevision CodeRevision? @relation(fields: [codeRevisionId], references: [id], onDelete: SetNull)
+  drawings     Drawing[]
 
   @@index([tenantId, hierarchyStable, createdAt(sort: Desc)], map: "bom_code_run_tenant_node_idx")
   @@map("bom_code_run")
@@ -372,4 +379,34 @@ model PlatformRequest {
   @@index([tenantId, requestedAt(sort: Desc)], map: "platform_request_tenant_idx")
   @@index([state, requestedAt(sort: Desc)], map: "platform_request_state_idx")
   @@map("platform_request")
+}
+
+/// P4-a — 도면(p24 "2. Drawings"). 모든 도면은 BOM 스냅샷 하나에서 나온다.
+/// 발행(issued) 잠금과 상태 역행 금지는 DB 트리거가 건다(migration 0008_drawing) —
+/// 앱이 깜빡해도 지켜지도록.
+model Drawing {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  hierarchyStable String?  @map("hierarchy_stable") @db.Uuid
+  bomRunId        String   @map("bom_run_id") @db.Uuid
+  drawingNo       String   @map("drawing_no")
+  drawingType     String   @map("drawing_type") // 'plan' | 'assembly'
+  scale           String   @default("1:50")
+  size            String   @default("A3")
+  currentRev      String   @default("A") @map("current_rev")
+  status          String   @default("draft") // draft|review|approved|issued (작성중/검토/승인/발행)
+  code            String
+  dxf             String
+  meta            Json     @default("{}") @db.JsonB
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+  createdBy       String   @map("created_by") @db.Uuid
+
+  tenant  Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  bomRun  BomCodeRun @relation(fields: [bomRunId], references: [id])
+  creator AppUser    @relation(fields: [createdBy], references: [id])
+
+  @@unique([tenantId, drawingNo, currentRev], map: "drawing_tenant_no_rev_key")
+  @@index([tenantId, hierarchyStable, createdAt(sort: Desc)], map: "drawing_tenant_node_idx")
+  @@map("drawing")
 }

@@ -1,44 +1,149 @@
-import type { SlotValues } from "../rccs";
-import { sectionsOf } from "./bom";
-import { codesFromSlots } from "../macro/provider";
-import { SAMPLE_VARS } from "../macro/provider";
+import type { Dims } from "@edim/bom-code";
 
-/** Minimal DXF R12 (ASCII) writer — LINE + TEXT entities. Deterministic. */
+/**
+ * M3/P4-a — DXF R12(ASCII) 작성기. 순수 함수: 같은 입력 → 같은 바이트.
+ *
+ * **P4-a 에서 바뀐 것**: 치수를 더 이상 여기서 계산하지 않는다. 예전에는
+ * `sqrt(CAP/NS/3600)` 같은 샘플 상수로 단면을 만들어 냈다 — 회사가 표를 고쳐도
+ * 도면은 그대로였다. 이제 W·H·L 은 **등록된 Key Dimension 표**(p38~40)에서 오고,
+ * 이 파일은 받은 숫자를 그릴 뿐이다. 표에 없으면 호출한 쪽이 거부한다(추측 금지).
+ *
+ * 두 종류:
+ *   plan     — 평면 배치도: 외형 + 섹션 분할 + 전장/단면 치수선
+ *   assembly — 조립도(p38·p40): 외형 + 풍선번호 + Item 표가 도면 안에
+ */
+
 function line(x1: number, y1: number, x2: number, y2: number, layer = "0"): string {
   return `0\nLINE\n8\n${layer}\n10\n${x1}\n20\n${y1}\n30\n0\n11\n${x2}\n21\n${y2}\n31\n0\n`;
 }
 function text(x: number, y: number, h: number, value: string, layer = "TEXT"): string {
   return `0\nTEXT\n8\n${layer}\n10\n${x}\n20\n${y}\n30\n0\n40\n${h}\n1\n${value}\n`;
 }
+function circle(x: number, y: number, r: number, layer: string): string {
+  return `0\nCIRCLE\n8\n${layer}\n10\n${x}\n20\n${y}\n30\n0\n40\n${r}\n`;
+}
 function rect(x: number, y: number, w: number, h: number, layer: string): string {
-  return line(x, y, x + w, y, layer) + line(x + w, y, x + w, y + h, layer) + line(x + w, y + h, x, y + h, layer) + line(x, y + h, x, y, layer);
+  return (
+    line(x, y, x + w, y, layer) +
+    line(x + w, y, x + w, y + h, layer) +
+    line(x + w, y + h, x, y + h, layer) +
+    line(x, y + h, x, y, layer)
+  );
 }
 
-export interface DxfMeta { sections: string[]; lengthMm: number; faceMm: number; entities: number }
+const LAYERS: [string, number][] = [
+  ["0", 7], ["OUTLINE", 7], ["SECTION", 3], ["DIM", 1], ["TEXT", 5], ["BALLOON", 2], ["TABLE", 4],
+];
+function wrap(ents: string): string {
+  return (
+    `0\nSECTION\n2\nHEADER\n9\n$ACADVER\n1\nAC1009\n9\n$INSUNITS\n70\n4\n0\nENDSEC\n` +
+    `0\nSECTION\n2\nTABLES\n0\nTABLE\n2\nLAYER\n70\n${LAYERS.length}\n` +
+    LAYERS.map(([l, c]) => `0\nLAYER\n2\n${l}\n70\n0\n62\n${c}\n6\nCONTINUOUS\n`).join("") +
+    `0\nENDTAB\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n${ents}0\nENDSEC\n0\nEOF\n`
+  );
+}
 
-export function buildDxf(slots: SlotValues, code: string): { dxf: string; meta: DxfMeta } {
-  const c = codesFromSlots(slots);
-  const cap = c.CAP || 10;
-  const sections = sectionsOf(slots);
-  const face = Math.round(Math.sqrt((cap * 1000) / SAMPLE_VARS["NS|10"] / 3600) * 1000);
-  const segLen = 900;
-  const length = sections.length * segLen;
+/** 도면에 들어가는 한 줄 — BOM 스냅샷의 줄에서 그대로 온다. */
+export interface DrawingItem {
+  no: number;
+  part: string;
+  qty: number;
+  unit: string;
+  childCode?: string;
+  remarks?: string;
+}
+
+export interface DxfInput {
+  code: string;
+  /** 등록된 Key Dimension (mm) */
+  dims: Dims;
+  /** 치수 표에서 고른 행(용량 등) — 표제란에 남긴다 */
+  dimItem: string;
+  sections: string[];
+  items?: DrawingItem[];
+}
+
+export interface DxfMeta {
+  type: "plan" | "assembly";
+  sections: string[];
+  widthMm: number;
+  heightMm: number;
+  lengthMm: number;
+  dimItem: string;
+  entities: number;
+  items?: number;
+}
+
+/** 평면 배치도 — 외형·섹션 분할·치수선. 치수는 전부 등록 표에서 온다. */
+export function buildPlanDxf(input: DxfInput): { dxf: string; meta: DxfMeta } {
+  const { W, L } = input.dims;
+  const sections = input.sections.length > 0 ? input.sections : ["Unit"];
+  const length = sections.length * L;
   let ents = "";
   let n = 0;
-  // plan view — outline + section splits
-  ents += rect(0, 0, length, face, "OUTLINE"); n += 4;
+
+  ents += rect(0, 0, length, W, "OUTLINE"); n += 4;
   sections.forEach((s, i) => {
-    if (i > 0) { ents += line(i * segLen, 0, i * segLen, face, "SECTION"); n++; }
-    ents += text(i * segLen + 120, face / 2, 60, s.toUpperCase()); n++;
+    if (i > 0) { ents += line(i * L, 0, i * L, W, "SECTION"); n++; }
+    ents += text(i * L + 120, W / 2, 60, s.toUpperCase()); n++;
   });
-  // dimensions
   ents += line(0, -300, length, -300, "DIM"); ents += text(length / 2 - 200, -420, 70, `L=${length}`); n += 2;
-  ents += line(-300, 0, -300, face, "DIM"); ents += text(-900, face / 2, 70, `H=${face}`); n += 2;
-  ents += text(0, face + 300, 90, `EDIM ${code} - AHU ${cap}000 CMH - PLAN`); n++;
-  const dxf =
-    `0\nSECTION\n2\nHEADER\n9\n$ACADVER\n1\nAC1009\n9\n$INSUNITS\n70\n4\n0\nENDSEC\n` +
-    `0\nSECTION\n2\nTABLES\n0\nTABLE\n2\nLAYER\n70\n5\n` +
-    ["0", "OUTLINE", "SECTION", "DIM", "TEXT"].map((l, i) => `0\nLAYER\n2\n${l}\n70\n0\n62\n${[7, 7, 3, 1, 5][i]}\n6\nCONTINUOUS\n`).join("") +
-    `0\nENDTAB\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n${ents}0\nENDSEC\n0\nEOF\n`;
-  return { dxf, meta: { sections, lengthMm: length, faceMm: face, entities: n } };
+  ents += line(-300, 0, -300, W, "DIM"); ents += text(-900, W / 2, 70, `W=${W}`); n += 2;
+  ents += text(0, W + 300, 90, `EDIM ${input.code} - PLAN - DIM ${input.dimItem}`); n++;
+
+  return {
+    dxf: wrap(ents),
+    meta: { type: "plan", sections, widthMm: W, heightMm: input.dims.H, lengthMm: length, dimItem: input.dimItem, entities: n },
+  };
+}
+
+/**
+ * 조립도(p38·p40) — 같은 외형에 **풍선번호**를 찍고, 도면 안에 Item 표를 그린다.
+ * 표의 내용은 BOM 스냅샷 줄이다. "코드 하나가 도면과 BOM 을 동시에 낳는다"가
+ * 종이 한 장에서 보인다.
+ */
+export function buildAssemblyDxf(input: DxfInput): { dxf: string; meta: DxfMeta } {
+  const { W, H, L } = input.dims;
+  const sections = input.sections.length > 0 ? input.sections : ["Unit"];
+  const items = (input.items ?? []).slice(0, 20);
+  const length = sections.length * L;
+  let ents = "";
+  let n = 0;
+
+  ents += rect(0, 0, length, W, "OUTLINE"); n += 4;
+  sections.forEach((s, i) => {
+    if (i > 0) { ents += line(i * L, 0, i * L, W, "SECTION"); n++; }
+    ents += text(i * L + 120, W - 200, 55, s.toUpperCase()); n++;
+  });
+
+  const r = 130;
+  items.forEach((it, i) => {
+    const cx = Math.round(((i + 0.5) * length) / Math.max(items.length, 1));
+    const cy = Math.round(W / 2);
+    ents += circle(cx, cy, r, "BALLOON"); n++;
+    ents += line(cx, cy - r, cx, 0, "BALLOON"); n++;
+    ents += text(cx - 45, cy - 40, 90, String(it.no), "BALLOON"); n++;
+  });
+
+  const rowH = 260;
+  const tblY = -900;
+  const colX = [0, 500, 3400, 4200];
+  const tblW = 6200;
+  const rows = items.length + 1;
+  for (let i = 0; i <= rows; i++) { ents += line(0, tblY - i * rowH, tblW, tblY - i * rowH, "TABLE"); n++; }
+  for (const x of [...colX, tblW]) { ents += line(x, tblY, x, tblY - rows * rowH, "TABLE"); n++; }
+  const head = ["Item", "Description", "Q'ty", "Remarks"];
+  head.forEach((h, i) => { ents += text(colX[i]! + 60, tblY - rowH + 80, 95, h, "TABLE"); n++; });
+  items.forEach((it, i) => {
+    const y = tblY - (i + 2) * rowH + 80;
+    const cells = [String(it.no), it.part, `${it.qty} ${it.unit}`, it.childCode ?? it.remarks ?? ""];
+    cells.forEach((c, k) => { ents += text(colX[k]! + 60, y, 90, c.slice(0, 38), "TABLE"); n++; });
+  });
+
+  ents += text(0, W + 300, 90, `EDIM ${input.code} - ASSEMBLY - DIM ${input.dimItem} (W${W} H${H} L${L})`); n++;
+
+  return {
+    dxf: wrap(ents),
+    meta: { type: "assembly", sections, widthMm: W, heightMm: H, lengthMm: length, dimItem: input.dimItem, entities: n, items: items.length },
+  };
 }

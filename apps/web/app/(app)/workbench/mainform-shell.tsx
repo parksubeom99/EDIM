@@ -272,7 +272,6 @@ export function MainFormShell({
         commands={commands}
         runRef={runRef}
         onBusy={setBusyKind}
-        macroValue={(() => { const r = runs.find((x) => x.kind === "edim" && x.status === "ran"); return typeof r?.value === "number" ? r.value : null; })()}
       />
       {/* ── EDIM Toolbox (floating, outside the 5 regions) ── */}
       <ToolboxWindow

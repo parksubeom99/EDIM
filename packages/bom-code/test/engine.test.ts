@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import demo from "../catalog/ahu-demo.json";
-import { runBomCode, sectionsFor, catalogFingerprint, macroTablesOf, type Catalog } from "../src/index";
+import { runBomCode, sectionsFor, catalogFingerprint, macroTablesOf, dimsFor, dimTableOf, type Catalog, type ProductCode } from "../src/index";
 
 const catalog = demo as unknown as Catalog;
 const S55 = { A: "EU", B: "55", C: "2123", D: "630", E: "SS", F: "1-21-13-15" } as const;
@@ -93,5 +93,58 @@ describe("bom-code engine (p34 Part List Run)", () => {
     if (!base.ok) throw new Error("run failed");
     expect(base.mainCode).toBe("EU-1-1-0-0");
     expect(base.lines.find((l) => l.childCode === "KCP 1")?.resolvedCode).toBe("KCP 1-1-0-0"); // empty slot → 0
+  });
+});
+
+describe("P4-a Key Dimension (p38~40) — 치수는 등록 표에서만 나온다", () => {
+  const eu = catalog.productCodes.find((p) => p.code === "EU")! as ProductCode;
+
+  it("제품 코드에 치수 표(Dim)가 등록되어 있다", () => {
+    const t = dimTableOf(eu);
+    expect(t).not.toBeNull();
+    expect(t!.role).toBe("dim");
+    expect(t!.cols.map((c) => c.name)).toEqual(expect.arrayContaining(["W", "H", "L"]));
+  });
+
+  it("슬롯 값으로 그 행의 치수를 읽는다", () => {
+    const r = dimsFor(eu, S55);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.item).toBe("55");
+    expect(r.dims.W).toBe(2472);
+    expect(r.dims.L).toBe(900);
+  });
+
+  it("슬롯이 비면 default 행을 쓴다", () => {
+    const r = dimsFor(eu, { A: "EU" });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.item).toBe("10");
+  });
+
+  it("치수 표가 없으면 추측하지 않고 거부한다", () => {
+    const noDim: ProductCode = { ...eu, tables: { cap: eu.tables.cap! } };
+    const r = dimsFor(noDim, S55);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe("NO_DIM_TABLE");
+  });
+
+  it("고른 값의 행이 없으면 거부한다", () => {
+    const r = dimsFor(eu, { ...S55, B: "99" });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe("NO_DIM_ROW");
+  });
+
+  it("치수 한 칸을 고치면 읽히는 값이 바뀐다 (변경 전파의 출발점)", () => {
+    const t = dimTableOf(eu)!;
+    const edited: ProductCode = {
+      ...eu,
+      tables: {
+        ...eu.tables,
+        dim: { ...t, rows: t.rows.map((r) => (r.item === "55" ? { ...r, cells: { ...r.cells, A: 2600 } } : r)) },
+      },
+    };
+    const r = dimsFor(edited, S55);
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.dims.W).toBe(2600);
   });
 });

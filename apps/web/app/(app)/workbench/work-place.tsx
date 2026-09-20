@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { CodeChip } from "@edim/ui";
 import type { SlotDef, SlotValues, AssembleResult } from "@/app/lib/rccs";
 import type { WorkTab } from "./toolbar";
@@ -64,7 +64,7 @@ export function WorkPlace({
           </div>
         )}
         {tab === "code" && <CodeBuilder slotDefs={slotDefs} slots={slots} onSlots={onSlots} assembled={assembled} nodeStable={nodeStable} canEdit={canEdit} rev={rev} onRev={onRev} />}
-        {tab === "design" && <DesignCanvas code={assembled.code} slots={slots} />}
+        {tab === "design" && <DesignCanvas code={assembled.code} slots={slots} runs={runs} nodeStable={nodeStable} canEdit={canEdit} />}
         {tab === "bom" && <BomPanel code={assembled.code} runs={runs} />}
         {tab === "macro" && <MacroPanel project={project} nodeStable={nodeStable} canEdit={canEdit} canDecide={canDecide} runs={runs} />}
         {tab === "document" && <DocumentPanel project={project} code={assembled.code} />}
@@ -270,7 +270,9 @@ function nextRevLabel(count: number): string {
 }
 
 /* ───────────── Design canvas (SVG, driven by slots) ───────────── */
-function DesignCanvas({ code, slots }: { code: string; slots: SlotValues }) {
+function DesignCanvas({ code, slots, runs, nodeStable, canEdit }: { code: string; slots: SlotValues; runs: RunResult[]; nodeStable: string | null; canEdit: boolean }) {
+  // P4-a: 도면은 **BOM 스냅샷**에서 나온다. 스냅샷이 없으면 뜰 수 없다.
+  const runId = runs.find((r) => r.kind === "bom" && r.runId)?.runId ?? null;
   const cap = Number(slots.B ?? 0) || 10;
   const w = 320 + Math.min(cap, 60) * 4;
   const hasRotor = slots.D === "630";
@@ -300,15 +302,27 @@ function DesignCanvas({ code, slots }: { code: string; slots: SlotValues }) {
           {slots.A ?? "—"} series {slots.C ?? "—"} {slots.E ? `· ${slots.E}` : ""}
         </text>
       </svg>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8, flexWrap: "wrap" }}>
         <a
           data-testid="dxf-download"
-          href={`/api/dxf?${Object.entries(slots).filter(([, v]) => v).map(([k, v]) => `${k}=${encodeURIComponent(v as string)}`).join("&")}`}
-          style={{ fontSize: "var(--fs-12)", color: "var(--accent-contrast)", background: "var(--accent)", border: "1px solid var(--line)", borderRadius: "var(--radius-sm)", padding: "5px 10px", textDecoration: "none" }}
+          href={runId ? `/api/dxf?runId=${runId}&type=plan` : "#"}
+          style={{ fontSize: "var(--fs-12)", color: "var(--accent-contrast)", background: runId ? "var(--accent)" : "var(--surface-2)", border: "1px solid var(--line)", borderRadius: "var(--radius-sm)", padding: "5px 10px", textDecoration: "none", opacity: runId ? 1 : 0.5, pointerEvents: runId ? "auto" : "none" }}
         >
-          DXF 다운로드
+          평면도 DXF
         </a>
-        <span style={muted}>평면 배치도 R12 DXF — AutoCAD·FreeCAD에서 열림 (레이어 OUTLINE/SECTION/DIM/TEXT)</span>
+        <a
+          data-testid="dxf-assembly"
+          href={runId ? `/api/dxf?runId=${runId}&type=assembly` : "#"}
+          style={{ fontSize: "var(--fs-12)", color: "var(--ink)", background: "var(--surface-2)", border: "1px solid var(--line)", borderRadius: "var(--radius-sm)", padding: "5px 10px", textDecoration: "none", opacity: runId ? 1 : 0.5, pointerEvents: runId ? "auto" : "none" }}
+        >
+          조립도 DXF
+        </a>
+        <DrawingRegister runId={runId} nodeStable={nodeStable} canEdit={canEdit} />
+        <span style={muted}>
+          {runId
+            ? "치수는 등록된 Key Dimension 표(p38~40)에서 옵니다. R12 DXF — AutoCAD·FreeCAD"
+            : "먼저 BOM Run 을 실행하세요 — 도면은 BOM 스냅샷에서 나옵니다."}
+        </span>
       </div>
     </div>
   );
@@ -352,5 +366,78 @@ function KeyDims({ slots, runs }: { slots: SlotValues; runs: RunResult[] }) {
         </span>
       ))}
     </div>
+  );
+}
+
+/* ───────────── P4-a · 도면 등록 (p24 Drawings) ───────────── */
+/**
+ * 뜬 도면을 **남긴다**. 남긴 도면은 번호·개정·상태를 갖고, 발행되면 잠긴다.
+ * 같은 번호를 다시 뜨면 개정이 붙어 전/후를 비교할 수 있다 — 치수를 바꾼 뒤
+ * "무엇이 달라졌나"를 도면으로 확인하기 위해서다.
+ */
+const DRAW_LABEL: Record<string, string> = { draft: "작성중", review: "검토", approved: "승인", issued: "발행" };
+const DRAW_NEXT: Record<string, string> = { draft: "review", review: "approved", approved: "issued" };
+
+function DrawingRegister({ runId, nodeStable, canEdit }: { runId: string | null; nodeStable: string | null; canEdit: boolean }) {
+  const [rows, setRows] = useState<{ id: string; drawingNo: string; currentRev: string; status: string; drawingType: string; meta: unknown }[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    const r = await fetch(`/api/drawings${nodeStable ? `?node=${nodeStable}` : ""}`);
+    const j = (await r.json().catch(() => ({}))) as { rows?: typeof rows };
+    setRows(j.rows ?? []);
+  }, [nodeStable]);
+  useEffect(() => { void load(); }, [load]);
+
+  async function make(type: "plan" | "assembly") {
+    if (!runId || busy) return;
+    setBusy(true); setErr(null);
+    const r = await fetch("/api/drawings", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ runId, type }) });
+    const j = (await r.json().catch(() => ({}))) as { error?: string };
+    setBusy(false);
+    if (!r.ok) { setErr(j.error ?? "도면 생성 실패"); return; }
+    await load();
+  }
+  async function advance(id: string, status: string) {
+    setErr(null);
+    const r = await fetch(`/api/drawings/${id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ status }) });
+    const j = (await r.json().catch(() => ({}))) as { error?: string };
+    if (!r.ok) { setErr(j.error ?? "상태 변경 실패"); return; }
+    await load();
+  }
+
+  return (
+    <span data-testid="drawing-register" style={{ display: "inline-flex", flexDirection: "column", gap: 6 }}>
+      <span style={{ display: "inline-flex", gap: 8 }}>
+        <button type="button" data-testid="drawing-make-plan" disabled={!runId || !canEdit || busy} onClick={() => void make("plan")}
+          style={{ fontSize: "var(--fs-12)", padding: "5px 10px", background: "var(--surface-2)", color: "var(--ink)", border: "1px solid var(--line)", borderRadius: "var(--radius-sm)", opacity: runId && canEdit ? 1 : 0.5 }}>
+          평면도 등록
+        </button>
+        <button type="button" data-testid="drawing-make-assembly" disabled={!runId || !canEdit || busy} onClick={() => void make("assembly")}
+          style={{ fontSize: "var(--fs-12)", padding: "5px 10px", background: "var(--surface-2)", color: "var(--ink)", border: "1px solid var(--line)", borderRadius: "var(--radius-sm)", opacity: runId && canEdit ? 1 : 0.5 }}>
+          조립도 등록
+        </button>
+      </span>
+      {err && <span data-testid="drawing-error" style={{ color: "var(--warn)", fontSize: "var(--fs-12)" }}>{err}</span>}
+      {rows.length > 0 && (
+        <span data-testid="drawing-list" style={{ display: "inline-flex", flexDirection: "column", gap: 4 }}>
+          {rows.map((d) => (
+            <span key={d.id} data-testid="drawing-row" data-status={d.status} style={{ display: "inline-flex", gap: 8, alignItems: "center", fontSize: "var(--fs-12)" }}>
+              <a href={`/api/drawings/${d.id}`} style={{ fontFamily: "var(--font-mono)", color: "var(--accent)" }}>
+                {d.drawingNo} Rev {d.currentRev}
+              </a>
+              <span>{DRAW_LABEL[d.status] ?? d.status}</span>
+              {canEdit && DRAW_NEXT[d.status] && (
+                <button type="button" data-testid={`drawing-advance-${d.drawingNo}-${d.currentRev}`} onClick={() => void advance(d.id, DRAW_NEXT[d.status]!)}
+                  style={{ fontSize: "var(--fs-12)", padding: "2px 8px", background: "transparent", color: "var(--ink)", border: "1px solid var(--line)", borderRadius: "var(--radius-sm)" }}>
+                  → {DRAW_LABEL[DRAW_NEXT[d.status]!]}
+                </button>
+              )}
+            </span>
+          ))}
+        </span>
+      )}
+    </span>
   );
 }

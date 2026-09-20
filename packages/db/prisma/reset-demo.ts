@@ -23,13 +23,18 @@ async function resetDemo(): Promise<void> {
   const t = IDS.tenantA;
   const rev = await adminPrisma.codeRevision.deleteMany({ where: { tenantId: t } });
   const mac = await adminPrisma.macroRegistry.deleteMany({ where: { tenantId: t } });
+  // 도면이 BOM 스냅샷을 참조하므로 **도면을 먼저** 지운다(FK RESTRICT).
+  // 발행된 도면은 트리거가 삭제를 막으므로(운영에서는 그게 맞다) 리셋 동안만 내린다.
+  await adminPrisma.$executeRawUnsafe(`ALTER TABLE "drawing" DISABLE TRIGGER USER`);
+  const dwg = await adminPrisma.drawing.deleteMany({ where: { tenantId: t } });
+  await adminPrisma.$executeRawUnsafe(`ALTER TABLE "drawing" ENABLE TRIGGER USER`);
   const run = await adminPrisma.bomCodeRun.deleteMany({ where: { tenantId: t } });
   const req = await adminPrisma.platformRequest.deleteMany({ where: { tenantId: t } });
   const aud = await adminPrisma.auditLog.deleteMany({ where: { tenantId: t } });
   // 리허설이 역할을 바꿔 놓았을 수 있다(User Management 시연) → 시드 역할로 되돌린다.
   await adminPrisma.membership.updateMany({ where: { tenantId: t, userId: IDS.viewerA }, data: { role: "viewer" } });
   await adminPrisma.membership.updateMany({ where: { tenantId: t, userId: IDS.ownerA }, data: { role: "owner" } });
-  console.log(`Demo reset: removed ${rev.count} code revisions, ${mac.count} macros, ${run.count} BOM run snapshots, ${req.count} platform requests, ${aud.count} audit rows; memberships restored.`);
+  console.log(`Demo reset: removed ${rev.count} code revisions, ${mac.count} macros, ${run.count} BOM run snapshots, ${dwg.count} drawings, ${req.count} platform requests, ${aud.count} audit rows; memberships restored.`);
   await seedAll();
   await seedDemo({ forceCatalog: true }); // 시연 중 고친 표·관계를 원상 복구
   console.log("Demo reset complete — first save will be Rev A, approved macro is back to the seeded revision.");

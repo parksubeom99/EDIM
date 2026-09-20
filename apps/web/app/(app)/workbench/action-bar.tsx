@@ -17,6 +17,8 @@ export interface RunResult {
   /** P1: per line — registered child code + p34 resolved code */
   trace?: { no: number; childCode: string; resolvedCode: string }[];
   mainCode?: string;
+  /** P4-a — BOM 실행이 남긴 스냅샷 id. 뒤따르는 산출물(EBOM·Cost·도면)의 입력이 된다. */
+  runId?: string | null;
 }
 
 const RUNS: { kind: "bom" | "edim" | "ebom" | "cost"; label: string }[] = [
@@ -39,7 +41,6 @@ const btn = (primary: boolean, disabled: boolean): CSSProperties => ({
 });
 
 export function ActionBar({
-  macroValue,
   project,
   code,
   codeOk,
@@ -63,10 +64,11 @@ export function ActionBar({
   onResult: (r: RunResult) => void;
   nodeStable: string | null;
   slots: SlotValues;
-  macroValue: number | null;
 }) {
   const [last, setLast] = useState<RunResult | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  // P4-a: 가장 최근 BOM 스냅샷. EBOM·Cost·도면은 화면 상태가 아니라 이 id 로 돈다.
+  const [runId, setRunId] = useState<string | null>(null);
   const runDisabled = !canEdit || !codeOk;
 
   async function run(kind: string) {
@@ -76,7 +78,8 @@ export function ActionBar({
       const res = await fetch(`/api/run/${kind}`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ projectId: project?.id ?? null, code, node: nodeStable, slots, macroValue }),
+        // macroValue 는 더 이상 보내지 않는다 — 서버가 승인 매크로를 직접 실행한다.
+        body: JSON.stringify({ projectId: project?.id ?? null, code, node: nodeStable, slots, runId }),
       });
       const body = (await res.json().catch(() => ({}))) as Partial<RunResult> & { error?: string };
       const r: RunResult = {
@@ -90,7 +93,9 @@ export function ActionBar({
         cost: body.cost,
         trace: body.trace,
         mainCode: body.mainCode,
+        runId: body.runId ?? null,
       };
+      if (kind === "bom" && body.runId) setRunId(body.runId);
       setLast(r);
       onResult(r);
     } finally {

@@ -1,4 +1,4 @@
-# EDIM 베타 — 발표 절차서 (v2, 2026-09-19 · P3-a 반영)
+# EDIM 베타 — 발표 절차서 (v3, 2026-09-19 · P3-a·P4-a 반영)
 
 > 목적: 회장님이 **자기 노트북에서** 베타 1수직을 직접 띄우고, 7장면으로 시연하고,
 > 질문에 방어하는 전 과정. 이 문서 하나로 준비 → 리허설 → 발표가 끝나야 한다.
@@ -35,25 +35,26 @@ pnpm dev                   # http://localhost:3000  (pnpm start 아님)
 
 ```powershell
 pnpm typecheck             # 11 패키지 Done
-pnpm -r test               # 169 passed
+pnpm -r test               # 177 passed
 pnpm --filter @edim/db revision:test   # Tier B 8/8 (append-only · RLS · 감사)
 pnpm --filter @edim/db backbone:test   # P1 코드 등뼈 13/13
-pnpm --filter @edim/db platform:test   # ★ P3-a 21/21 (DB①/DB② 권한 분리·역류 차단)
+pnpm --filter @edim/db platform:test   # ★ P3-a 22/22 (DB①/DB② 권한 분리·역류 차단)
+pnpm --filter @edim/db drawing:test    # ★ P4-a 12/12 (도면 개정·발행 잠금·스냅샷 연결)
 pip install playwright --break-system-packages ; playwright install chromium
 pnpm db:reset:demo         # ★ 리허설 흔적 제거 (테스트·이전 e2e가 남긴 Rev·매크로 revision)
-python scripts\demo_e2e.py http://localhost:3000 shots   # ★ 51/51 PASS면 발표 가능
+python scripts\demo_e2e.py http://localhost:3000 shots   # ★ 68/68 PASS면 발표 가능
 pnpm db:reset:demo         # ★ e2e 자신도 흔적을 남긴다 → 시연 직전 반드시 한 번 더
 ```
 
-`demo_e2e.py`가 51/51이면 아래 시연 8장면은 **기계적으로 재현이 보장된** 상태다.
+`demo_e2e.py`가 68/68이면 아래 시연 9장면은 **기계적으로 재현이 보장된** 상태다.
 
 **리허설 잔재 규칙** — `code_revision`은 append-only라 앱에서 지울 수 없다. e2e·`revision:test`·손 리허설을 한 번이라도 돌린 DB에서는 본 시연의 첫 저장이 "Rev A"가 아니라 "Rev C/E…"로 찍히고, 매크로 revision도 r2가 아니라 r3+로 보인다. e2e의 `S2d`가 이 상태를 FAIL로 잡아준다.
 
-**발표 당일 아침 순서 (이 순서 그대로):** `docker ps` healthy → `pnpm db:reset:demo` → `demo_e2e.py` 51/51 → **`pnpm db:reset:demo` 한 번 더** → 브라우저 강력 새로고침(Ctrl+Shift+R) → 이후 시연 시작 전까지 화면 클릭·저장 금지.
+**발표 당일 아침 순서 (이 순서 그대로):** `docker ps` healthy → `pnpm db:reset:demo` → `demo_e2e.py` 68/68 → **`pnpm db:reset:demo` 한 번 더** → 브라우저 강력 새로고침(Ctrl+Shift+R) → 이후 시연 시작 전까지 화면 클릭·저장 금지.
 
 ---
 
-## 2. 시연 대본 — 8장면 (약 10분)
+## 2. 시연 대본 — 9장면 (약 12분)
 
 로그인: `owner@acme.test` (이메일만, 비밀번호 없음 — 베타 스켈레톤 인증).
 
@@ -68,6 +69,8 @@ pnpm db:reset:demo         # ★ e2e 자신도 흔적을 남긴다 → 시연 �
 | 7 | Design | **Export**(DXF R12) → CAD/뷰어로 열어 평면 배치 확인 | "도면도 코드의 함수입니다. 지금은 평면 배치 1장, 다음이 승인도·제작도입니다." | p37~40 |
 
 | 8 | Company Info. → Platform Console | `/m/company`에서 **Special 의뢰** 제출 → 로그아웃 → `platform@edim.test`로 로그인 → `/platform`에서 **승인** → 다시 회사 계정으로 보면 **승인됨** | "3계층입니다. 회사가 자기 코드·표·매크로를 고치는 건 회사 관리자 선에서 끝나고(셀프서비스), 플랫폼으로 올라오는 건 Special 의뢰뿐입니다. 그리고 **플랫폼 화면에는 고객사 업무 데이터가 없습니다** — 참는 게 아니라 DB 권한이 없습니다(p54)." | p54·p59·p64 |
+
+| 9 | Design 탭 → Set-Up 표 → Design 탭 | BOM Run 뒤 **평면도·조립도 DXF**를 받고 → Set-Up에서 **치수 표 한 칸**(55행 W)을 2472→2600으로 고치고 → 같은 코드로 다시 Run → 도면이 따라 바뀐다. 도면을 **등록**하면 번호·개정(A→B)·상태가 붙고, **발행**하면 잠긴다 | "도면이 코드에서 나옵니다. 그리고 치수는 제가 코드에 박아 둔 값이 아니라 **회사가 등록한 표**에서 옵니다 — 표를 고치면 도면이 바뀝니다. 발행된 도면은 DB가 수정을 거부합니다." | p38~40·p24 |
 
 마무리 문장: "여기까지가 베타입니다. 다음은 회사 실 표 바인딩과 도면 확장입니다. 그 두 개는 **구조가 아니라 데이터**의 문제입니다."
 

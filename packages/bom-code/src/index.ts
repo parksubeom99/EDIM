@@ -53,6 +53,13 @@ export interface TableRow {
 export interface TechTable {
   /** the N of `TableN(...)` — unique within a product code */
   no: number;
+  /**
+   * p16/p51 "Table Type" — 같은 표 구조를 쓰되 **읽는 쪽**이 다르다.
+   *   "tech" (기본) : BOM·Macro 가 `{표.열}` / `TableN(...)` 으로 읽는다
+   *   "dim"         : 도면(P4-a)이 읽는 Key Dimension 표. 제품 코드당 1개.
+   * 종류를 표에 붙이는 것이라 새 화면·새 테이블이 없다.
+   */
+  role?: "tech" | "dim";
   by: SlotKey;
   /** Item used when the slot is EMPTY (a chosen value without a row is an error) */
   default: string;
@@ -292,4 +299,54 @@ export function macroTablesOf(product: ProductCode): { tables: Record<string, Re
     }
   }
   return { tables, labels };
+}
+
+/* ── P4-a · Key Dimension (p38~40) ─────────────────────────────────────────── */
+
+/**
+ * 도면이 읽는 치수 열 이름. 표의 **열 이름**(name)으로 찾는다 — 열 글자(A,B,C)는
+ * 회사가 자유롭게 붙이므로 위치에 의존하지 않는다.
+ *   W = 단면 폭 · H = 단면 높이 · L = 섹션 1개 길이 (mm)
+ */
+export const DIM_NAMES = ["W", "H", "L"] as const;
+export type DimName = (typeof DIM_NAMES)[number];
+export type Dims = Record<DimName, number>;
+
+/** 제품 코드의 Key Dimension 표(종류 dim). 없으면 null. */
+export function dimTableOf(p: ProductCode): TechTable | null {
+  for (const t of Object.values(p.tables)) if (t.role === "dim") return t;
+  return null;
+}
+
+export type DimsResult =
+  | { ok: true; dims: Dims; item: string; tableName: string }
+  | { ok: false; code: "NO_DIM_TABLE" | "NO_DIM_ROW" | "MISSING_DIM_COL" | "NOT_NUMERIC"; message: string };
+
+/**
+ * 등록된 치수를 뽑는다. **계산하지 않는다** — 표에 없으면 추측 대신 거부한다
+ * (P1 에서 세운 규칙: 등록되지 않은 것은 0 이 아니라 오류).
+ */
+export function dimsFor(p: ProductCode, slots: SlotValues): DimsResult {
+  const entry = Object.entries(p.tables).find(([, t]) => t.role === "dim");
+  if (!entry)
+    return { ok: false, code: "NO_DIM_TABLE", message: `제품 코드 ${p.code} 에 치수 표(Dim)가 등록되지 않았습니다` };
+  const [tableName, t] = entry;
+  const chosen = slots[t.by];
+  const item = chosen && chosen !== "" ? chosen : t.default;
+  const row = t.rows.find((r) => r.item === item);
+  if (!row)
+    return { ok: false, code: "NO_DIM_ROW", message: `치수 표 ${tableName} 에 ${t.by}=${item} 행이 없습니다` };
+  const byName = new Map(t.cols.map((c) => [c.name, c.key]));
+  const dims = {} as Dims;
+  for (const n of DIM_NAMES) {
+    const key = byName.get(n);
+    if (!key)
+      return { ok: false, code: "MISSING_DIM_COL", message: `치수 표 ${tableName} 에 열 ${n} 이 없습니다 (필요: ${DIM_NAMES.join(", ")})` };
+    const cell = row.cells[key];
+    const v = typeof cell === "number" ? cell : Number(cell);
+    if (!Number.isFinite(v) || v <= 0)
+      return { ok: false, code: "NOT_NUMERIC", message: `치수 ${n}(${item} 행)이 숫자가 아닙니다: ${String(cell)}` };
+    dims[n] = v;
+  }
+  return { ok: true, dims, item, tableName };
 }

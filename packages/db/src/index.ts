@@ -91,3 +91,17 @@ export type {
 } from "./platform";
 export { listMembers, setMemberRole, LastOwnerError } from "./membership";
 export type { MemberRow } from "./membership";
+export {
+  saveDrawing,
+  listDrawings,
+  getDrawing,
+  setDrawingStatus,
+  getBomRun,
+  latestRevisionId,
+  DRAWING_STATUSES,
+  DRAWING_STATUS_LABEL,
+  isDrawingStatus,
+  DrawingLockedError,
+  DrawingStatusBackwardsError,
+} from "./drawing";
+export type { DrawingStatus, SaveDrawingInput } from "./drawing";

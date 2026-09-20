@@ -159,6 +159,8 @@ export interface BomCodeRunInput {
   lines: Json;
   cost: Json;
   source?: string;
+  /** P4-a — 이 실행이 근거로 삼은 코드 개정(없으면 null) */
+  codeRevisionId?: string | null;
   createdBy: string;
 }
 
@@ -177,6 +179,9 @@ export async function saveBomCodeRun(tx: TenantClient, input: BomCodeRunInput): 
       lines: input.lines,
       cost: input.cost,
       source: input.source ?? "workbench",
+      // P4-a: 어느 코드 개정으로 돌렸는지. 이 한 칸이 있어야 견적·도면에서
+      // 거꾸로 Rev 까지 따라갈 수 있다(연결 장부 약함 #3).
+      codeRevisionId: input.codeRevisionId ?? null,
       createdBy: input.createdBy,
     },
   });

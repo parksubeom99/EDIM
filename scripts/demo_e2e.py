@@ -47,8 +47,12 @@ with sync_playwright() as p:
         nuke(pg); pg.click(f"button:has-text('{k}')", force=True); time.sleep(2.5)
     body=pg.inner_text("body"); ok("S6a BOM rows incl. macro-driven isolator + p14 spec", "Vibration isolator" in body and "칼라강판" in body, "Vibration isolator" in body and "칼라강판" in body)
     m=re.search(r"15,487,170",body); ok("S6b Cost total ₩15,487,170", bool(m), m); pg.screenshot(path=f"{OUT}/15_bom_cost.png",full_page=True)
-    # S7 DXF
-    d=ctx.request.get(BASE+"/api/dxf?A=EU&B=55&C=2123&D=630&E=SS"); ok("S7 DXF 200 + AC1009", (d.status, d.headers.get("content-type")), d.status==200 and "AC1009" in d.text())
+    # S7 DXF — P4-a: 도면은 슬롯이 아니라 **BOM 스냅샷**에서 나온다
+    J0={"content-type":"application/json"}; S55_0={"A":"EU","B":"55","C":"2123","D":"630","E":"SS","F":"1-21-13-15"}
+    r0=ctx.request.post(BASE+"/api/run/bom",headers=J0,data=json.dumps({"slots":S55_0,"code":"EU-55-2123-630SS-1-21-13-15","node":"a0000000-0000-4000-8000-000000000004"}))
+    RUN0=r0.json().get("runId")
+    d=ctx.request.get(BASE+f"/api/dxf?runId={RUN0}&type=plan"); ok("S7 DXF 200 + AC1009 (스냅샷 기준)", (d.status, d.headers.get("content-type")), d.status==200 and "AC1009" in d.text())
+    nd=ctx.request.get(BASE+"/api/dxf"); ok("S7b 스냅샷 없이는 도면을 못 뜬다 (400)", nd.status, nd.status==400)
     open(f"{OUT}/edim_sample.dxf","w").write(d.text())
     nuke(pg); pg.locator("button", has_text=re.compile(r"^Design$")).first.click(force=True); time.sleep(1.5); pg.screenshot(path=f"{OUT}/16_design_tab.png")
     # ── P1 코드 기반 등뼈 (EDIM.pdf p31·33·34) ─────────────────────────────────────────
@@ -115,6 +119,73 @@ with sync_playwright() as p:
     # S11 권한: viewer는 등록을 못 한다 (서버에서 차단)
     v=b.new_context(); v.request.post(BASE+"/api/auth/login",data={"email":"viewer@acme.test"})
     r=v.request.post(BASE+"/api/setup/sub-codes",headers=J,data=json.dumps({"group":"AHU Code","itemKey":"B","itemName":"용량","value":"99"})); ok("S11 viewer cannot register codes (403)", r.status, r.status==403); v.close()
+    # ── P4-a 치수 전파 · 도면 (p38~40 Key Dimension · p24 Drawings) ─────────────
+    import ezdxf, io
+    def dxf_stats(txt):
+        doc=ezdxf.read(io.StringIO(txt)); msp=doc.modelspace()
+        ents=[e for e in msp]
+        xs=[]; ys=[]
+        for e in ents:
+            if e.dxftype()=="LINE": xs+= [e.dxf.start.x, e.dxf.end.x]; ys+=[e.dxf.start.y, e.dxf.end.y]
+            elif e.dxftype()=="TEXT": xs.append(e.dxf.insert.x); ys.append(e.dxf.insert.y)
+        texts=sorted(e.dxf.text for e in ents if e.dxftype()=="TEXT")
+        return {"n":len(ents),"layers":sorted({e.dxf.layer for e in ents}),"maxx":round(max(xs)),"maxy":round(max(ys)),"texts":texts}
+    # S18a 지금 도면의 폭은 등록 표의 값이다
+    m=ctx.request.get(BASE+f"/api/dxf?runId={RUN0}&type=plan&meta=1").json()
+    ok("S18a 도면 치수가 등록 표에서 온다 (W=2472 · 치수행 55)", (m.get("widthMm"), m.get("dimItem")), m.get("widthMm")==2472 and m.get("dimItem")=="55")
+    before=dxf_stats(ctx.request.get(BASE+f"/api/dxf?runId={RUN0}&type=plan").text())
+    # S18b 치수 표의 한 칸(55행 W)을 2472 → 2600 으로 바꾼다
+    cat=ctx.request.get(BASE+"/api/setup/catalog").json()
+    eu=[p for p in cat.get("productCodes",[]) if p.get("code")=="EU"][0]
+    dimname=[k for k,t in eu["tables"].items() if t.get("role")=="dim"][0]
+    wkey=[c["key"] for c in eu["tables"][dimname]["cols"] if c["name"]=="W"][0]
+    for row in eu["tables"][dimname]["rows"]:
+        if row["item"]=="55": row["cells"][wkey]=2600
+    up=ctx.request.post(BASE+"/api/setup/product-codes",headers=J0,data=json.dumps(eu))
+    ok("S18b 치수 표의 한 칸을 2472 → 2600 으로 고친다", up.status, up.status==200)
+    # S18c 같은 코드로 다시 돌리면 도면이 바뀐다
+    r1=ctx.request.post(BASE+"/api/run/bom",headers=J0,data=json.dumps({"slots":S55_0,"code":"EU-55-2123-630SS-1-21-13-15","node":"a0000000-0000-4000-8000-000000000004"}))
+    RUN1=r1.json().get("runId")
+    after=dxf_stats(ctx.request.get(BASE+f"/api/dxf?runId={RUN1}&type=plan").text())
+    m1=ctx.request.get(BASE+f"/api/dxf?runId={RUN1}&type=plan&meta=1").json()
+    ok("S18c 치수를 바꾸니 도면 폭이 따라간다 (2472 → 2600 · ezdxf 실측 도형도 그만큼 커짐)", (m.get("widthMm"), m1.get("widthMm"), after["maxy"]-before["maxy"]), m1.get("widthMm")==2600 and after["maxy"]-before["maxy"]==128)
+    Lb=[t for t in before["texts"] if t.startswith("L=")]; La=[t for t in after["texts"] if t.startswith("L=")]
+    ok("S18d 바뀐 것은 폭뿐 — 엔티티 수·레이어·전장(L)은 그대로", (before["n"], after["n"], Lb, La), before["n"]==after["n"] and before["layers"]==after["layers"] and before["maxx"]==after["maxx"] and Lb==La and len(Lb)==1)
+    ok("S18e 치수 문자열만 갈렸다 (W=2472 → W=2600)", ("W=2472" in before["texts"], "W=2600" in after["texts"]), "W=2472" in before["texts"] and "W=2600" in after["texts"] and "W=2600" not in before["texts"])
+    # S18f 조립도는 BOM 스냅샷의 Item 표를 도면 안에 담는다
+    asm=ctx.request.get(BASE+f"/api/dxf?runId={RUN1}&type=assembly").text()
+    am=ctx.request.get(BASE+f"/api/dxf?runId={RUN1}&type=assembly&meta=1").json()
+    ok("S18f 조립도에 Item 표와 풍선번호가 들어간다 (p38·p40)", (am.get("items"), "Q'ty" in asm), am.get("items")==11 and "Q'ty" in asm and "0\nCIRCLE\n" in asm)
+    open(f"{OUT}/edim_assembly.dxf","w").write(asm)
+    # S19 도면을 남긴다 — 번호·개정·상태·발행 잠금 (p24)
+    g1=ctx.request.post(BASE+"/api/drawings",headers=J0,data=json.dumps({"runId":RUN1,"type":"plan"})).json()
+    ok("S19a 도면 등록 Rev A", (g1.get("drawingNo"), g1.get("rev")), g1.get("rev")=="A")
+    g2=ctx.request.post(BASE+"/api/drawings",headers=J0,data=json.dumps({"runId":RUN1,"type":"plan"})).json()
+    ok("S19b 다시 뜨면 Rev B — 앞 개정은 남는다", g2.get("rev"), g2.get("rev")=="B")
+    for st in ["review","approved","issued"]:
+        pr=ctx.request.patch(BASE+f"/api/drawings/{g1['id']}",headers=J0,data=json.dumps({"status":st}))
+    ok("S19c 작성중 → 검토 → 승인 → 발행", pr.status, pr.status==200)
+    lk=ctx.request.patch(BASE+f"/api/drawings/{g1['id']}",headers=J0,data=json.dumps({"status":"issued"}))
+    ok("S19d 발행된 도면은 잠긴다 (409)", lk.status, lk.status==409)
+    dl=ctx.request.get(BASE+f"/api/drawings/{g1['id']}")
+    ok("S19e 남긴 도면을 그대로 내려받는다", dl.status==200 and "AC1009" in dl.text(), dl.status==200 and "AC1009" in dl.text())
+    # S20 산출물은 스냅샷에서만 나온다 — 근거 없는 재계산 금지
+    nr=ctx.request.post(BASE+"/api/run/cost",headers=J0,data=json.dumps({"slots":S55_0}))
+    ok("S20a runId 없는 Cost 는 거부된다 (409)", nr.status, nr.status==409)
+    cr=ctx.request.post(BASE+"/api/run/cost",headers=J0,data=json.dumps({"runId":RUN1})).json()
+    ok("S20b Cost 는 스냅샷에 저장된 값을 그대로 읽는다", cr.get("value"), isinstance(cr.get("value"),(int,float)) and cr.get("value")>0)
+    er=ctx.request.post(BASE+"/api/run/ebom",headers=J0,data=json.dumps({"runId":RUN1})).json()
+    ok("S20c EBOM 도 같은 스냅샷에서 나온다", len(er.get("groups",[])), len(er.get("groups",[]))>0)
+    # S20d 매크로 값은 서버가 직접 낸다 — 클라이언트가 보내지 않아도 방진구가 들어간다
+    parts=[l.get("part") for l in r1.json().get("lines",[])]
+    ok("S20d 클라이언트가 매크로 값을 안 보내도 서버가 실행해 방진구가 나온다", r1.json().get("macroValue"), r1.json().get("macroValue")==455.4 and any("Vibration" in (p or "") for p in parts))
+    # S21 화면: Design 탭에서 도면을 등록하고 상태가 보인다
+    nuke(pg); pg.goto(BASE+"/workbench",wait_until="domcontentloaded"); time.sleep(2); nuke(pg)
+    pg.click("text=PS-61313"); time.sleep(1.5); nuke(pg)
+    pg.locator("button", has_text=re.compile(r"^Design$")).first.click(force=True); time.sleep(1.5); nuke(pg)
+    body=pg.inner_text("[data-testid=design-canvas]")
+    ok("S21 Design 탭에 등록된 도면과 상태가 보인다", ("발행" in body, "Rev" in body), "Rev" in body and ("발행" in body or "작성중" in body))
+    pg.screenshot(path=f"{OUT}/43_drawings.png",full_page=True)
     # ── P3-a 플랫폼 관리자 계층 · DB①/DB② 소유 분리 (p54 User Management · p59 최종 승인 · p64 Admin.) ──
     # S16 회사 관리자가 Company Info.에서 Special 의뢰를 올린다 = 회사→플랫폼 유일 통로
     pg.goto(BASE+"/m/company",wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=user-management]",timeout=30000); time.sleep(1.5); nuke(pg)

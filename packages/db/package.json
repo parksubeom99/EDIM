@@ -23,7 +23,8 @@
     "revision:test": "dotenv -e ../../.env -- tsx prisma/code-revision-test.ts",
     "seed:catalog": "dotenv -e ../../.env -- tsx prisma/seed-catalog.ts",
     "backbone:test": "dotenv -e ../../.env -- tsx prisma/code-backbone-test.ts",
-    "platform:test": "dotenv -e ../../.env -- tsx prisma/platform-test.ts"
+    "platform:test": "dotenv -e ../../.env -- tsx prisma/platform-test.ts",
+    "drawing:test": "dotenv -e ../../.env -- tsx prisma/drawing-test.ts"
   },
   "dependencies": {
     "@edim/core-ontology": "workspace:*",
