@@ -77,7 +77,14 @@ export async function approve(tx: TenantClient, input: MacroApproveInput): Promi
     data: { status: "superseded" },
   });
 
-  const agg = await tx.macroRegistry.aggregate({ _max: { revision: true }, where: { stableId: draft.stableId } });
+  // Revision numbers belong to macros that were *approved at some point* (approved | superseded).
+  // A draft/rejected row carries the column default (1) but has never held a revision, so it must
+  // not be counted — otherwise the very first approval comes out as r2 (defect present since
+  // 14e346d; caught by macro:test, which had never been run against Postgres).
+  const agg = await tx.macroRegistry.aggregate({
+    _max: { revision: true },
+    where: { stableId: draft.stableId, status: { in: ["approved", "superseded"] } },
+  });
   const revision = (agg._max.revision ?? 0) + 1;
 
   await tx.macroRegistry.update({

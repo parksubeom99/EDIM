@@ -41,6 +41,9 @@ pnpm --filter @edim/db backbone:test   # P1 코드 등뼈 13/13
 pnpm --filter @edim/db platform:test   # ★ P3-a 25/25 (DB①/DB② 권한 분리·역류 차단)
 pnpm --filter @edim/db drawing:test    # ★ P4-a 16/16 (도면 개정·발행 잠금·스냅샷 연결)
 pnpm --filter @edim/db document:test   # ★ P4-b·P6 37/37 (견적·Tech Data·구매 요청 · 발행/발주 잠금 · 승인된 BOM 만 발행·발주)
+pnpm --filter @edim/db project:test    # 프로젝트·승인 도메인
+pnpm --filter @edim/db hierarchy:test  # 09-21 수리 — 트리 생성·이동·개정·감사
+pnpm --filter @edim/db macro:test      # 09-21 수리 — 첫 승인 r1·반려는 번호 소비 안 함 (※ 매크로를 전부 지운다 → 아래 reset:demo 필수)
 pip install playwright ezdxf ; playwright install chromium   # ezdxf = 도면(DXF)을 파싱해 검증
 pnpm db:reset:demo         # ★ 리허설 흔적 제거 (테스트·이전 e2e가 남긴 Rev·매크로 revision)
 python scripts\demo_e2e.py http://localhost:3000 shots   # ★ 99/99 PASS면 발표 가능
@@ -49,7 +52,7 @@ pnpm db:reset:demo         # ★ e2e 자신도 흔적을 남긴다 → 시연 �
 
 `demo_e2e.py`가 99/99이면 아래 시연 11장면은 **기계적으로 재현이 보장된** 상태다.
 
-**리허설 잔재 규칙** — `code_revision`은 append-only라 앱에서 지울 수 없다. e2e·`revision:test`·손 리허설을 한 번이라도 돌린 DB에서는 본 시연의 첫 저장이 "Rev A"가 아니라 "Rev C/E…"로 찍히고, 매크로 revision도 r2가 아니라 r3+로 보인다. e2e의 `S2d`가 이 상태를 FAIL로 잡아준다.
+**리허설 잔재 규칙** — `code_revision`은 append-only라 앱에서 지울 수 없다. e2e·`revision:test`·손 리허설을 한 번이라도 돌린 DB에서는 본 시연의 첫 저장이 "Rev A"가 아니라 "Rev C/E…"로 찍히고, 매크로도 시드된 r1 이 아니라 r2+ 로 보인다. e2e의 `S2d`가 이 상태를 FAIL로 잡아준다.
 
 **발표 당일 아침 순서 (이 순서 그대로):** `docker ps` healthy → `pnpm db:reset:demo` → `demo_e2e.py` 99/99 → **`pnpm db:reset:demo` 한 번 더** → 브라우저 강력 새로고침(Ctrl+Shift+R) → 이후 시연 시작 전까지 화면 클릭·저장 금지.
 
@@ -87,7 +90,7 @@ pnpm db:reset:demo         # ★ e2e 자신도 흔적을 남긴다 → 시연 �
 |---|---|
 | dev 서버 안 뜸 | `pnpm db:up` 상태 확인 → `docker ps` 에 edim-db healthy인지. 포트 5433 충돌 시 docker-compose.yml 포트만 바꾸고 .env 동기화 |
 | 첫 Run이 no-macro | `pnpm db:seed:demo` 재실행 (멱등) |
-| 첫 저장이 Rev A가 아님 · 매크로가 r3 이상 · e2e `S2d` FAIL | 리허설 잔재. `pnpm db:reset:demo` (멱등, 데모 테넌트 한정, admin 역할로만 삭제) → 새로고침 |
+| 첫 저장이 Rev A가 아님 · 라이브 승인 전인데 매크로가 r2 이상 · e2e `S2d` FAIL | 리허설 잔재. `pnpm db:reset:demo` (멱등, 데모 테넌트 한정, admin 역할로만 삭제) → 새로고침 |
 | 브라우저 dev 오버레이가 클릭 가림 | 우하단 N 아이콘 닫기. 리허설에선 `pnpm build && pnpm start`도 가능하나 발표는 dev로 검증된 경로를 쓴다 |
 | 네트워크·프로젝터 사고 | `shots/` 스크린샷 7장(demo_e2e.py 산출) + `edim_sample.dxf`를 USB에 둔다. 최악엔 스크린샷으로 7장면을 그대로 진행 |
 | DXF 열 프로그램 없음 | 무료 뷰어(예: LibreCAD/ODA Viewer) 사전 설치, 또는 `shots/m3_dxf_render.png` 로 대체 |

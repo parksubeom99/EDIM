@@ -72,10 +72,14 @@ async function main() {
 
   const t1 = await withTenant(IDS.tenantA, (tx) => getTree(tx));
   const root1 = t1[0];
+  // Baseline-relative on purpose: the seed grew a project node under the root (eee26c1), which
+  // turned the old hard-coded "1 child" into a false FAIL. What this step proves is that
+  // create(+1) then move-away(−1) leaves the root exactly as it was, and AHU-02 is gone from it.
+  const rootKids0 = root0?.children.length ?? -1;
   check(
-    "root has 1 child after AHU-02 moved away",
-    root1?.children.length === 1,
-    `children=${root1?.children.length}`,
+    "root child count is back to baseline after AHU-02 moved away",
+    root1?.children.length === rootKids0 && !root1?.children.some((c) => c.label === "AHU-02"),
+    `baseline=${rootKids0} now=${root1?.children.length}`,
   );
   const mod1 = find(t1, "AHU-01");
   check(

@@ -100,3 +100,8 @@ P4-a 의 축을 그대로 이었다 — 견적·Tech Data·구매 요청도 **BO
 - macro: `approved macro is retrievable at revision 1 — got approved/2` · `new approval supersedes prior + bumps revision — got id2/3`
 둘 다 기대값이 시드·레지스트리 변경을 못 따라간 것으로 보인다(같은 기능의 vitest 단위 테스트는 통과). 원인 확정과 수정은 다음 작업.
 
+#### 수리 (2026-09-21 · 위 추정은 절반만 맞았다)
+- **hierarchy — 기대값이 낡음(제품 정상).** `eee26c1`(L3 프로젝트 엔진)이 시드 root 아래에 프로젝트 노드를 추가해 root 기준 자식이 1 → 2 가 됐는데 테스트가 `1` 을 못 박고 있었다. "만들고(+1) 옮기면(−1) root 는 처음 그대로이고 AHU-02 는 root 에 없다"는 **기준선 상대 단언**으로 바꿨다.
+- **macro — 제품 결함(테스트가 옳았다).** `approve()` 가 "그 노드 모든 행의 최대 revision + 1" 을 매겼는데 초안의 열 기본값이 1 이라 **첫 승인이 r2** 로 나왔다. 테스트와 구현은 같은 커밋(`14e346d`, 7/6)에서 나왔고 그 테스트는 Postgres 가 없어 한 번도 돈 적이 없다. 개정 번호는 **승인된 적 있는 행(approved·superseded)만** 세도록 고쳤고, "반려된 초안은 번호를 소비하지 않는다(r1 → r2 → r3)" 단언을 더했다. 스키마 변경 없음. 화면에 보이던 `approved r3 / superseded r2` 는 이제 `r2 / r1` 이다(DEMO.md 장면 4 의 "r1 탑재 → 라이브 승인 시 r2" 서술이 비로소 사실이 됐다).
+- 두 검증 + `project:test` 를 `docs/ci/ci.yml` 에 넣었다. **주의:** 두 검증은 시드를 다시 깔고 `macro:test` 는 매크로를 전부 지운다 — 데모 DB 에서 돌렸으면 `pnpm db:reset:demo` 후 시연할 것.
+

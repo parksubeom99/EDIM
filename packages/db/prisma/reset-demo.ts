@@ -3,7 +3,7 @@
  *
  * 왜 필요한가: 리허설(demo_e2e.py · revision:test · 손 시연)은 흔적을 남긴다.
  *   - code_revision  : append-only라 앱에서는 지울 수 없다 → 본 시연의 첫 저장이 'Rev A'가 아니라 'Rev E'가 된다
- *   - macro_registry : 승인할 때마다 revision이 오른다(r2 → r7 …)
+ *   - macro_registry : 승인할 때마다 revision이 오른다(r1 → r6 …)
  *   - project_approval / task / attachment, audit_log
  *   - document / purchase_request : 시연 중 뜬 견적·Tech Data·구매 요청(발행·발주 잠금 포함)
  *   - platform_request : 시연 중 올린 Special 의뢰 · 멤버 역할 변경(User Management)

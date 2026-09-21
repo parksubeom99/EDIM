@@ -1,6 +1,6 @@
 import { adminPrisma, appPrisma } from "../src/client";
 import { withTenant } from "../src/tenant";
-import { approve, createDraft, getApproved } from "../src/macro";
+import { approve, createDraft, getApproved, reject } from "../src/macro";
 import { IDS, seedAll } from "./seed";
 
 /**
@@ -72,6 +72,18 @@ async function main(): Promise<void> {
       (m) => m.status === "superseded",
     );
     check("exactly one prior row is superseded", superseded.length === 1 && superseded[0]?.id === id1);
+
+    // 2b: drafts and rejections never consume a revision number -----------------
+    const idRej = await createDraft(tx, { stableId: IDS.a_item, dsl: "=SUM(Table1(A,1:3))+9", createdBy: IDS.ownerA });
+    await reject(tx, { id: idRej, rejectedBy: IDS.ownerA });
+    const id3 = await createDraft(tx, { stableId: IDS.a_item, dsl: "=SUM(Table1(A,1:3))+2", createdBy: IDS.ownerA });
+    await approve(tx, { id: id3, approvedBy: IDS.ownerA, verified: true });
+    const appr3 = await getApproved(tx, IDS.a_item);
+    check(
+      "a rejected draft does not consume a revision (r1 → r2 → r3, no gap)",
+      appr3?.id === id3 && appr3?.revision === 3,
+      `got ${appr3?.revision}`,
+    );
 
     // 3: cross-tenant invisibility --------------------------------------------
     const bCount = await tx.macroRegistry.count({ where: { tenantId: IDS.tenantB } });

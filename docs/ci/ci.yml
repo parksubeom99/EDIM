@@ -34,3 +34,7 @@ jobs:
       - run: pnpm --filter @edim/db platform:test
       - run: pnpm --filter @edim/db drawing:test
       - run: pnpm --filter @edim/db document:test
+      - run: pnpm --filter @edim/db project:test
+      # 아래 둘은 시드를 다시 깔고(macro 는 매크로를 전부 지운다) 돌기 때문에 맨 끝에 둔다
+      - run: pnpm --filter @edim/db hierarchy:test
+      - run: pnpm --filter @edim/db macro:test
