@@ -46,15 +46,15 @@ pnpm --filter @edim/db hierarchy:test  # 09-21 수리 — 트리 생성·이동�
 pnpm --filter @edim/db macro:test      # 09-21 수리 — 첫 승인 r1·반려는 번호 소비 안 함 (※ 매크로를 전부 지운다 → 아래 reset:demo 필수)
 pip install playwright ezdxf ; playwright install chromium   # ezdxf = 도면(DXF)을 파싱해 검증
 pnpm db:reset:demo         # ★ 리허설 흔적 제거 (테스트·이전 e2e가 남긴 Rev·매크로 revision)
-python scripts\demo_e2e.py http://localhost:3000 shots   # ★ 99/99 PASS면 발표 가능
+python scripts\demo_e2e.py http://localhost:3000 shots   # ★ 106/106 PASS면 발표 가능
 pnpm db:reset:demo         # ★ e2e 자신도 흔적을 남긴다 → 시연 직전 반드시 한 번 더
 ```
 
-`demo_e2e.py`가 99/99이면 아래 시연 11장면은 **기계적으로 재현이 보장된** 상태다.
+`demo_e2e.py`가 106/106이면 아래 시연 11장면은 **기계적으로 재현이 보장된** 상태다.
 
 **리허설 잔재 규칙** — `code_revision`은 append-only라 앱에서 지울 수 없다. e2e·`revision:test`·손 리허설을 한 번이라도 돌린 DB에서는 본 시연의 첫 저장이 "Rev A"가 아니라 "Rev C/E…"로 찍히고, 매크로도 시드된 r1 이 아니라 r2+ 로 보인다. e2e의 `S2d`가 이 상태를 FAIL로 잡아준다.
 
-**발표 당일 아침 순서 (이 순서 그대로):** `docker ps` healthy → `pnpm db:reset:demo` → `demo_e2e.py` 99/99 → **`pnpm db:reset:demo` 한 번 더** → 브라우저 강력 새로고침(Ctrl+Shift+R) → 이후 시연 시작 전까지 화면 클릭·저장 금지.
+**발표 당일 아침 순서 (이 순서 그대로):** `docker ps` healthy → `pnpm db:reset:demo` → `demo_e2e.py` 106/106 → **`pnpm db:reset:demo` 한 번 더** → 브라우저 강력 새로고침(Ctrl+Shift+R) → 이후 시연 시작 전까지 화면 클릭·저장 금지.
 
 ---
 
@@ -128,4 +128,4 @@ pnpm db:reset:demo         # ★ e2e 자신도 흔적을 남긴다 → 시연 �
 - 2026-09-18 엘 샌드박스 재현(fresh clone, main a9f81dc) + 리허설 잔재 실측: e2e 2회 연속 시 Rev A~D 누적 확인 → `db:reset:demo` 추가, e2e에 잔재 탐지 단언 `S2d` 추가(14단계). reset → e2e 14/14 → (reset 없이) 재실행 시 S2d FAIL → reset → 14/14 확인.
 - 회장님 Windows 로컬 실행은 **아직 0회**. §1을 회장님이 한 번 통과하는 순간이 발표 준비 완료 시점이다.
 - 2026-09-21 엘 샌드박스(브랜치 `feat/p4b-document-purchase`): reset → `demo_e2e.py` **87/87**(S22~S26 = 견적·Tech Data·구매 요청 18단계 추가). 장면 10 의 화면 3장(Document 탭 · Purchasing · 견적서 인쇄본)은 스크린샷을 눈으로 확인했다. **회장님 Windows 로컬 실행은 여전히 0회.**
-- 2026-09-21 엘 샌드박스(브랜치 `feat/p6-approval-binding`): `demo_e2e.py` **99/99**(S27~S29 = 승인 묶기·발행/발주 문·추적·Accepted 12단계 추가). e2e 의 고정 sleep 3곳을 "상태가 바뀔 때까지 대기"로 바꿨다(첫 호출의 라우트 컴파일이 느리면 헛눌림). **회장님 Windows 로컬 실행은 여전히 0회.**
+- 2026-09-21 엘 샌드박스(브랜치 `feat/p6-approval-binding`): `demo_e2e.py` **106/106**(S27~S29 = 승인 묶기·발행/발주 문·추적·Accepted 12단계 추가). e2e 의 고정 sleep 3곳을 "상태가 바뀔 때까지 대기"로 바꿨다(첫 호출의 라우트 컴파일이 느리면 헛눌림). **회장님 Windows 로컬 실행은 여전히 0회.**
