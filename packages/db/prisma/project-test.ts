@@ -13,6 +13,7 @@ import {
   decideApproval,
   listApprovals,
 } from "../src/project";
+import { saveBomCodeRun } from "../src/code-catalog";
 import { seedAll, IDS } from "./seed";
 import type { HierarchyTreeNode } from "@edim/core-ontology";
 
@@ -95,11 +96,17 @@ async function main() {
     await setSalesStage(tx, projectId, "협의", IDS.ownerA);
     const taskId = await addTask(tx, projectId, "kickoff", null, IDS.ownerA);
     await setTaskState(tx, taskId, "done", IDS.ownerA);
+    // P6: 승인은 BOM 스냅샷에 대해 요청한다 — 이 프로젝트 노드에서 돌린 스냅샷을 하나 만든다.
+    const run = await saveBomCodeRun(tx, {
+      stableId: created.hierarchyStable, code: "TEST-PROJECT-RUN", slots: { A: "EU" }, macroValue: null,
+      parentCode: "EU", catalogFp: "test-project", lines: [], cost: {}, createdBy: IDS.ownerA,
+    });
     const apId = await requestApproval(
       tx,
       projectId,
       IDS.ownerA,
       "please review",
+      run.id,
     );
     await decideApproval(tx, apId, "approved", IDS.ownerA, "ok");
   });
@@ -140,7 +147,8 @@ async function main() {
   );
 
   const after = await withTenant(IDS.tenantA, (tx) => tx.auditLog.count());
-  check("audit_log grew by 7", after - before === 7, `delta=${after - before}`);
+  // 7 → 8: P6 에서 승인 요청이 BOM 스냅샷을 요구하게 되면서, 이 테스트가 만드는 스냅샷 1건의 감사 줄이 늘었다.
+  check("audit_log grew by 8", after - before === 8, `delta=${after - before}`);
 
   console.log("");
   if (failures.length > 0) {

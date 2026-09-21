@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { withTenantSession } from "@edim/auth";
-import { decideApproval } from "@edim/db";
+import { decideApproval, ApprovalBindingError } from "@edim/db";
 import { getServerSession } from "@/app/lib/session";
 import { canDecideApproval } from "@/app/lib/project-perms";
 
@@ -24,6 +24,7 @@ export async function POST(
     return NextResponse.json({ error: "invalid decision" }, { status: 400 });
   const note = typeof body.note === "string" ? body.note : null;
 
+  try {
   await withTenantSession(session, (tx) =>
     decideApproval(
       tx,
@@ -33,5 +34,9 @@ export async function POST(
       note,
     ),
   );
+  } catch (e) {
+    if (e instanceof ApprovalBindingError) return NextResponse.json({ error: e.message }, { status: e.status });
+    throw e;
+  }
   return NextResponse.json({ ok: true });
 }

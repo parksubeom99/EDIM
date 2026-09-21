@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import {
   withTenant, getDrawing, setDrawingStatus, isDrawingStatus,
-  DrawingLockedError, DrawingStatusBackwardsError,
+  DrawingLockedError, BomNotApprovedError, DrawingStatusBackwardsError,
 } from "@edim/db";
 import { getServerSession } from "@/app/lib/session";
 import { canEditProject } from "@/app/lib/project-perms";
@@ -37,7 +37,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     );
     return NextResponse.json({ ok: true, status: row.status });
   } catch (e) {
-    if (e instanceof DrawingLockedError || e instanceof DrawingStatusBackwardsError)
+    if (e instanceof BomNotApprovedError || e instanceof DrawingLockedError || e instanceof DrawingStatusBackwardsError)
       return NextResponse.json({ error: e.message }, { status: 409 });
     return NextResponse.json({ error: "상태 변경 실패" }, { status: 409 });
   }

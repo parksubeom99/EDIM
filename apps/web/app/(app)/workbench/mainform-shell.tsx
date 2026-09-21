@@ -33,7 +33,7 @@ export interface WorkbenchProject {
     description: string | null;
     uploadedAt: string;
   }[];
-  approvals: { id: string; state: string; note: string | null; requestedAt: string }[];
+  approvals: { id: string; state: string; note: string | null; requestedAt: string; bomRunId: string | null; bomCode: string | null }[];
   pipeline: PipelineState;
 }
 
@@ -255,6 +255,7 @@ export function MainFormShell({
               rev={rev && rev.code === assembled.code ? rev.rev : null}
               canEdit={canEdit}
               canDecide={canDecide}
+              runId={runs.find((r) => r.kind === "bom" && r.runId)?.runId ?? null}
             />
           </div>
         </aside>

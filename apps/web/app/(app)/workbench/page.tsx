@@ -60,12 +60,15 @@ export default async function WorkbenchPage({
           state: a.state,
           note: a.note,
           requestedAt: a.requestedAt.toISOString(),
+          bomRunId: a.bomRunId,
+          bomCode: a.bomRun?.code ?? null,
         })),
         pipeline: derivePipeline(
           detail.approvals.map((a) => ({
             id: a.id,
             state: a.state,
             note: a.note,
+            bomRunId: a.bomRunId,
             requestedAt: a.requestedAt,
           })),
         ),

@@ -289,26 +289,9 @@ export function ProjectDetail({
 
         {tab === "approval" && (
           <div>
-            {canEdit && (
-              <button
-                type="button"
-                onClick={async () => {
-                  if (
-                    await post(`/api/projects/${p.id}/approvals`, {
-                      note: null,
-                    })
-                  )
-                    refresh();
-                }}
-                style={{
-                  padding: "6px 12px",
-                  fontSize: "var(--fs-13)",
-                  marginBottom: 12,
-                }}
-              >
-                request approval
-              </button>
-            )}
+            <p data-testid="approval-hint" style={{ fontSize: "var(--fs-13)", color: "var(--ink-muted)", margin: "0 0 12px" }}>
+              승인은 <b>BOM 스냅샷에 대해</b> 요청합니다 — MainForm 작업대에서 BOM Run 을 실행한 뒤 Inspector 의 <i>Check 요청</i>을 누르세요.
+            </p>
             <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
               {p.approvals.length === 0 && (
                 <li

@@ -1,5 +1,6 @@
 import type { TenantClient } from "./tenant";
 import { writeAudit } from "./audit";
+import { assertRunApproved } from "./approval-gate";
 
 /**
  * P4-b — 구매 요청(p51 [Set-Up / User ERP / Material / Purchase]).
@@ -139,6 +140,7 @@ export async function setPurchaseRequestStatus(
   const order = PR_STATUSES as readonly string[];
   if (order.indexOf(input.status) < order.indexOf(cur.status))
     throw new PrBackwardsError(cur.status, input.status);
+  if (input.status === "ordered") await assertRunApproved(tx, cur.bomRunId, "구매 요청은 발주할");
 
   const core = cur.prNo.split("-").slice(1, -1).join("-");
   const poNo = input.status === "ordered" ? await nextNo(tx, "PO", core) : null;

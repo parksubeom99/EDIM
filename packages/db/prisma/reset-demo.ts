@@ -36,13 +36,15 @@ async function resetDemo(): Promise<void> {
   const doc = await adminPrisma.document.deleteMany({ where: { tenantId: t } });
   const prq = await adminPrisma.purchaseRequest.deleteMany({ where: { tenantId: t } });
   for (const tb of P4B) await adminPrisma.$executeRawUnsafe(`ALTER TABLE "${tb}" ENABLE TRIGGER USER`);
+  // P6: 승인 기록이 BOM 스냅샷을 참조한다 → 스냅샷보다 먼저 지운다(시연은 Design 단계에서 시작).
+  const apr = await adminPrisma.projectApproval.deleteMany({ where: { tenantId: t } });
   const run = await adminPrisma.bomCodeRun.deleteMany({ where: { tenantId: t } });
   const req = await adminPrisma.platformRequest.deleteMany({ where: { tenantId: t } });
   const aud = await adminPrisma.auditLog.deleteMany({ where: { tenantId: t } });
   // 리허설이 역할을 바꿔 놓았을 수 있다(User Management 시연) → 시드 역할로 되돌린다.
   await adminPrisma.membership.updateMany({ where: { tenantId: t, userId: IDS.viewerA }, data: { role: "viewer" } });
   await adminPrisma.membership.updateMany({ where: { tenantId: t, userId: IDS.ownerA }, data: { role: "owner" } });
-  console.log(`Demo reset: removed ${rev.count} code revisions, ${mac.count} macros, ${run.count} BOM run snapshots, ${dwg.count} drawings, ${doc.count} documents, ${prq.count} purchase requests, ${req.count} platform requests, ${aud.count} audit rows; memberships restored.`);
+  console.log(`Demo reset: removed ${rev.count} code revisions, ${mac.count} macros, ${run.count} BOM run snapshots, ${dwg.count} drawings, ${doc.count} documents, ${prq.count} purchase requests, ${apr.count} approvals, ${req.count} platform requests, ${aud.count} audit rows; memberships restored.`);
   await seedAll();
   await seedDemo({ forceCatalog: true }); // 시연 중 고친 표·관계를 원상 복구
   console.log("Demo reset complete — first save will be Rev A, approved macro is back to the seeded revision.");

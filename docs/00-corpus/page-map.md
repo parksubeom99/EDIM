@@ -1,4 +1,4 @@
-# 청사진 페이지 색인 — 70장의 지금 (main `1b7625e` · 2026-09-21)
+# 청사진 페이지 색인 — 70장의 지금 (main `fd31d88+P6` · 2026-09-21)
 
 > 이 파일은 `docs/02-reports/build_blueprint_match.py` 의 판정 데이터에서 **자동 생성**된다. 손으로 고치지 말 것.
 > 실동 18 · 부분 22 · 미착수 11 · 개념·표지 19 (합 70). 판정은 엘의 것 — 회장님 조정 대상.
@@ -11,7 +11,7 @@
 | p2 | 개념·표지 | System concept | — | — | — |
 | p3 | 개념·표지 | CTO Business — As-is / To-be | "제품 Configuration 선정과 동시에 모든 업무 자료 생성" — 코드 한 줄에서 BOM·도면·원가·견적·Tech Data·구매 요청이 한 BOM 스냅샷으로부터 나오는 것까지 얇게 실증 | 수작업 입력·오류가 실제로 줄었는지는 회사 실 데이터로 재 본 적이 없다 | — |
 | p4 | 개념·표지 | System Integration — 생성 자료 5종 | BOM / Part List ✓ · Tech Data ✓(1종) · DWG 2D ✓(평면·조립) · Cost ✓(단가 샘플) | DWG 3D · Work Process 산출 없음<br>ERP 연계는 구매 요청까지 · Smart Factory·AR/XR 은 EDIM 완료 후 확장 단계(회장님 확정) | — |
-| p5 | 실동 | Real-Time Code connectivity — 코드 한 줄이 회사를 관통한다 | 제품 선정(Code 생성) → Part-List(Code 연결) → DWG(Code 기반) → Cost → 견적 → 구매 요청이 끊기지 않고 이어진다<br>연결 장부 14고리 중 이어짐 11 · 약함 0 · 없음 3 | Product(Code QR) · Manufacturing/MES 고리 없음<br>남은 '없음' 3: 승인↔Rev·BOM(P6) · DB①→DB②(P3-b) · Special(P3-c) | docs/plan/connection-ledger.md · e2e S8 · S18c · S22b · S24a |
+| p5 | 실동 | Real-Time Code connectivity — 코드 한 줄이 회사를 관통한다 | 제품 선정(Code 생성) → Part-List(Code 연결) → DWG(Code 기반) → Cost → 견적 → 구매 요청이 끊기지 않고 이어진다<br>연결 장부 14고리 중 이어짐 12 · 약함 0 · 없음 2 | Product(Code QR) · Manufacturing/MES 고리 없음<br>남은 '없음' 2: DB①→DB②(P3-b · DXF 연구 후) · Special(P3-c · D1 후) | docs/plan/connection-ledger.md · e2e S8 · S18c · S22b · S24a · S28a |
 | p6 | 개념·표지 | EDIM System 구성 | MainForm 상단에 CPQ · PLM · ERP · EDIM Toolbox, 별도 Set-Up(Code System) 화면이 실제로 있다 | GUI Toolkit Canvas · EDIM Chart · Template 없음<br>Product DB 의 [AI 학습] 갈래는 구조만(DB① 비어 있음) | — |
 | p7 | 개념·표지 | EDIM 효과 | 1. 제품 선정과 동시에 생성되는 자료 4종(BOM·도면·기술 자료·견적서)은 모두 화면에서 나온다(깊이는 p17 참조) | 2. 경영 효과 · 3. Set-up 시간 20% 는 주장이다 — 재 본 값이 없다 | — |
 | p8 | 개념·표지 | 기존 System 대비 — 시스템 정의 50 / 고객 구현 40 / EDIM 지원 10 | 3계층으로 반영: 회사가 자기 코드·표·매크로를 직접 고치고(셀프서비스), 플랫폼으로 올라오는 것은 Special 의뢰 한 통로뿐 | 50/40/10 비율은 실제 Set-up 을 해 본 적이 없어 검증되지 않았다 | e2e S10b · S16a~S16j |
@@ -29,7 +29,7 @@
 | p15 | 부분 | Technical Data | Tech Data 문서 1종: 결과값 + 그 값을 낸 승인 매크로 개정·원문 + 입력 슬롯, 번호·개정·상태·발행 잠금 | Arrangement 방향(L0~R270) 선택 · Import · Technical data 목록 없음<br>매크로 결과 1값뿐 — 기술 계산서 수준이 아니다 | e2e S23a · S23b · document:test 28 |
 | p16 | 부분 | Document Template · Edit Table | Edit Table = Set-Up 의 제품 코드 표 편집 ✓ — 한 칸을 고치면 BOM·매크로·도면이 따라 바뀐다<br>Output Data 인쇄 ✓ | Input Data 템플릿(온도·습도·밀도 + 단위) 없음<br>Table Type 은 tech·dim 두 종뿐(Variant·Material 없음) · Data Up-Load 없음 | e2e S10b · S10d · S18b |
 | p17 | 실동 | 네 가지 산출물 — BOM · Quotation · Document · Drawing | 네 가지 모두 화면에서 나오고, 모두 같은 BOM 스냅샷 하나를 입력으로 받는다<br>문서·도면은 번호·개정(A→B)·상태 4단계·발행 잠금 | Approval Drawing / Manufacturing Drawing 구분 없음(평면도·조립도 2종)<br>'준비시간 1시간 이내' 는 재 본 적 없다 | e2e S25b · S19a~S19e · S22d |
-| p18 | 부분 | 작업 화면 틀 — Hierarchy · Approval · Schedule | Hierarchy · Description · Approval(단계 요청) ✓ | Schedule management(To-do · Done · Schedule · Approval Request List) 없음 — Inspector 에 '일정 없음'<br>Data Up-Load 없음 | e2e S1 |
+| p18 | 부분 | 작업 화면 틀 — Hierarchy · Approval · Schedule | Hierarchy · Description · Approval(BOM 에 묶인 단계 요청) ✓ | Schedule management(To-do · Done · Schedule · Approval Request List) 없음 — Inspector 에 '일정 없음'<br>Data Up-Load 없음 | e2e S1 |
 
 ## System tool (p19–28)
 
@@ -96,7 +96,7 @@
 |---|---|---|---|---|---|
 | p53 | 개념·표지 | Form | — | — | — |
 | p54 | 부분 | Set-Up 메뉴 지도 | 1. Code — Sub code · Product Code · Code Relationship ✓<br>EDIM Tool — Macro ✓ · UI Design 일부 | Arrangement Code/Set-up · TLM Design · CPQ Selection · Print Set-up 없음<br>User ERP 는 구매 요청만 | e2e S9 · S10 · S12 |
-| p55 | 실동 | Approval Management · Authorization · Security | Design → Check → Approve → Accepted 승인 단계 ✓<br>역할별 권한(RBAC) · 사용자 관리(마지막 owner 강등 거부) · 테넌트 격리(RLS) · 감사 로그 ✓ | DOC No · Version · Released 를 모아 보는 승인 대장 화면 없음<br>승인이 아직 코드 Rev·BOM 과 묶여 있지 않다(P6) | project:test · rls:test · e2e S11 · S17a · S17b |
+| p55 | 실동 | Approval Management · Authorization · Security | Design → Check → Approve → Accepted ✓ — 승인은 BOM 스냅샷에 묶인다: 발행·발주는 승인된 BOM 에서만(DB 트리거)<br>역할별 권한(RBAC) · 사용자 관리(마지막 owner 강등 거부) · 테넌트 격리(RLS) · 감사 로그 ✓ | DOC No · Version · Released 를 모아 보는 승인 대장 화면 없음<br>승인 권한은 회사 안(owner·engineer)뿐 — 플랫폼 단계 승인자 분리는 미정 | project:test · rls:test · e2e S27a~d · S29b~d · S11 · S17 |
 | p56 | 실동 | 작업대 — 다섯 구역 | Tool bar · Work Hierarchy · Main Work Place · Sub Work Place · Key Work Place 가 청사진 그대로 떠 있다 | EDIM Toolbar 의 업무 목록(고객 관리 … 시운전 요청) 없음 | e2e S1 |
 | p57 | 부분 | Toolbox Macro — 다섯 갈래 상호 연동 | Prompt · Macro · Flowchart · Description · Coding 이 같은 매크로를 본다 | Data Management(Directory · Type of source: Table/Chart/Formula drawing) 없음<br>함수 마법사 · 그래프 마법사 없음 | e2e S13b · S13c · S13e |
 | p58 | 미착수 | Main Work place Toolbar | — | Arrangement · Move · Delete · Add · DWG · View · Free CAD · 설계 심볼 · 승인 — 버튼 줄은 청사진 순서대로 있지만 눌러도 동작하는 것이 없다<br>그림 제작 Module 없음 (Action Bar 편집은 p25 의 것이라 여기서 세지 않았다) | — |
@@ -111,7 +111,7 @@
 |---|---|---|---|---|---|
 | p63 | 개념·표지 | Structure | — | — | — |
 | p64 | 부분 | TLM Code Management · ERP Set-up | Sub Code · Product Code · Code relationship(BOM) Hierarchy ✓ · Approval management ✓<br>3계층(플랫폼 → 회사 관리자 → 사용자) ✓ | Department Std. · Company DB(Customer·Supplier) · Warehouse · Inventory · Bank 없음 | platform:test 25 · e2e S16 · S17 |
-| p65 | 실동 | Work Process — 한 번의 Run 에서 나오는 것들 | Main Code → BOM → 도면 · 원가 · Tech Data · PCR·견적 · 구매 요청, 모두 한 BOM 스냅샷에서<br>인쇄본 발치에 어느 BOM · 코드 개정 · 매크로 개정에서 나온 숫자인지 찍힌다 | Non-Standard Option(X Code) → R&D → New Code 흐름 없음<br>Project 폴더 저장 구조 · ERP 승인 연결 없음(P6) | e2e S20a~S20d · S22b · S22c · S22f |
+| p65 | 실동 | Work Process — 한 번의 Run 에서 나오는 것들 | Main Code → BOM → 도면 · 원가 · Tech Data · PCR·견적 · 구매 요청, 모두 한 BOM 스냅샷에서<br>구매 요청에서 거꾸로 추적: BOM → 코드 개정 → 카탈로그 지문 → 매크로 개정 → 승인 | Non-Standard Option(X Code) → R&D → New Code 흐름 없음<br>Project 폴더 저장 구조 없음 | e2e S20a~S20d · S22f · S28a~S28d |
 | p66 | 부분 | PCR → Quotation | PCR(Material + Manufacturing = Direct Cost → Full cost) + 견적서 ✓<br>견적 합계 = 스냅샷 원가 그대로(15,487,170 = 15,487,170) | PCR 세부(Procurement · Sub-manufacturing · Sales & Adm. · EBIT) · Business Type 열 없음<br>단가는 샘플 — 구조 시연이다 | e2e S22a~S22f · document:test 28 |
 | p67 | 부분 | 단가 관리 Table | 단가가 코드 관계에 한 값으로 있고, 고치면 원가가 바뀐다 | 견적 · 구매 이력 · 재고 단가 · 견적 적용 Table 4종 없음<br>제조 정보(시간·임율·장비) 없음 · Supplier 없음 | e2e S6b |
 

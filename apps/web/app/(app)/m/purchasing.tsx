@@ -11,6 +11,17 @@ import { useCallback, useEffect, useState } from "react";
 interface PrLine { lineNo: number; resolvedCode: string; part: string; spec: string; qty: number; unit: string; unitPrice: number; supplier: string | null; requiredDate: string | null }
 interface Pr { id: string; prNo: string; poNo: string | null; projectNo: string | null; code: string; status: string; bomRunId: string; lines: PrLine[] }
 
+interface Trace {
+  snapshot: { id: string; code: string; catalogFp: string; total: number | null; lines: number };
+  codeRevision: { rev: number; code: string } | null;
+  macro: { revision: number } | null;
+  approvals: { tier: string; state: string }[];
+  approved: boolean;
+  drawings: { drawingNo: string; rev: string; status: string }[];
+  documents: { docNo: string; rev: string; status: string }[];
+}
+const revLetter = (n: number) => String.fromCharCode(64 + Math.min(Math.max(n, 1), 26));
+
 const LABEL: Record<string, string> = { draft: "작성중", rfq: "견적 요청", ordered: "발주" };
 const NEXT: Record<string, string> = { draft: "rfq", rfq: "ordered" };
 const th = { textAlign: "left" as const, padding: "5px 6px", color: "var(--ink-muted)", fontWeight: 500, borderBottom: "1px solid var(--line)" };
@@ -19,6 +30,12 @@ const td = { padding: "5px 6px", borderBottom: "1px solid var(--line)", vertical
 export function Purchasing({ canEdit }: { canEdit: boolean }) {
   const [rows, setRows] = useState<Pr[]>([]);
   const [err, setErr] = useState<string | null>(null);
+  const [trace, setTrace] = useState<Record<string, Trace | null>>({});
+  async function toggleTrace(pr: Pr) {
+    if (trace[pr.id]) return setTrace((t) => ({ ...t, [pr.id]: null }));
+    const j = (await fetch(`/api/trace?runId=${pr.bomRunId}`).then((r) => r.json()).catch(() => null)) as Trace | null;
+    setTrace((t) => ({ ...t, [pr.id]: j }));
+  }
   const load = useCallback(async () => {
     const j = (await fetch("/api/purchase-requests").then((r) => r.json()).catch(() => ({}))) as { rows?: Pr[] };
     setRows(j.rows ?? []);
@@ -54,12 +71,28 @@ export function Purchasing({ canEdit }: { canEdit: boolean }) {
                   → {LABEL[NEXT[pr.status]!]}
                 </button>
               )}
+              <button type="button" data-testid={`pr-trace-${pr.prNo}`} onClick={() => void toggleTrace(pr)}
+                style={{ fontSize: "var(--fs-12)", padding: "4px 10px", background: "transparent", color: "var(--ink)", border: "1px solid var(--line)", borderRadius: "var(--radius-sm)" }}>
+                추적
+              </button>
               <a data-testid={`pr-export-${pr.prNo}`} href={`/api/purchase-requests/${pr.id}/export`}
                 style={{ fontSize: "var(--fs-12)", padding: "4px 10px", background: "var(--accent)", color: "var(--accent-contrast)", border: "1px solid var(--line)", borderRadius: "var(--radius-sm)", textDecoration: "none" }}>
                 Export CSV
               </a>
             </span>
           </div>
+          {trace[pr.id] && (() => { const t = trace[pr.id]!; return (
+            <div data-testid="pr-trace" data-approved={t.approved ? "1" : "0"} style={{ marginTop: 8, padding: "8px 10px", border: "1px dashed var(--line)", borderRadius: "var(--radius-sm)", fontSize: "var(--fs-12)", lineHeight: 1.7 }}>
+              <b>이 구매 요청은 어디서 왔나</b> — 거꾸로 따라갑니다 (전부 저장된 값)<br />
+              {pr.prNo} ← BOM 스냅샷 <span style={{ fontFamily: "var(--font-mono)" }}>{t.snapshot.id.slice(0, 8)}</span> ({t.snapshot.code} · {t.snapshot.lines}줄 · 원가 {t.snapshot.total?.toLocaleString("ko-KR") ?? "—"})
+              {" "}← 코드 개정 <b>{t.codeRevision ? `Rev ${revLetter(t.codeRevision.rev)} (${t.codeRevision.code})` : "없음 — 저장하지 않은 조합으로 실행"}</b>
+              {" "}← 카탈로그 지문 <span style={{ fontFamily: "var(--font-mono)" }}>{t.snapshot.catalogFp}</span>
+              {" "}← 승인 매크로 <b>{t.macro ? `r${t.macro.revision}` : "없음"}</b><br />
+              승인: <b style={{ color: t.approved ? "var(--accent)" : "var(--warn)" }}>{t.approved ? "승인된 BOM" : "아직 승인되지 않은 BOM — 발주할 수 없습니다"}</b>
+              {t.approvals.length > 0 && <> ({t.approvals.map((a) => `${a.tier}:${a.state}`).join(" · ")})</>}
+              {" · "}같은 BOM 에서 나온 것: 도면 {t.drawings.map((d) => `${d.drawingNo} Rev ${d.rev}`).join(", ") || "없음"} / 문서 {t.documents.map((d) => `${d.docNo} Rev ${d.rev}`).join(", ") || "없음"}
+            </div>
+          ); })()}
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 8, fontSize: "var(--fs-12)" }}>
               <thead><tr><th style={th}>Item</th><th style={th}>Code</th><th style={th}>Part · Spec</th><th style={{ ...th, textAlign: "right" }}>Qty</th><th style={th}>Supplier</th><th style={th}>Required date</th><th style={{ ...th, textAlign: "right" }}>Price</th></tr></thead>

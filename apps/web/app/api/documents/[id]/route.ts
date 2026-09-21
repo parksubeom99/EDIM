@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import {
   withTenant, getDocument, setDocumentStatus, isDocumentStatus,
-  DocumentLockedError, DocumentStatusBackwardsError,
+  DocumentLockedError, BomNotApprovedError, DocumentStatusBackwardsError,
 } from "@edim/db";
 import { getServerSession } from "@/app/lib/session";
 import { canEditProject } from "@/app/lib/project-perms";
@@ -35,7 +35,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     );
     return NextResponse.json({ ok: true, status: row.status });
   } catch (e) {
-    if (e instanceof DocumentLockedError || e instanceof DocumentStatusBackwardsError)
+    if (e instanceof BomNotApprovedError || e instanceof DocumentLockedError || e instanceof DocumentStatusBackwardsError)
       return NextResponse.json({ error: e.message }, { status: 409 });
     return NextResponse.json({ error: "상태 변경 실패" }, { status: 409 });
   }

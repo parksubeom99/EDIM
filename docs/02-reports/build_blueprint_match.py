@@ -17,7 +17,7 @@ import base64, html, io, os, sys
 from PIL import Image
 
 CORPUS, SHOTS, OUTDIR = sys.argv[1], sys.argv[2], sys.argv[3]
-MAIN = sys.argv[4] if len(sys.argv) > 4 else "1b7625e"
+MAIN = sys.argv[4] if len(sys.argv) > 4 else "p6"
 DATE = "2026-09-21"
 HERE = os.path.dirname(os.path.abspath(__file__))
 DECK = os.path.join(HERE, "..", "deck")
@@ -43,9 +43,9 @@ PAGES = {
        ["BOM / Part List ✓ · Tech Data ✓(1종) · DWG 2D ✓(평면·조립) · Cost ✓(단가 샘플)"],
        ["DWG 3D · Work Process 산출 없음", "ERP 연계는 구매 요청까지 · Smart Factory·AR/XR 은 EDIM 완료 후 확장 단계(회장님 확정)"], shot="15_bom_cost"),
  5: pg("L", "EDIM / Code", "Real-Time Code connectivity — 코드 한 줄이 회사를 관통한다",
-       ["제품 선정(Code 생성) → Part-List(Code 연결) → DWG(Code 기반) → Cost → 견적 → 구매 요청이 끊기지 않고 이어진다", "연결 장부 14고리 중 **이어짐 11 · 약함 0 · 없음 3**"],
-       ["Product(Code QR) · Manufacturing/MES 고리 없음", "남은 '없음' 3: 승인↔Rev·BOM(P6) · DB①→DB②(P3-b) · Special(P3-c)"],
-       "docs/plan/connection-ledger.md · e2e S8 · S18c · S22b · S24a", "15_bom_cost", "P6 통합에서 '사람 재입력 0'을 한 코드로 끝까지 증명"),
+       ["제품 선정(Code 생성) → Part-List(Code 연결) → DWG(Code 기반) → Cost → 견적 → 구매 요청이 끊기지 않고 이어진다", "연결 장부 14고리 중 **이어짐 12 · 약함 0 · 없음 2**"],
+       ["Product(Code QR) · Manufacturing/MES 고리 없음", "남은 '없음' 2: DB①→DB②(P3-b · DXF 연구 후) · Special(P3-c · D1 후)"],
+       "docs/plan/connection-ledger.md · e2e S8 · S18c · S22b · S24a · S28a", "15_bom_cost", "남은 두 고리는 회장님·사장님 입력을 기다린다"),
  6: pg("C", "개념", "EDIM System 구성",
        ["MainForm 상단에 CPQ · PLM · ERP · EDIM Toolbox, 별도 Set-Up(Code System) 화면이 실제로 있다"],
        ["GUI Toolkit Canvas · EDIM Chart · Template 없음", "Product DB 의 [AI 학습] 갈래는 구조만(DB① 비어 있음)"], shot="10_project_bound"),
@@ -88,7 +88,7 @@ PAGES = {
         ["Approval Drawing / Manufacturing Drawing 구분 없음(평면도·조립도 2종)", "'준비시간 1시간 이내' 는 재 본 적 없다"],
         "e2e S25b · S19a~S19e · S22d", "44_document_tab"),
  18: pg("P", "PLM > Set-Up > Work Process > Design", "작업 화면 틀 — Hierarchy · Approval · Schedule",
-        ["Hierarchy · Description · Approval(단계 요청) ✓"], ["Schedule management(To-do · Done · Schedule · Approval Request List) 없음 — Inspector 에 '일정 없음'", "Data Up-Load 없음"],
+        ["Hierarchy · Description · Approval(BOM 에 묶인 단계 요청) ✓"], ["Schedule management(To-do · Done · Schedule · Approval Request List) 없음 — Inspector 에 '일정 없음'", "Data Up-Load 없음"],
         "e2e S1", "10_project_bound"),
  19: pg("C", "간지", "Detail Process"),  # 글자가 이미지로 들어 있어 텍스트 추출본은 비어 있다 — 쪽 이미지를 보고 확인(2026-09-21)
  20: pg("C", "간지", "System tool — 사용자가 직접 필요한 System Customizing"),
@@ -171,9 +171,9 @@ PAGES = {
         ["1. Code — Sub code · Product Code · Code Relationship ✓", "EDIM Tool — Macro ✓ · UI Design 일부"], ["Arrangement Code/Set-up · TLM Design · CPQ Selection · Print Set-up 없음", "User ERP 는 구매 요청만"],
         "e2e S9 · S10 · S12", "23_codebuilder_from_subcode"),
  55: pg("L", "System Set-Up", "Approval Management · Authorization · Security",
-        ["Design → Check → Approve → Accepted 승인 단계 ✓", "역할별 권한(RBAC) · 사용자 관리(마지막 owner 강등 거부) · 테넌트 격리(RLS) · 감사 로그 ✓"],
-        ["DOC No · Version · Released 를 모아 보는 승인 대장 화면 없음", "승인이 아직 코드 Rev·BOM 과 묶여 있지 않다(P6)"],
-        "project:test · rls:test · e2e S11 · S17a · S17b", "42_user_management", "P6 통합"),
+        ["Design → Check → Approve → Accepted ✓ — 승인은 **BOM 스냅샷에 묶인다**: 발행·발주는 승인된 BOM 에서만(DB 트리거)", "역할별 권한(RBAC) · 사용자 관리(마지막 owner 강등 거부) · 테넌트 격리(RLS) · 감사 로그 ✓"],
+        ["DOC No · Version · Released 를 모아 보는 승인 대장 화면 없음", "승인 권한은 회사 안(owner·engineer)뿐 — 플랫폼 단계 승인자 분리는 미정"],
+        "project:test · rls:test · e2e S27a~d · S29b~d · S11 · S17", "51_accepted"),
  56: pg("L", "E-1 · EDIM System Structure", "작업대 — 다섯 구역",
         ["Tool bar · Work Hierarchy · Main Work Place · Sub Work Place · Key Work Place 가 청사진 그대로 떠 있다"], ["EDIM Toolbar 의 업무 목록(고객 관리 … 시운전 요청) 없음"], "e2e S1", "10_project_bound"),
  57: pg("P", "E-2 · EDIM System Toolbar", "Toolbox Macro — 다섯 갈래 상호 연동",
@@ -199,9 +199,9 @@ PAGES = {
         ["Sub Code · Product Code · Code relationship(BOM) Hierarchy ✓ · Approval management ✓", "3계층(플랫폼 → 회사 관리자 → 사용자) ✓"],
         ["Department Std. · Company DB(Customer·Supplier) · Warehouse · Inventory · Bank 없음"], "platform:test 25 · e2e S16 · S17", "40_company_admin"),
  65: pg("L", "EDIM RUN", "Work Process — 한 번의 Run 에서 나오는 것들",
-        ["Main Code → BOM → 도면 · 원가 · Tech Data · PCR·견적 · 구매 요청, **모두 한 BOM 스냅샷**에서", "인쇄본 발치에 어느 BOM · 코드 개정 · 매크로 개정에서 나온 숫자인지 찍힌다"],
-        ["Non-Standard Option(X Code) → R&D → New Code 흐름 없음", "Project 폴더 저장 구조 · ERP 승인 연결 없음(P6)"],
-        "e2e S20a~S20d · S22b · S22c · S22f", "44_document_tab", "P6 통합"),
+        ["Main Code → BOM → 도면 · 원가 · Tech Data · PCR·견적 · 구매 요청, **모두 한 BOM 스냅샷**에서", "구매 요청에서 거꾸로 **추적**: BOM → 코드 개정 → 카탈로그 지문 → 매크로 개정 → 승인"],
+        ["Non-Standard Option(X Code) → R&D → New Code 흐름 없음", "Project 폴더 저장 구조 없음"],
+        "e2e S20a~S20d · S22f · S28a~S28d", "45_purchasing"),
  66: pg("P", "D-3 · Pre-Calculation Report & Quotation", "PCR → Quotation",
         ["PCR(Material + Manufacturing = Direct Cost → Full cost) + 견적서 ✓", "견적 합계 = 스냅샷 원가 **그대로**(15,487,170 = 15,487,170)"],
         ["PCR 세부(Procurement · Sub-manufacturing · Sales & Adm. · EBIT) · Business Type 열 없음", "단가는 샘플 — 구조 시연이다"],
@@ -273,7 +273,7 @@ def s_rule():
     return f'''<section class="slide"><div class="stage"><header><span class="no">01</span><h2>읽는 법 — 판정 기준과 실측</h2></header>
 <div class="honest">
 <div class="h"><b>판정 네 가지</b><p><u>실동</u> 그 장의 핵심 동작이 화면에서 끝까지 돌고, e2e 나 DB 검증이 그것을 못 박고 있다.<br><u>부분</u> 일부만 돈다 — 도는 것과 없는 것을 둘 다 적는다.<br><u>미착수</u> 구현 대상인데 도는 것이 없다. <b>버튼 자리만 있는 것은 미착수로 셌다.</b><br><u>개념·표지</u> 구현 대상이 아닌 장. 반영된 곳이 있으면 적었다.</p></div>
-<div class="h hb"><b>실측 (main {MAIN} · 엘 샌드박스)</b><p>typecheck 11 · 단위 테스트 189 · 발표 시나리오 e2e <b>87/87</b><br>DB 검증: rls · revision · backbone 13 · platform 25 · drawing 14 · document 28 · auth<br>회귀: 슬롯 1,200 조합에서 BOM 불변<br>각 장의 근거 칸에 적힌 S번호는 <code>scripts/demo_e2e.py</code> 의 단계 이름이다.</p></div>
+<div class="h hb"><b>실측 (main {MAIN} · 엘 샌드박스)</b><p>typecheck 11 · 단위 테스트 189 · 발표 시나리오 e2e <b>99/99</b><br>DB 검증: rls · revision · backbone 13 · platform 25 · drawing 16 · document 37 · auth<br>회귀: 슬롯 1,200 조합에서 BOM 불변<br>각 장의 근거 칸에 적힌 S번호는 <code>scripts/demo_e2e.py</code> 의 단계 이름이다.</p></div>
 <div class="h"><b>오른쪽 화면은 전부 실제 캡처</b><p>목업이 아니다. <code>demo_e2e.py</code> 가 매번 새로 찍는 화면이고, 이번부터 <code>docs/screens/</code> 에 함께 올렸다. 도면은 내려받은 DXF 를 ezdxf 로 다시 그린 것이다.</p></div>
 <div class="h hc"><b>여전히 검증되지 않은 것</b><p><b>회장님 Windows PC 실행 0회</b> — 위 수치는 전부 엘 샌드박스(Linux) 기준.<br>표·단가는 샘플 · Prompt→Macro 실모델 호출 0회 · 도면은 선과 글자 수준.</p></div>
 </div></div></section>'''
@@ -313,7 +313,7 @@ def s_remaining():
 <div class="honest">
 <div class="h hc"><b>회장님 몫</b><p>① <b>Windows PC 에서 1회 실행</b> — 모든 수치가 그때 처음 회장님 것이 된다 (<code>docs/DEMO.md</code> §1, pull 후 <code>pnpm db:generate && pnpm db:migrate</code>)<br>② API 키로 Prompt→Macro 1회 · ③ 회사 실 표(단가 · Table1/NS)<br>④ 결정: 코드 개정에 슬롯 F 를 넣을지 · Arrangement(p13·35·36·46) 우선순위<br>⑤ DXF 추출 연구 결과(→ P3-b) · 88md 백업 · CI 워크플로 파일 1개 추가(토큰 권한 밖)</p></div>
 <div class="h"><b>사장님 몫</b><p><b>D1</b> — Special Tool Box 첫 시연 사례(→ P3-c)<br>회사 기술 문서 · 기술 계산식(→ Tech Data 깊이, p15)</p></div>
-<div class="h hb"><b>엘이 이어서 할 수 있는 것</b><p><b>P6 통합</b> — 프로젝트 승인 ↔ 코드 Rev · BOM 을 묶어 연결 장부 '없음' 3 → 2, 한 코드가 등록→승인까지 사람 재입력 없이<br>그 뒤 P5 발표(80% 완성 후 — 회장님 결정)</p></div>
+<div class="h hb"><b>엘이 이어서 할 수 있는 것</b><p><b>P6 통합은 끝났다</b>(승인 ↔ BOM · 발행/발주 문 · 추적 — 연결 장부 '없음' 3 → 2).<br>남은 엘 몫: 기존에 깨져 있던 검증 2종(hierarchy · macro) 수리 · 변경 전파를 한 시나리오로 묶는 단언 · P5 발표 준비(회장님 결정 후)</p></div>
 <div class="h"><b>범위 밖으로 둔 것</b><p>p43·p44 생산·MES · p69 파트너·모바일·QR · 3D DWG · 클라우드 배포.<br>회장님 확정: EDIM 완료 후 확장 단계(ERP → Digital Twin → AR·XR).</p></div>
 </div></div></section>'''
 

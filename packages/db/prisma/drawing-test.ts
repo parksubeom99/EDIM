@@ -15,6 +15,8 @@ import {
   saveDrawing, listDrawings, setDrawingStatus, latestRevisionId, revisionIdForSlots,
   DrawingLockedError, DrawingStatusBackwardsError,
 } from "../src/drawing";
+import { requestApproval, decideApproval } from "../src/project";
+import { BomNotApprovedError } from "../src/approval-gate";
 import { IDS } from "./seed";
 
 let pass = 0;
@@ -28,6 +30,14 @@ async function throws(fn: () => Promise<unknown>): Promise<unknown> {
 }
 
 const NODE = "a0000000-0000-4000-8000-000000000004";
+
+/** P6: 발행·발주는 승인된 BOM 에서만 → 테스트도 같은 길로 승인을 받는다(요청 → 결정). */
+const approveRun = (runId: string) =>
+  withTenant(IDS.tenantA, async (tx) => {
+    const id = await requestApproval(tx, IDS.projectA, IDS.ownerA, "tier:org · test", runId);
+    await decideApproval(tx, id, "approved", IDS.ownerA, "tier:org · approved");
+    return id;
+  });
 
 async function main(): Promise<void> {
   // --- 1) 스냅샷에 코드 개정이 박힌다 ---------------------------------------
@@ -87,6 +97,13 @@ async function main(): Promise<void> {
   );
   check("상태는 되돌릴 수 없다", back instanceof DrawingStatusBackwardsError);
 
+  // P6 — 승인되지 않은 BOM 에서 나온 도면은 발행할 수 없다
+  const noAp = await throws(() => withTenant(IDS.tenantA, (tx) => setDrawingStatus(tx, { id: d1.id, status: "issued", actorId: IDS.ownerA })));
+  check("P6 승인 전에는 발행이 거부된다 (도메인)", noAp instanceof BomNotApprovedError);
+  const noApRaw = await throws(() => withTenant(IDS.tenantA, (tx) => tx.drawing.update({ where: { id: d1.id }, data: { status: "issued" } })));
+  check("P6 앱을 우회해 발행해도 DB 가 거부한다", noApRaw !== null && /not approved/.test(String(noApRaw)));
+  await approveRun(d1.bomRunId);
+
   const issued = await withTenant(IDS.tenantA, (tx) => setDrawingStatus(tx, { id: d1.id, status: "issued", actorId: IDS.ownerA }));
   check("발행까지 올라간다", issued.status === "issued");
 
@@ -113,6 +130,8 @@ async function main(): Promise<void> {
   await adminPrisma.$executeRawUnsafe(`ALTER TABLE "drawing" DISABLE TRIGGER USER`);
   await adminPrisma.drawing.deleteMany({ where: { drawingNo: "TEST-PLN" } });
   await adminPrisma.$executeRawUnsafe(`ALTER TABLE "drawing" ENABLE TRIGGER USER`);
+  await adminPrisma.projectApproval.deleteMany({ where: { note: { contains: "· test" } } });
+  await adminPrisma.projectApproval.deleteMany({ where: { bomRun: { catalogFp: "test" } } });
   await adminPrisma.bomCodeRun.deleteMany({ where: { catalogFp: "test" } });
   await adminPrisma.codeRevision.deleteMany({ where: { code: { startsWith: "TEST-EU-12-" } } });
 

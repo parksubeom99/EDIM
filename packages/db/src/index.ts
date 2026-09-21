@@ -47,6 +47,7 @@ export {
   addAttachment,
   listApprovals,
   requestApproval,
+  ApprovalBindingError,
   decideApproval,
 } from "./project";
 export type {
@@ -133,3 +134,7 @@ export {
   PrEmptyError,
 } from "./purchase";
 export type { PrStatus, PrLineInput, CreatePrInput } from "./purchase";
+export { isRunApproved, assertRunApproved, BomNotApprovedError } from "./approval-gate";
+export { traceRun } from "./trace";
+export type { RunTrace } from "./trace";
+

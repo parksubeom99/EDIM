@@ -227,13 +227,17 @@ model ProjectApproval {
   note        String?
   requestedAt DateTime  @default(now()) @map("requested_at") @db.Timestamptz(6)
   decidedAt   DateTime? @map("decided_at") @db.Timestamptz(6)
+  /// P6: 이 승인이 가리키는 BOM 스냅샷. 한 번 묶이면 바뀌지 않는다(DB 트리거). null = P6 이전 기록.
+  bomRunId    String?   @map("bom_run_id") @db.Uuid
 
-  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant    Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  bomRun    BomCodeRun? @relation(fields: [bomRunId], references: [id])
   project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   requester AppUser  @relation("ApprovalRequester", fields: [requesterId], references: [id])
   approver  AppUser? @relation("ApprovalApprover", fields: [approverId], references: [id])
 
   @@index([tenantId, projectId])
+  @@index([tenantId, bomRunId], map: "project_approval_run_idx")
   @@map("project_approval")
 }
 
@@ -363,6 +367,7 @@ model BomCodeRun {
   drawings         Drawing[]
   documents        Document[]
   purchaseRequests PurchaseRequest[]
+  approvals        ProjectApproval[]
 
   @@index([tenantId, hierarchyStable, createdAt(sort: Desc)], map: "bom_code_run_tenant_node_idx")
   @@map("bom_code_run")

@@ -19,6 +19,9 @@ import {
   createPurchaseRequest, listPurchaseRequests, setPurchaseRequestStatus,
   PrDuplicateError, PrEmptyError, PrLockedError, PrBackwardsError,
 } from "../src/purchase";
+import { requestApproval, decideApproval } from "../src/project";
+import { BomNotApprovedError } from "../src/approval-gate";
+import { traceRun } from "../src/trace";
 import { IDS } from "./seed";
 
 let pass = 0;
@@ -49,6 +52,14 @@ const LINES = [
   { bomLineNo: 9, childCode: "PVF 1", resolvedCode: "PVF 1", part: "Inverter", spec: "11kW VFD", qty: 1, unit: "ea", unitPrice: 541000 },
 ];
 
+/** P6: 발행·발주는 승인된 BOM 에서만 → 테스트도 같은 길로 승인을 받는다(요청 → 결정). */
+const approveRun = (runId: string) =>
+  withTenant(IDS.tenantA, async (tx) => {
+    const id = await requestApproval(tx, IDS.projectA, IDS.ownerA, "tier:org · test", runId);
+    await decideApproval(tx, id, "approved", IDS.ownerA, "tier:org · approved");
+    return id;
+  });
+
 async function cleanup(): Promise<void> {
   for (const t of ["document", "purchase_request", "purchase_request_line"])
     await adminPrisma.$executeRawUnsafe(`ALTER TABLE "${t}" DISABLE TRIGGER USER`);
@@ -58,6 +69,7 @@ async function cleanup(): Promise<void> {
   await adminPrisma.purchaseRequest.deleteMany({ where: { bomRunId: { in: ids } } });
   for (const t of ["document", "purchase_request", "purchase_request_line"])
     await adminPrisma.$executeRawUnsafe(`ALTER TABLE "${t}" ENABLE TRIGGER USER`);
+  await adminPrisma.projectApproval.deleteMany({ where: { bomRun: { catalogFp: FP } } });
   await adminPrisma.bomCodeRun.deleteMany({ where: { catalogFp: FP } });
 }
 
@@ -91,6 +103,10 @@ async function main(): Promise<void> {
     withTenant(IDS.tenantA, (tx) => setDocumentStatus(tx, { id, status, actorId: IDS.ownerA }));
   await to(q1.id, "review"); await to(q1.id, "approved");
   check("문서 상태는 되돌릴 수 없다", (await throws(() => to(q1.id, "draft"))) instanceof DocumentStatusBackwardsError);
+  check("P6 승인 전에는 문서 발행이 거부된다 (도메인)", (await throws(() => to(q1.id, "issued"))) instanceof BomNotApprovedError);
+  const rawIssue = await throws(() => withTenant(IDS.tenantA, (tx) => tx.document.update({ where: { id: q1.id }, data: { status: "issued" } })));
+  check("P6 앱을 우회해 발행해도 DB 가 거부한다", rawIssue !== null && /not approved/.test(String(rawIssue)));
+  const apId = await approveRun(run.id);
   check("발행까지 올라간다", (await to(q1.id, "issued")).status === "issued");
   check("발행된 문서는 도메인 규칙이 막는다", (await throws(() => to(q1.id, "issued"))) instanceof DocumentLockedError);
   const raw = await throws(() => withTenant(IDS.tenantA, (tx) => tx.document.update({ where: { id: q1.id }, data: { body: { total: 1 } } })));
@@ -117,6 +133,11 @@ async function main(): Promise<void> {
   const rfq = await ps(pr.id, "rfq");
   check("견적 요청 단계에는 PO 번호가 없다", rfq.status === "rfq" && rfq.poNo === null);
   check("Process 는 되돌릴 수 없다", (await throws(() => ps(pr.id, "draft"))) instanceof PrBackwardsError);
+  // run 은 위에서 승인됐다. 승인되지 않은 run2 의 구매 요청은 발주할 수 없다.
+  await ps(pr2.id, "rfq");
+  check("P6 승인되지 않은 BOM 의 구매 요청은 발주할 수 없다 (도메인)", (await throws(() => ps(pr2.id, "ordered"))) instanceof BomNotApprovedError);
+  const rawOrd = await throws(() => withTenant(IDS.tenantA, (tx) => tx.purchaseRequest.update({ where: { id: pr2.id }, data: { status: "ordered", poNo: "PO-TEST-9" } })));
+  check("P6 앱을 우회해 발주해도 DB 가 거부한다", rawOrd !== null && /not approved/.test(String(rawOrd)));
   const ord = await ps(pr.id, "ordered");
   check("발주하면 PO 번호가 붙는다", ord.status === "ordered" && ord.poNo === "PO-TEST-1", String(ord.poNo));
   check("발주된 구매 요청은 도메인 규칙이 막는다", (await throws(() => ps(pr.id, "ordered"))) instanceof PrLockedError);
@@ -126,6 +147,22 @@ async function main(): Promise<void> {
   check("발주 후 줄 수량 직접 수정도 DB 가 거부한다", rawLine !== null && /ordered/.test(String(rawLine)));
   const rawPo = await throws(() => withTenant(IDS.tenantA, (tx) => tx.purchaseRequest.update({ where: { id: pr2.id }, data: { poNo: "PO-FAKE-1" } })));
   check("발주 전에 PO 번호만 끼워 넣을 수 없다 (DB check)", rawPo !== null);
+
+  // --- P6) 승인 기록 자체의 잠금 · 추적 ---------------------------------------------
+  const rebind = await throws(() => withTenant(IDS.tenantA, (tx) => tx.projectApproval.update({ where: { id: apId }, data: { bomRunId: run2.id } })));
+  check("P6 승인이 가리키는 스냅샷은 바꿀 수 없다 (DB)", rebind !== null && /binding cannot change/.test(String(rebind)));
+  const redo = await throws(() => withTenant(IDS.tenantA, (tx) => decideApproval(tx, apId, "rejected", IDS.ownerA, "tier:org · undo")));
+  check("P6 결정된 승인은 뒤집을 수 없다", redo !== null);
+  const wrongNode = await throws(() => withTenant(IDS.tenantA, async (tx) => {
+    const other = await saveBomCodeRun(tx, { stableId: null, code: "TEST-P4B-X", slots: {}, macroValue: null, parentCode: "EU", catalogFp: FP, lines: [], cost: {}, createdBy: IDS.ownerA });
+    return requestApproval(tx, IDS.projectA, IDS.ownerA, "tier:org · test", other.id);
+  }));
+  check("P6 다른 곳에서 돌린 스냅샷으로는 승인을 요청할 수 없다", wrongNode !== null && /이 프로젝트에서 실행한 것이 아닙니다/.test(String(wrongNode)));
+  const platWrong = await throws(() => withTenant(IDS.tenantA, (tx) => requestApproval(tx, IDS.projectA, IDS.ownerA, "tier:platform · test", run2.id)));
+  check("P6 플랫폼 단계는 조직 승인을 받은 바로 그 스냅샷이어야 한다", platWrong !== null && /조직 승인을 받은 BOM 스냅샷과 다릅니다/.test(String(platWrong)));
+  const tr = await withTenant(IDS.tenantA, (tx) => traceRun(tx, run.id));
+  check("P6 추적: 스냅샷 → 매크로 개정 → 승인 → 문서 → 구매 요청(PO)이 한 번에 따라온다",
+    !!tr && tr.approved && tr.macro?.revision === 2 && tr.documents.length >= 3 && tr.purchaseRequest?.poNo === "PO-TEST-1" && tr.snapshot.total === 1322);
 
   // --- 5) 경계 ------------------------------------------------------------------
   const docsB = await withTenant(IDS.tenantB, (tx) => listDocuments(tx));

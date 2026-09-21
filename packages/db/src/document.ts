@@ -1,5 +1,6 @@
 import type { TenantClient } from "./tenant";
 import { writeAudit } from "./audit";
+import { assertRunApproved } from "./approval-gate";
 
 /**
  * P4-b — 문서(견적 p66 · Tech Data p15~16).
@@ -126,6 +127,7 @@ export async function setDocumentStatus(
   const order = DOCUMENT_STATUSES as readonly string[];
   if (order.indexOf(input.status) < order.indexOf(cur.status))
     throw new DocumentStatusBackwardsError(cur.status, input.status);
+  if (input.status === "issued") await assertRunApproved(tx, cur.bomRunId, "문서는 발행할");
 
   const row = await tx.document.update({ where: { id: input.id }, data: { status: input.status } });
   await writeAudit(tx, input.actorId, "update", "document", row.id, { status: cur.status }, { status: row.status });

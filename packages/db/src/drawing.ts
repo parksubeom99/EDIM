@@ -1,5 +1,6 @@
 import type { TenantClient } from "./tenant";
 import { writeAudit } from "./audit";
+import { assertRunApproved } from "./approval-gate";
 
 /**
  * P4-a — 도면(p24 "2. Drawings").
@@ -122,6 +123,7 @@ export async function setDrawingStatus(
   const order = DRAWING_STATUSES as readonly string[];
   if (order.indexOf(input.status) < order.indexOf(cur.status))
     throw new DrawingStatusBackwardsError(cur.status, input.status);
+  if (input.status === "issued") await assertRunApproved(tx, cur.bomRunId, "도면은 발행할");
 
   const row = await tx.drawing.update({
     where: { id: input.id },

@@ -43,8 +43,13 @@ with sync_playwright() as p:
     pg.click("button:has-text('EDIM Run')"); time.sleep(3); body=pg.inner_text("body"); m=re.search(r"455\.4",body); ok("S5 EDIM Run = 455.4", m.group(0) if m else body[-300:], m); pg.screenshot(path=f"{OUT}/14_edim_run.png")
     # S6 BOM tab + BOM Run / EBOM / Cost
     nuke(pg); pg.locator("button", has_text=re.compile(r"^BOM$")).first.click(force=True); time.sleep(1)
-    for k in ("BOM Run","EBOM Run","Cost"):
-        nuke(pg); pg.click(f"button:has-text('{k}')", force=True); time.sleep(2.5)
+    for k,seen in (("BOM Run","Vibration isolator"),("EBOM Run",None),("Cost","15,487,170")):
+        nuke(pg); pg.click(f"button:has-text('{k}')", force=True)
+        # 고정 sleep 대신 결과가 화면에 나타날 때까지(첫 호출은 dev 서버의 라우트 컴파일로 느리다). 안 나타나면 아래 단언이 잡는다.
+        if seen:
+            try: pg.wait_for_function("t => document.body.innerText.includes(t)", arg=seen, timeout=30000)
+            except Exception: pass
+        time.sleep(2.0)
     body=pg.inner_text("body"); ok("S6a BOM rows incl. macro-driven isolator + p14 spec", "Vibration isolator" in body and "칼라강판" in body, "Vibration isolator" in body and "칼라강판" in body)
     m=re.search(r"15,487,170",body); ok("S6b Cost total ₩15,487,170", bool(m), m); pg.screenshot(path=f"{OUT}/15_bom_cost.png",full_page=True)
     # S7 DXF — P4-a: 도면은 슬롯이 아니라 **BOM 스냅샷**에서 나온다
@@ -162,6 +167,18 @@ with sync_playwright() as p:
     ok("S19a 도면 등록 Rev A", (g1.get("drawingNo"), g1.get("rev")), g1.get("rev")=="A")
     g2=ctx.request.post(BASE+"/api/drawings",headers=J0,data=json.dumps({"runId":RUN1,"type":"plan"})).json()
     ok("S19b 다시 뜨면 Rev B — 앞 개정은 남는다", g2.get("rev"), g2.get("rev")=="B")
+    # ── P6 금실: 밖으로 나가는 것(발행·발주)은 **승인된 BOM** 에서만 (p55·p56·p65) ──
+    PID="c0000000-0000-4000-8000-000000000001"
+    na=ctx.request.patch(BASE+f"/api/drawings/{g1['id']}",headers=J0,data=json.dumps({"status":"issued"}))
+    ok("S27a 승인되지 않은 BOM 에서 나온 도면은 발행할 수 없다 (409 + 이유)", (na.status, na.json().get("error","")[:24]), na.status==409 and "승인" in na.json().get("error",""))
+    nr2=ctx.request.post(BASE+f"/api/projects/{PID}/approvals",headers=J0,data=json.dumps({"note":"tier:org · e2e"}))
+    ok("S27b 무엇을 승인하는지 모르는 승인 요청은 받지 않는다 (runId 없으면 400)", nr2.status, nr2.status==400)
+    aq=ctx.request.post(BASE+f"/api/projects/{PID}/approvals",headers=J0,data=json.dumps({"note":"tier:org · e2e","runId":RUN1})); AID=aq.json().get("id")
+    still=ctx.request.patch(BASE+f"/api/drawings/{g1['id']}",headers=J0,data=json.dumps({"status":"issued"}))
+    ok("S27c 승인을 BOM 스냅샷에 묶어 요청한다 · 요청만으로는 아직 발행 못 한다", (aq.status, still.status), aq.status==200 and aq.json().get("runId")==RUN1 and still.status==409)
+    ad=ctx.request.post(BASE+f"/api/project-approvals/{AID}",headers=J0,data=json.dumps({"decision":"approved","note":"ok"}))
+    ad2=ctx.request.post(BASE+f"/api/project-approvals/{AID}",headers=J0,data=json.dumps({"decision":"rejected","note":"undo"}))
+    ok("S27d 승인한다 · 결정된 승인은 뒤집을 수 없다 (409)", (ad.status, ad2.status), ad.status==200 and ad2.status==409)
     for st in ["review","approved","issued"]:
         pr=ctx.request.patch(BASE+f"/api/drawings/{g1['id']}",headers=J0,data=json.dumps({"status":st}))
     ok("S19c 작성중 → 검토 → 승인 → 발행", pr.status, pr.status==200)
@@ -241,7 +258,9 @@ with sync_playwright() as p:
     pg.goto(BASE+"/m/purchasing",wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=pr-card]",timeout=30000); time.sleep(1.2); nuke(pg)
     ncard=len(pg.query_selector_all("[data-testid=pr-card]")); PRNO=pj.get("prNo")
     ok("S26a Purchasing 에 구매 요청 2건(API 1 · 화면 1)이 줄과 함께 보인다", (ncard, len(pg.query_selector_all("[data-testid=pr-line]"))), ncard==2 and len(pg.query_selector_all("[data-testid=pr-line]"))==2*len(want))
-    for _ in range(2): nuke(pg); pg.click(f"[data-testid='pr-advance-{PRNO}']", force=True); time.sleep(1.8)
+    CARD=f"[data-testid=pr-card]:has([data-testid='pr-export-{PRNO}'])"
+    for want_st in ("rfq","ordered"):  # 고정 sleep 이 아니라 **상태가 바뀔 때까지** 기다린다(첫 호출은 라우트 컴파일로 느릴 수 있다)
+        nuke(pg); pg.click(f"[data-testid='pr-advance-{PRNO}']", force=True); pg.wait_for_selector(f"{CARD}[data-status={want_st}]",timeout=20000); time.sleep(0.4)
     card=pg.inner_text(f"[data-testid=pr-card]:has([data-testid='pr-export-{PRNO}'])")
     ok("S26b 견적 요청 → 발주 · 발주되면 PO 번호가 붙는다 (PO-61313-n)", card.split("\n")[0][:60], "발주" in card and "PO-61313-" in card and not pg.query_selector(f"[data-testid='pr-advance-{PRNO}']"))
     lk=ctx.request.patch(BASE+f"/api/purchase-requests/{pj.get('id')}",headers=J0,data=json.dumps({"status":"ordered"}))
@@ -249,8 +268,34 @@ with sync_playwright() as p:
     ex=ctx.request.get(BASE+f"/api/purchase-requests/{pj.get('id')}/export"); rows_=ex.text().strip().split("\r\n")
     ok("S26d Export CSV: 머리 1줄 + 구매 품목 줄 · PR·PO 번호 포함 · 엑셀용 BOM", (ex.status, len(rows_), ex.headers.get("content-type")), ex.status==200 and "text/csv" in ex.headers.get("content-type","") and len(rows_)==1+len(want) and PRNO in rows_[1] and "PO-61313-" in rows_[1] and ex.body()[:3]==b"\xef\xbb\xbf")
     open(f"{OUT}/{PRNO}.csv","wb").write(ex.body())
+    # S28 추적 — 구매 요청에서 거꾸로: 스냅샷 → 코드 개정 → 카탈로그 지문 → 매크로 개정 → 승인
+    t1=ctx.request.get(BASE+f"/api/trace?runId={RUN1}").json(); ta=ctx.request.get(BASE+f"/api/trace?runId={ra.get('runId')}").json()
+    ok("S28a 추적: 발주된 구매 요청의 BOM 은 승인돼 있고, 매크로 개정·도면·문서·PO 가 한 번에 따라온다", (t1.get("approved"), (t1.get("macro") or {}).get("revision"), len(t1.get("drawings",[])), len(t1.get("documents",[])), (t1.get("purchaseRequest") or {}).get("poNo")), t1.get("approved") is True and isinstance((t1.get("macro") or {}).get("revision"),int) and len(t1.get("drawings",[]))>=2 and len(t1.get("documents",[]))>=3 and str((t1.get("purchaseRequest") or {}).get("poNo","")).startswith("PO-61313-") and t1["snapshot"]["total"]==cr.get("value"))
+    ok("S28b 추적: Rev A 슬롯으로 돌린 BOM 은 코드 개정 Rev A 까지 거슬러 올라간다 · 그 BOM 은 미승인", ((ta.get("codeRevision") or {}).get("rev"), ta.get("approved")), (ta.get("codeRevision") or {}).get("rev")==1 and ta.get("approved") is False)
+    other=[x for x in ctx.request.get(BASE+"/api/purchase-requests").json().get("rows",[]) if x.get("id")!=pj.get("id")][0]; ONO=other["prNo"]
+    nuke(pg); pg.click(f"[data-testid='pr-trace-{PRNO}']", force=True); time.sleep(1.5); nuke(pg); pg.click(f"[data-testid='pr-trace-{ONO}']", force=True); time.sleep(1.5)
+    tp=[(e.get_attribute("data-approved"), e.inner_text()) for e in pg.query_selector_all("[data-testid=pr-trace]")]
+    ok("S28c 화면: 추적 패널이 승인된 BOM 과 미승인 BOM 을 가려 보여 준다", [x[0] for x in tp], sorted(x[0] for x in tp)==["0","1"] and any("승인된 BOM" in x[1] and "매크로" in x[1] for x in tp))
+    OCARD=f"[data-testid=pr-card]:has([data-testid='pr-export-{ONO}'])"
+    nuke(pg); pg.click(f"[data-testid='pr-advance-{ONO}']", force=True); pg.wait_for_selector(f"{OCARD}[data-status=rfq]",timeout=20000); time.sleep(0.4)
+    nuke(pg); pg.click(f"[data-testid='pr-advance-{ONO}']", force=True); pg.wait_for_selector("[data-testid=purchasing-error]",timeout=20000); time.sleep(0.4)
+    pe=pg.inner_text("[data-testid=purchasing-error]") if pg.query_selector("[data-testid=purchasing-error]") else ""
+    ost=[x for x in ctx.request.get(BASE+"/api/purchase-requests").json().get("rows",[]) if x.get("prNo")==ONO][0]
+    ok("S28d 화면: 승인되지 않은 BOM 의 구매 요청은 견적 요청까지만 — 발주는 막히고 이유가 뜬다", (ost.get("status"), pe[:30]), ost.get("status")=="rfq" and ost.get("poNo") is None and "승인" in pe)
+    # S29 플랫폼 단계 — 조직 승인을 받은 바로 그 스냅샷이어야 한다
+    pw=ctx.request.post(BASE+f"/api/projects/{PID}/approvals",headers=J0,data=json.dumps({"note":"tier:platform · e2e","runId":ra.get("runId")}))
+    ok("S29a 다른 스냅샷으로는 플랫폼 단계에 올릴 수 없다 (409)", pw.status, pw.status==409)
     pg.screenshot(path=f"{OUT}/45_purchasing.png",full_page=True)
     pg.goto(BASE+f"/api/documents/{q1.get('id')}/print",wait_until="domcontentloaded"); time.sleep(0.8); pg.screenshot(path=f"{OUT}/46_quotation_print.png",full_page=True)
+    pg.goto(BASE+"/workbench?node=a0000000-0000-4000-8000-000000000004",wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=pipeline-stage]",timeout=30000); time.sleep(1.5); nuke(pg)
+    st0=pg.inner_text("[data-testid=pipeline-stage]"); insp=pg.inner_text("[data-testid=pipeline-stage] >> xpath=ancestor::*[3]")
+    ok("S29b 화면: Inspector 가 Approve 단계와 승인된 BOM 을 보여 준다", (st0, RUN1[:8] in insp), st0.strip()=="Approve" and RUN1[:8] in insp)
+    nuke(pg); pg.click("[data-testid=request-platform]", force=True); time.sleep(2.5); nuke(pg); pg.click("[data-testid=approve-btn]", force=True); time.sleep(2.5)
+    st1=pg.inner_text("[data-testid=pipeline-stage]"); t2=ctx.request.get(BASE+f"/api/trace?runId={RUN1}").json()
+    bd=pg.query_selector("[data-testid=approval-bound]")
+    ok("S29d 화면: 승인된 것은 BOM 이다 — 화면의 현재 코드(AL)가 승인된 BOM(SS)과 다르면 그렇다고 말한다", (bd.get_attribute("data-differs") if bd else None), bool(bd) and "630SS" in bd.inner_text() and bd.get_attribute("data-differs")=="1" and "다릅니다" in bd.inner_text())
+    ok("S29c 화면: Accepted 요청 → 승인 → Accepted · 플랫폼 승인도 같은 BOM 에 묶인다", (st1, [f"{a_['tier']}:{a_['state']}" for a_ in t2.get("approvals",[])]), st1.strip()=="Accepted" and any(a_["tier"]=="platform" and a_["state"]=="approved" for a_ in t2.get("approvals",[])))
+    pg.screenshot(path=f"{OUT}/51_accepted.png",full_page=True)
     # ── P3-a 플랫폼 관리자 계층 · DB①/DB② 소유 분리 (p54 User Management · p59 최종 승인 · p64 Admin.) ──
     # S16 회사 관리자가 Company Info.에서 Special 의뢰를 올린다 = 회사→플랫폼 유일 통로
     pg.goto(BASE+"/m/company",wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=user-management]",timeout=30000); time.sleep(1.5); nuke(pg)

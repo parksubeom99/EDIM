@@ -1,7 +1,8 @@
 /**
  * Two-tier approval pipeline (p28 · p56): Design → Check → Approve → Accepted.
  *
- * Derived purely from existing `ProjectApproval` rows (no schema change):
+ * Derived purely from existing `ProjectApproval` rows.
+ * P6: each row is bound to a BOM snapshot (`bomRunId`) — what was approved is a snapshot, not a memo.
  *   note prefix `tier:org`      → organizational approval (tier 1)
  *   note prefix `tier:platform` → platform approval (tier 2)
  *
@@ -25,6 +26,8 @@ export interface ApprovalRow {
   state: string; // requested | approved | rejected
   note: string | null;
   requestedAt: string | Date;
+  /** P6 — 이 승인이 가리키는 BOM 스냅샷 (P6 이전 기록은 없음) */
+  bomRunId?: string | null;
 }
 
 export const TIER_PREFIX: Record<ApprovalTier, string> = {

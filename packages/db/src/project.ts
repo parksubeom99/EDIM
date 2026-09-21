@@ -265,22 +265,57 @@ export function listApprovals(tx: TenantClient, projectId: string) {
   return tx.projectApproval.findMany({
     where: { projectId },
     orderBy: { requestedAt: "desc" },
+    // P6: 무엇을 승인했는지 — 묶인 BOM 스냅샷의 코드를 함께 돌려준다.
+    include: { bomRun: { select: { code: true } } },
   });
 }
 
+export class ApprovalBindingError extends Error {
+  constructor(readonly status: number, message: string) {
+    super(message);
+    this.name = "ApprovalBindingError";
+  }
+}
+
+/**
+ * P6 — 승인은 **BOM 스냅샷에 대해** 요청한다.
+ * 스냅샷은 코드 개정·매크로 개정·카탈로그 지문을 품고 있으므로, 승인이 스냅샷에 묶이면
+ * "무엇을 승인했는가"가 그 셋까지 한 번에 정해진다. 묶인 뒤에는 바꿀 수 없다(DB 트리거).
+ *  - 스냅샷은 이 프로젝트의 노드에서 돌린 것이어야 한다.
+ *  - 플랫폼 단계(tier:platform) 요청은 **조직 승인을 받은 바로 그 스냅샷**이어야 한다.
+ */
 export async function requestApproval(
   tx: TenantClient,
   projectId: string,
   requesterId: string,
   note: string | null,
+  bomRunId: string,
 ): Promise<string> {
   const tenantId = await requireTenant(tx);
+  const project = await tx.project.findUnique({ where: { id: projectId } });
+  if (!project) throw new ApprovalBindingError(404, "프로젝트를 찾을 수 없습니다");
+  const run = await tx.bomCodeRun.findUnique({ where: { id: bomRunId } });
+  if (!run) throw new ApprovalBindingError(404, "BOM 스냅샷을 찾을 수 없습니다");
+  if (run.hierarchyStable !== project.hierarchyStable)
+    throw new ApprovalBindingError(422, "이 BOM 스냅샷은 이 프로젝트에서 실행한 것이 아닙니다");
+  if ((note ?? "").startsWith("tier:platform")) {
+    const org = await tx.projectApproval.findFirst({
+      where: { projectId, note: { startsWith: "tier:org" } },
+      orderBy: { requestedAt: "desc" },
+    });
+    if (!org || org.state !== "approved" || org.bomRunId !== bomRunId)
+      throw new ApprovalBindingError(409, "조직 승인을 받은 BOM 스냅샷과 다릅니다 — 같은 스냅샷으로 올려야 합니다");
+  }
   const ap = await tx.projectApproval.create({
-    data: { tenantId, projectId, requesterId, state: "requested", note },
+    data: { tenantId, projectId, requesterId, state: "requested", note, bomRunId },
   });
   await writeAudit(tx, requesterId, "create", "project_approval", ap.id, null, {
     projectId,
     state: "requested",
+    bomRunId,
+    code: run.code,
+    codeRevisionId: run.codeRevisionId,
+    macroRevision: run.macroRevision,
   });
   return ap.id;
 }
@@ -296,6 +331,12 @@ export async function decideApproval(
   const before = await tx.projectApproval.findUniqueOrThrow({
     where: { id: approvalId },
   });
+  if (before.state !== "requested")
+    throw new ApprovalBindingError(409, `이미 결정된 승인입니다 (${before.state})`);
+  // 단계 표식(tier:org / tier:platform)은 요청 때 붙은 것이다. 결정 메모가 그것을 지우지 못하게 한다
+  // — 표식이 사라지면 "이 BOM 은 승인됐는가"(0010 bom_run_is_approved)가 승인을 못 알아본다.
+  const tier = /^tier:(org|platform)/.exec(before.note ?? "")?.[0];
+  if (tier && !(note ?? "").startsWith(tier)) note = `${tier} · ${note ?? decision}`;
   await tx.projectApproval.update({
     where: { id: approvalId },
     data: { state: decision, approverId, note, decidedAt: new Date() },

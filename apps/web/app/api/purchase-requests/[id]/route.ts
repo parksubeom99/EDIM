@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { withTenant, setPurchaseRequestStatus, isPrStatus, PrLockedError, PrBackwardsError } from "@edim/db";
+import { withTenant, setPurchaseRequestStatus, isPrStatus, PrLockedError, BomNotApprovedError, PrBackwardsError } from "@edim/db";
 import { getServerSession } from "@/app/lib/session";
 import { canEditProject } from "@/app/lib/project-perms";
 
@@ -20,7 +20,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     );
     return NextResponse.json({ ok: true, status: row.status, poNo: row.poNo });
   } catch (e) {
-    if (e instanceof PrLockedError || e instanceof PrBackwardsError)
+    if (e instanceof BomNotApprovedError || e instanceof PrLockedError || e instanceof PrBackwardsError)
       return NextResponse.json({ error: e.message }, { status: 409 });
     return NextResponse.json({ error: "Process 변경 실패" }, { status: 409 });
   }
