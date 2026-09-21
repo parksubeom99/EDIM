@@ -203,6 +203,13 @@ with sync_playwright() as p:
     lk=ctx.request.patch(BASE+f"/api/documents/{q1.get('id')}",headers=J0,data=json.dumps({"status":"issued"}))
     bk=ctx.request.patch(BASE+f"/api/documents/{q2.get('id')}",headers=J0,data=json.dumps({"status":"review"})); bk2=ctx.request.patch(BASE+f"/api/documents/{q2.get('id')}",headers=J0,data=json.dumps({"status":"draft"}))
     ok("S22e 발행된 견적은 잠기고(409), 상태는 되돌릴 수 없다(409)", (pr_.status, lk.status, bk2.status), pr_.status==200 and lk.status==409 and bk.status==200 and bk2.status==409)
+    # S22f 견적서 발치의 '코드 개정' 근거 — 최신 개정이 아니라 **그 슬롯으로 저장된** 개정만 찍힌다
+    revA=[x for x in rv if x.get("revNo")==1][0]; SA={"A":"EU","B":"55","C":"2123","D":"630","E":"SS"}
+    ra=ctx.request.post(BASE+"/api/run/bom",headers=J0,data=json.dumps({"slots":SA,"code":"EU-55-2123-630SS","node":"a0000000-0000-4000-8000-000000000004"})).json()
+    qa=ctx.request.post(BASE+"/api/documents",headers=J0,data=json.dumps({"runId":ra.get("runId"),"type":"quotation"})).json()
+    srcA=ctx.request.get(BASE+f"/api/documents/{qa.get('id')}").json().get("body",{}).get("source",{})
+    src1=ctx.request.get(BASE+f"/api/documents/{q1.get('id')}").json().get("body",{}).get("source",{})
+    ok("S22f Rev A 의 슬롯으로 돌리면 Rev A 가 근거로 찍히고(최신은 Rev B), 저장한 적 없는 조합은 비워 둔다", (srcA.get("codeRevisionId")==revA.get("id"), src1.get("codeRevisionId")), srcA.get("codeRevisionId")==revA.get("id") and src1.get("codeRevisionId") is None)
     # S23 Tech Data: 값 + 그 값을 낸 승인 매크로 개정 + 입력
     t1=ctx.request.post(BASE+"/api/documents",headers=J0,data=json.dumps({"runId":RUN1,"type":"techdata"})).json()
     tb=ctx.request.get(BASE+f"/api/documents/{t1.get('id')}").json().get("body",{})
@@ -227,7 +234,7 @@ with sync_playwright() as p:
     for tid in ("doc-make-quotation","doc-make-techdata","pr-make"):
         nuke(pg); pg.click(f"[data-testid={tid}]", force=True); pg.wait_for_selector("[data-testid=document-msg]",timeout=15000); time.sleep(1.8)
     dp=pg.inner_text("[data-testid=document-panel]"); nrow=len(pg.query_selector_all("[data-testid=document-row]"))
-    ok("S25b 화면에서 견적·Tech Data·구매 요청이 등록되고 목록에 보인다", (nrow, "구매 요청 있음" in dp), nrow>=5 and "구매 요청 있음" in dp and "발행" in dp and pg.get_attribute("[data-testid=document-msg]","data-ok")=="1")
+    ok("S25b 화면에서 견적·Tech Data·구매 요청이 등록되고 목록에 보인다", (nrow, "구매 요청 있음" in dp), nrow>=6 and "구매 요청 있음" in dp and "발행" in dp and pg.get_attribute("[data-testid=document-msg]","data-ok")=="1")
     ok("S25c 구매 요청을 만든 스냅샷에서는 버튼이 잠긴다 (두 번 사지 않는다)", pg.is_disabled("[data-testid=pr-make]"), pg.is_disabled("[data-testid=pr-make]"))
     pg.screenshot(path=f"{OUT}/44_document_tab.png",full_page=True)
     # S26 화면: Purchasing — Process 를 올리고(견적 요청 → 발주) CSV 로 내보낸다 (p51)
