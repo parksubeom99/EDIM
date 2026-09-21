@@ -35,12 +35,13 @@ pnpm dev                   # http://localhost:3000  (pnpm start 아님)
 
 ```powershell
 pnpm typecheck             # 11 패키지 Done
-pnpm -r test               # 177 passed
+pnpm -r --workspace-concurrency=1 test   # 189 passed
 pnpm --filter @edim/db revision:test   # Tier B 8/8 (append-only · RLS · 감사)
 pnpm --filter @edim/db backbone:test   # P1 코드 등뼈 13/13
-pnpm --filter @edim/db platform:test   # ★ P3-a 22/22 (DB①/DB② 권한 분리·역류 차단)
-pnpm --filter @edim/db drawing:test    # ★ P4-a 12/12 (도면 개정·발행 잠금·스냅샷 연결)
-pip install playwright --break-system-packages ; playwright install chromium
+pnpm --filter @edim/db platform:test   # ★ P3-a 25/25 (DB①/DB② 권한 분리·역류 차단)
+pnpm --filter @edim/db drawing:test    # ★ P4-a 14/14 (도면 개정·발행 잠금·스냅샷 연결)
+pnpm --filter @edim/db document:test   # ★ P4-b 28/28 (견적·Tech Data·구매 요청 · 발행/발주 잠금)
+pip install playwright ezdxf ; playwright install chromium   # ezdxf = 도면(DXF)을 파싱해 검증
 pnpm db:reset:demo         # ★ 리허설 흔적 제거 (테스트·이전 e2e가 남긴 Rev·매크로 revision)
 python scripts\demo_e2e.py http://localhost:3000 shots   # ★ 87/87 PASS면 발표 가능
 pnpm db:reset:demo         # ★ e2e 자신도 흔적을 남긴다 → 시연 직전 반드시 한 번 더
