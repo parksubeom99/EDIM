@@ -24,5 +24,13 @@ jobs:
       - run: pnpm db:generate
       - run: pnpm db:migrate
       - run: pnpm db:seed
+      - run: pnpm db:seed:demo
       - run: pnpm typecheck
       - run: pnpm -r --workspace-concurrency=1 test
+      # DB 가 직접 막는 규칙들 — 앱을 우회해도 거부되는지(RLS · append-only · 발행/발주 잠금 · 플랫폼 열람 차단)
+      - run: pnpm --filter @edim/db rls:test
+      - run: pnpm --filter @edim/db revision:test
+      - run: pnpm --filter @edim/db backbone:test
+      - run: pnpm --filter @edim/db platform:test
+      - run: pnpm --filter @edim/db drawing:test
+      - run: pnpm --filter @edim/db document:test

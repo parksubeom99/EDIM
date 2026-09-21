@@ -1,4 +1,6 @@
 # 00-corpus — 근거 코퍼스
 
 EDIM.pdf 원문 인용과 페이지 색인. 설계 판단의 1차 근거.
+
+- **[page-map.md](page-map.md)** — 청사진 70쪽 대조(쪽마다 판정 · 도는 것 · 없는 것 · 근거). `docs/02-reports/build_blueprint_match.py` 에서 자동 생성.
 모든 설계 결정은 여기 페이지 번호로 소급 가능해야 한다.
