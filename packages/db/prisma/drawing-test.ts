@@ -12,7 +12,7 @@ import { withTenant } from "../src/tenant";
 import { appPrisma, adminPrisma } from "../src/client";
 import { saveBomCodeRun } from "../src/code-catalog";
 import {
-  saveDrawing, listDrawings, setDrawingStatus, latestRevisionId,
+  saveDrawing, listDrawings, setDrawingStatus, latestRevisionId, revisionIdForSlots,
   DrawingLockedError, DrawingStatusBackwardsError,
 } from "../src/drawing";
 import { IDS } from "./seed";
@@ -47,6 +47,17 @@ async function main(): Promise<void> {
     revId === null ? run.codeRevisionId === null : run.codeRevisionId === revId,
     `rev=${String(revId)} snap=${String(run.codeRevisionId)}`,
   );
+
+  // P4-b 에서 고친 규칙: 근거로 박는 개정은 "최신"이 아니라 **그 슬롯으로 저장된** 개정이다.
+  const { saveRevision } = await import("../src/code-revision");
+  const mkRev = (slots: Record<string, string>, code: string) =>
+    withTenant(IDS.tenantA, (tx) => saveRevision(tx, { stableId: NODE, code, slots, reason: "drawing-test", createdBy: IDS.ownerA }));
+  const rSS = await mkRev({ A: "EU", B: "12", E: "SS" }, "TEST-EU-12-SS");
+  const rAL = await mkRev({ A: "EU", B: "12", E: "AL" }, "TEST-EU-12-AL");
+  const forSS = await withTenant(IDS.tenantA, (tx) => revisionIdForSlots(tx, NODE, { A: "EU", B: "12", E: "SS", D: "" }));
+  const forNone = await withTenant(IDS.tenantA, (tx) => revisionIdForSlots(tx, NODE, { A: "EU", B: "12", E: "ZZ" }));
+  check("최신 개정(AL)이 있어도 SS 로 돌리면 SS 개정이 근거다", forSS === rSS.id && forSS !== rAL.id, `${String(forSS)}`);
+  check("저장한 적 없는 조합은 근거 개정이 없다 (null — 최신을 대신 박지 않는다)", forNone === null, String(forNone));
 
   // --- 2·3) 도면은 스냅샷에서 나오고, 다시 뜨면 개정이 붙는다 ---------------
   const d1 = await withTenant(IDS.tenantA, (tx) =>
@@ -103,6 +114,7 @@ async function main(): Promise<void> {
   await adminPrisma.drawing.deleteMany({ where: { drawingNo: "TEST-PLN" } });
   await adminPrisma.$executeRawUnsafe(`ALTER TABLE "drawing" ENABLE TRIGGER USER`);
   await adminPrisma.bomCodeRun.deleteMany({ where: { catalogFp: "test" } });
+  await adminPrisma.codeRevision.deleteMany({ where: { code: { startsWith: "TEST-EU-12-" } } });
 
   console.log(fail === 0 ? `\nALL PASS (${pass})` : `\n${fail} FAILED / ${pass} passed`);
   await appPrisma.$disconnect();

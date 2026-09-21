@@ -148,3 +148,30 @@ export async function latestRevisionId(
   });
   return r?.id ?? null;
 }
+
+/**
+ * 이 슬롯 조합으로 **저장된** 코드 개정 id. 없으면 null.
+ *
+ * P4-b 에서 고침: 예전에는 `latestRevisionId` 로 "그 노드의 최신 개정"을 무조건 박았다.
+ * 그러면 Rev B(…AL)를 저장해 둔 노드에서 …SS 로 BOM 을 돌려도 스냅샷에 Rev B 가 찍힌다 —
+ * 견적서 발치에 **틀린 근거**가 인쇄된다(2026-09-20 인쇄본 육안 검증에서 발견).
+ * 근거를 못 대면 비워 둔다: 저장하지 않은 조합으로 돌린 실행은 null 이다.
+ */
+export async function revisionIdForSlots(
+  tx: TenantClient,
+  stableId: string,
+  slots: Record<string, string>,
+): Promise<string | null> {
+  const canon = (o: unknown): string => {
+    const r = (o && typeof o === "object" ? o : {}) as Record<string, unknown>;
+    return JSON.stringify(Object.keys(r).filter((k) => typeof r[k] === "string" && r[k] !== "").sort().map((k) => [k, r[k]]));
+  };
+  const want = canon(slots);
+  const revs = await tx.codeRevision.findMany({
+    where: { hierarchyStable: stableId },
+    orderBy: { revNo: "desc" },
+    select: { id: true, slots: true },
+  });
+  return revs.find((r) => canon(r.slots) === want)?.id ?? null;
+}
+

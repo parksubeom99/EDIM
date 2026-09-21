@@ -3,6 +3,8 @@ import { getServerSession } from "@/app/lib/session";
 import { getModule, canAccessModule } from "@/app/lib/modules";
 import { listProjectsForSession } from "@/app/lib/project";
 import { CompanyAdmin } from "../company-admin";
+import { Purchasing } from "../purchasing";
+import { canEditProject } from "@/app/lib/project-perms";
 
 /**
  * Module routing stub (STEP 5). Guarded server-side: an unpermitted role sees a
@@ -25,7 +27,7 @@ export default async function ModulePage({
     allowed && key === "project" ? await listProjectsForSession() : null;
 
   return (
-    <main style={{ maxWidth: 640, margin: "10vh auto", padding: 24 }}>
+    <main style={{ maxWidth: key === "purchasing" ? 960 : 640, margin: "10vh auto", padding: 24 }}>
       <Link
         href="/"
         style={{ color: "var(--accent)", fontSize: "var(--fs-13)" }}
@@ -45,6 +47,8 @@ export default async function ModulePage({
           </h1>
           {key === "company" ? (
             <CompanyAdmin myRole={session!.role} />
+          ) : key === "purchasing" ? (
+            <Purchasing canEdit={canEditProject(session!.role)} />
           ) : key === "project" ? (
             <ul style={{ listStyle: "none", padding: 0 }}>
               {(projects ?? []).map((p) => (

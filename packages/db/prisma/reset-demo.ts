@@ -5,6 +5,7 @@
  *   - code_revision  : append-only라 앱에서는 지울 수 없다 → 본 시연의 첫 저장이 'Rev A'가 아니라 'Rev E'가 된다
  *   - macro_registry : 승인할 때마다 revision이 오른다(r2 → r7 …)
  *   - project_approval / task / attachment, audit_log
+ *   - document / purchase_request : 시연 중 뜬 견적·Tech Data·구매 요청(발행·발주 잠금 포함)
  *   - platform_request : 시연 중 올린 Special 의뢰 · 멤버 역할 변경(User Management)
  * 앱 역할(edim_app)에는 code_revision DELETE 권한이 없다(의도된 설계). 그래서 이 스크립트만
  * 스키마 소유자(adminPrisma)로 지운다. 대상은 데모 테넌트(tenantA) 한정.
@@ -28,13 +29,20 @@ async function resetDemo(): Promise<void> {
   await adminPrisma.$executeRawUnsafe(`ALTER TABLE "drawing" DISABLE TRIGGER USER`);
   const dwg = await adminPrisma.drawing.deleteMany({ where: { tenantId: t } });
   await adminPrisma.$executeRawUnsafe(`ALTER TABLE "drawing" ENABLE TRIGGER USER`);
+  // P4-b: 문서·구매 요청도 BOM 스냅샷을 참조한다 → 스냅샷보다 **먼저** 지운다.
+  // 발행·발주된 것은 트리거가 삭제를 막으므로 리셋 동안만 내린다(줄은 머리와 함께 cascade).
+  const P4B = ["document", "purchase_request", "purchase_request_line"];
+  for (const tb of P4B) await adminPrisma.$executeRawUnsafe(`ALTER TABLE "${tb}" DISABLE TRIGGER USER`);
+  const doc = await adminPrisma.document.deleteMany({ where: { tenantId: t } });
+  const prq = await adminPrisma.purchaseRequest.deleteMany({ where: { tenantId: t } });
+  for (const tb of P4B) await adminPrisma.$executeRawUnsafe(`ALTER TABLE "${tb}" ENABLE TRIGGER USER`);
   const run = await adminPrisma.bomCodeRun.deleteMany({ where: { tenantId: t } });
   const req = await adminPrisma.platformRequest.deleteMany({ where: { tenantId: t } });
   const aud = await adminPrisma.auditLog.deleteMany({ where: { tenantId: t } });
   // 리허설이 역할을 바꿔 놓았을 수 있다(User Management 시연) → 시드 역할로 되돌린다.
   await adminPrisma.membership.updateMany({ where: { tenantId: t, userId: IDS.viewerA }, data: { role: "viewer" } });
   await adminPrisma.membership.updateMany({ where: { tenantId: t, userId: IDS.ownerA }, data: { role: "owner" } });
-  console.log(`Demo reset: removed ${rev.count} code revisions, ${mac.count} macros, ${run.count} BOM run snapshots, ${dwg.count} drawings, ${req.count} platform requests, ${aud.count} audit rows; memberships restored.`);
+  console.log(`Demo reset: removed ${rev.count} code revisions, ${mac.count} macros, ${run.count} BOM run snapshots, ${dwg.count} drawings, ${doc.count} documents, ${prq.count} purchase requests, ${req.count} platform requests, ${aud.count} audit rows; memberships restored.`);
   await seedAll();
   await seedDemo({ forceCatalog: true }); // 시연 중 고친 표·관계를 원상 복구
   console.log("Demo reset complete — first save will be Rev A, approved macro is back to the seeded revision.");

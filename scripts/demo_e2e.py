@@ -189,6 +189,61 @@ with sync_playwright() as p:
     kd=pg.inner_text("body")
     ok("S21b 핵심 치수가 등록 표 값을 그대로 보여 준다 (화면이 따로 계산하지 않는다)", "2600×2472" in kd, "2600×2472" in kd)
     pg.screenshot(path=f"{OUT}/43_drawings.png",full_page=True)
+    # ── P4-b 견적 · Tech Data · 구매 요청 — 전부 BOM 스냅샷(runId) 하나에서 (p66 · p15~16 · p51) ──
+    # S22 견적: 합계는 다시 세지 않는다 — Cost API 가 읽는 바로 그 값이다
+    nr=ctx.request.post(BASE+"/api/documents",headers=J0,data=json.dumps({"type":"quotation"}))
+    ok("S22a 스냅샷 없이는 견적을 못 뜬다 (400)", nr.status, nr.status==400)
+    q1=ctx.request.post(BASE+"/api/documents",headers=J0,data=json.dumps({"runId":RUN1,"type":"quotation"})).json()
+    ok("S22b 견적 합계 = Cost API 값 (한 원도 다르지 않다) · 번호 QR-61313-nn Rev A", (q1.get("docNo"), q1.get("rev"), q1.get("total"), cr.get("value")), q1.get("total")==cr.get("value") and str(q1.get("docNo","")).startswith("QR-61313-") and q1.get("rev")=="A")
+    ph=ctx.request.get(BASE+f"/api/documents/{q1.get('id')}/print"); won=format(int(cr.get("value")),",")
+    ok("S22c 인쇄본(HTML)에 그 합계와 근거 스냅샷 id 가 찍힌다", (ph.status, won in ph.text(), RUN1 in ph.text()), ph.status==200 and "text/html" in ph.headers.get("content-type","") and won in ph.text() and RUN1 in ph.text() and "견 적 서" in ph.text())
+    q2=ctx.request.post(BASE+"/api/documents",headers=J0,data=json.dumps({"runId":RUN1,"type":"quotation"})).json()
+    ok("S22d 같은 코드로 다시 뜨면 같은 번호에 Rev B", (q2.get("docNo"), q2.get("rev")), q2.get("docNo")==q1.get("docNo") and q2.get("rev")=="B")
+    for st in ("review","approved","issued"): pr_=ctx.request.patch(BASE+f"/api/documents/{q1.get('id')}",headers=J0,data=json.dumps({"status":st}))
+    lk=ctx.request.patch(BASE+f"/api/documents/{q1.get('id')}",headers=J0,data=json.dumps({"status":"issued"}))
+    bk=ctx.request.patch(BASE+f"/api/documents/{q2.get('id')}",headers=J0,data=json.dumps({"status":"review"})); bk2=ctx.request.patch(BASE+f"/api/documents/{q2.get('id')}",headers=J0,data=json.dumps({"status":"draft"}))
+    ok("S22e 발행된 견적은 잠기고(409), 상태는 되돌릴 수 없다(409)", (pr_.status, lk.status, bk2.status), pr_.status==200 and lk.status==409 and bk.status==200 and bk2.status==409)
+    # S23 Tech Data: 값 + 그 값을 낸 승인 매크로 개정 + 입력
+    t1=ctx.request.post(BASE+"/api/documents",headers=J0,data=json.dumps({"runId":RUN1,"type":"techdata"})).json()
+    tb=ctx.request.get(BASE+f"/api/documents/{t1.get('id')}").json().get("body",{})
+    ok("S23a Tech Data = 매크로 결과 455.4 + 승인 개정·원문 + 입력 슬롯", (t1.get("docNo"), t1.get("value"), tb.get("macro",{}).get("revision")), t1.get("value")==455.4 and isinstance(tb.get("macro",{}).get("revision"),int) and bool(tb.get("macro",{}).get("dsl")) and [i["key"] for i in tb.get("input",[])][:2]==["A","B"] and str(t1.get("docNo","")).startswith("TD-61313-"))
+    rn=ctx.request.post(BASE+"/api/run/bom",headers=J0,data=json.dumps({"slots":S55_0,"code":"EU-55-2123-630SS-1-21-13-15"})).json()
+    tn=ctx.request.post(BASE+"/api/documents",headers=J0,data=json.dumps({"runId":rn.get("runId"),"type":"techdata"}))
+    ok("S23b 매크로 없이 돈 스냅샷은 Tech Data 를 거부한다 (422 — 값을 지어내지 않는다)", (rn.get("macroValue"), tn.status), rn.get("macroValue") is None and tn.status==422)
+    # S24 구매 요청: 스냅샷 줄 중 '구매 품목'으로 등록돼 있던 것만
+    cat=ctx.request.get(BASE+"/api/setup/catalog").json(); buy={p_["code"] for p_ in cat.get("productCodes",[]) if p_.get("kind")=="purchase"}
+    want=[t_ for t_ in r1.json().get("trace",[]) if t_.get("childCode") in buy]
+    pq=ctx.request.post(BASE+"/api/purchase-requests",headers=J0,data=json.dumps({"runId":RUN1,"requiredDate":"2026-10-15"})); pj=pq.json()
+    ok("S24a 구매 요청 줄 수 = 스냅샷의 구매 품목 수 · 번호 PR-61313-n", (pj.get("prNo"), pj.get("lines"), len(want)), pq.status==200 and pj.get("lines")==len(want) and len(want)>0 and str(pj.get("prNo","")).startswith("PR-61313-"))
+    dq=ctx.request.post(BASE+"/api/purchase-requests",headers=J0,data=json.dumps({"runId":RUN1}))
+    ok("S24b 같은 스냅샷으로 두 번 사지 않는다 (409)", dq.status, dq.status==409)
+    prs=ctx.request.get(BASE+"/api/purchase-requests").json().get("rows",[]); mine=[x for x in prs if x.get("id")==pj.get("id")][0]
+    byno={l_["no"]:l_ for l_ in r1.json().get("lines",[])}
+    got=[(l_["bomLineNo"],l_["resolvedCode"],l_["qty"],l_["unitPrice"]) for l_ in mine["lines"]]; exp=[(t_["no"],t_["resolvedCode"],byno[t_["no"]]["qty"],byno[t_["no"]]["unitCost"]) for t_ in want]
+    ok("S24c 줄의 BOM 줄번호·코드·수량·단가가 스냅샷 줄 그대로다 · 필요일 반영", got, got==exp and all(l_["requiredDate"][:10]=="2026-10-15" for l_ in mine["lines"]))
+    # S25 화면: Document 탭 — 방금 화면에서 돌린 BOM 스냅샷으로 세 산출물을 만든다
+    nuke(pg); pg.locator("button", has_text=re.compile(r"^Document$")).first.click(force=True); time.sleep(1.5); nuke(pg)
+    ok("S25a Document 탭이 BOM 스냅샷을 잡고 있다 (버튼이 열려 있다)", pg.inner_text("[data-testid=document-run]"), "없음" not in pg.inner_text("[data-testid=document-run]") and pg.is_enabled("[data-testid=doc-make-quotation]"))
+    for tid in ("doc-make-quotation","doc-make-techdata","pr-make"):
+        nuke(pg); pg.click(f"[data-testid={tid}]", force=True); pg.wait_for_selector("[data-testid=document-msg]",timeout=15000); time.sleep(1.8)
+    dp=pg.inner_text("[data-testid=document-panel]"); nrow=len(pg.query_selector_all("[data-testid=document-row]"))
+    ok("S25b 화면에서 견적·Tech Data·구매 요청이 등록되고 목록에 보인다", (nrow, "구매 요청 있음" in dp), nrow>=5 and "구매 요청 있음" in dp and "발행" in dp and pg.get_attribute("[data-testid=document-msg]","data-ok")=="1")
+    ok("S25c 구매 요청을 만든 스냅샷에서는 버튼이 잠긴다 (두 번 사지 않는다)", pg.is_disabled("[data-testid=pr-make]"), pg.is_disabled("[data-testid=pr-make]"))
+    pg.screenshot(path=f"{OUT}/44_document_tab.png",full_page=True)
+    # S26 화면: Purchasing — Process 를 올리고(견적 요청 → 발주) CSV 로 내보낸다 (p51)
+    pg.goto(BASE+"/m/purchasing",wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=pr-card]",timeout=30000); time.sleep(1.2); nuke(pg)
+    ncard=len(pg.query_selector_all("[data-testid=pr-card]")); PRNO=pj.get("prNo")
+    ok("S26a Purchasing 에 구매 요청 2건(API 1 · 화면 1)이 줄과 함께 보인다", (ncard, len(pg.query_selector_all("[data-testid=pr-line]"))), ncard==2 and len(pg.query_selector_all("[data-testid=pr-line]"))==2*len(want))
+    for _ in range(2): nuke(pg); pg.click(f"[data-testid='pr-advance-{PRNO}']", force=True); time.sleep(1.8)
+    card=pg.inner_text(f"[data-testid=pr-card]:has([data-testid='pr-export-{PRNO}'])")
+    ok("S26b 견적 요청 → 발주 · 발주되면 PO 번호가 붙는다 (PO-61313-n)", card.split("\n")[0][:60], "발주" in card and "PO-61313-" in card and not pg.query_selector(f"[data-testid='pr-advance-{PRNO}']"))
+    lk=ctx.request.patch(BASE+f"/api/purchase-requests/{pj.get('id')}",headers=J0,data=json.dumps({"status":"ordered"}))
+    ok("S26c 발주된 구매 요청은 잠긴다 (409)", lk.status, lk.status==409)
+    ex=ctx.request.get(BASE+f"/api/purchase-requests/{pj.get('id')}/export"); rows_=ex.text().strip().split("\r\n")
+    ok("S26d Export CSV: 머리 1줄 + 구매 품목 줄 · PR·PO 번호 포함 · 엑셀용 BOM", (ex.status, len(rows_), ex.headers.get("content-type")), ex.status==200 and "text/csv" in ex.headers.get("content-type","") and len(rows_)==1+len(want) and PRNO in rows_[1] and "PO-61313-" in rows_[1] and ex.body()[:3]==b"\xef\xbb\xbf")
+    open(f"{OUT}/{PRNO}.csv","wb").write(ex.body())
+    pg.screenshot(path=f"{OUT}/45_purchasing.png",full_page=True)
+    pg.goto(BASE+f"/api/documents/{q1.get('id')}/print",wait_until="domcontentloaded"); time.sleep(0.8); pg.screenshot(path=f"{OUT}/46_quotation_print.png",full_page=True)
     # ── P3-a 플랫폼 관리자 계층 · DB①/DB② 소유 분리 (p54 User Management · p59 최종 승인 · p64 Admin.) ──
     # S16 회사 관리자가 Company Info.에서 Special 의뢰를 올린다 = 회사→플랫폼 유일 통로
     pg.goto(BASE+"/m/company",wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=user-management]",timeout=30000); time.sleep(1.5); nuke(pg)

@@ -98,6 +98,7 @@ export {
   setDrawingStatus,
   getBomRun,
   latestRevisionId,
+  revisionIdForSlots,
   DRAWING_STATUSES,
   DRAWING_STATUS_LABEL,
   isDrawingStatus,
@@ -105,3 +106,30 @@ export {
   DrawingStatusBackwardsError,
 } from "./drawing";
 export type { DrawingStatus, SaveDrawingInput } from "./drawing";
+export {
+  saveDocument,
+  listDocuments,
+  getDocument,
+  setDocumentStatus,
+  DOCUMENT_TYPES,
+  DOCUMENT_STATUSES,
+  isDocumentType,
+  isDocumentStatus,
+  DocumentLockedError,
+  DocumentStatusBackwardsError,
+} from "./document";
+export type { DocumentType, DocumentStatus, SaveDocumentInput } from "./document";
+export {
+  createPurchaseRequest,
+  listPurchaseRequests,
+  getPurchaseRequest,
+  setPurchaseRequestStatus,
+  PR_STATUSES,
+  PR_STATUS_LABEL,
+  isPrStatus,
+  PrLockedError,
+  PrBackwardsError,
+  PrDuplicateError,
+  PrEmptyError,
+} from "./purchase";
+export type { PrStatus, PrLineInput, CreatePrInput } from "./purchase";

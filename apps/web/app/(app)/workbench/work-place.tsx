@@ -67,7 +67,7 @@ export function WorkPlace({
         {tab === "design" && <DesignCanvas code={assembled.code} slots={slots} runs={runs} nodeStable={nodeStable} canEdit={canEdit} />}
         {tab === "bom" && <BomPanel code={assembled.code} runs={runs} />}
         {tab === "macro" && <MacroPanel project={project} nodeStable={nodeStable} canEdit={canEdit} canDecide={canDecide} runs={runs} />}
-        {tab === "document" && <DocumentPanel project={project} code={assembled.code} />}
+        {tab === "document" && <DocumentPanel project={project} code={assembled.code} runs={runs} nodeStable={nodeStable} canEdit={canEdit} />}
       </div>
 
       {/* Sub / Key Work Place */}
@@ -328,22 +328,101 @@ function DesignCanvas({ code, slots, runs, nodeStable, canEdit }: { code: string
   );
 }
 
-/* ───────────── Document panel ───────────── */
-function DocumentPanel({ project, code }: { project: WorkbenchProject | null; code: string }) {
+/* ───────────── Document panel · P4-b (p66 견적 · p15~16 Tech Data · p51 구매 요청) ───────────── */
+/**
+ * 세 산출물 모두 **BOM 스냅샷 하나**에서 나온다. 스냅샷이 없으면 버튼이 잠기고,
+ * 화면은 숫자를 계산하지 않는다 — 서버가 스냅샷에서 읽어 만든 것을 보여 줄 뿐이다.
+ */
+const DOC_LABEL: Record<string, string> = { draft: "작성중", review: "검토", approved: "승인", issued: "발행" };
+const DOC_NEXT: Record<string, string> = { draft: "review", review: "approved", approved: "issued" };
+const DOC_TYPE_LABEL: Record<string, string> = { quotation: "견적", techdata: "Tech Data" };
+const btn: CSSProperties = { fontSize: "var(--fs-12)", padding: "5px 10px", background: "var(--surface-1)", color: "var(--ink)", border: "1px solid var(--line)", borderRadius: "var(--radius-sm)" };
+
+function DocumentPanel({ project, code, runs, nodeStable, canEdit }: { project: WorkbenchProject | null; code: string; runs: RunResult[]; nodeStable: string | null; canEdit: boolean }) {
+  const runId = runs.find((r) => r.kind === "bom" && r.runId)?.runId ?? null;
+  const [docs, setDocs] = useState<{ id: string; docNo: string; docType: string; currentRev: string; status: string }[]>([]);
+  const [prs, setPrs] = useState<{ id: string; prNo: string; status: string; bomRunId: string; lines: unknown[] }[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  const load = useCallback(async () => {
+    const q = nodeStable ? `?node=${nodeStable}` : "";
+    const [d, p] = await Promise.all([
+      fetch(`/api/documents${q}`).then((r) => r.json()).catch(() => ({})),
+      fetch(`/api/purchase-requests${q}`).then((r) => r.json()).catch(() => ({})),
+    ]);
+    setDocs((d as { rows?: typeof docs }).rows ?? []);
+    setPrs((p as { rows?: typeof prs }).rows ?? []);
+  }, [nodeStable]);
+  useEffect(() => { void load(); }, [load]);
+
+  async function post(url: string, body: object) {
+    if (!runId || busy) return;
+    setBusy(true); setMsg(null);
+    const r = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+    const j = (await r.json().catch(() => ({}))) as { error?: string; message?: string };
+    setBusy(false);
+    setMsg(r.ok ? { ok: true, text: j.message ?? "완료" } : { ok: false, text: j.error ?? "실패" });
+    await load();
+  }
+  async function advance(id: string, status: string) {
+    setMsg(null);
+    const r = await fetch(`/api/documents/${id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ status }) });
+    const j = (await r.json().catch(() => ({}))) as { error?: string };
+    if (!r.ok) setMsg({ ok: false, text: j.error ?? "상태 변경 실패" });
+    await load();
+  }
+  const off = !runId || !canEdit || busy;
+  const prOfRun = prs.find((p) => p.bomRunId === runId) ?? null;
+
   return (
     <div data-testid="document-panel" style={card}>
-      <div style={h}>Document · 기술문서</div>
-      <p style={{ ...muted, margin: "0 0 8px" }}>Export는 Action Bar에서 실동(JSON). 기술문서 템플릿은 M3.</p>
-      <dl style={{ display: "grid", gridTemplateColumns: "120px 1fr", gap: "4px 8px", fontSize: "var(--fs-13)", margin: 0 }}>
+      <div style={h}>Document · 견적 · Tech Data · 구매 요청</div>
+      <dl style={{ display: "grid", gridTemplateColumns: "120px 1fr", gap: "4px 8px", fontSize: "var(--fs-13)", margin: "0 0 10px" }}>
         <dt style={muted}>프로젝트</dt>
         <dd style={{ margin: 0 }}>{project ? `${project.projectNo} · ${project.name}` : "—"}</dd>
         <dt style={muted}>고객</dt>
         <dd style={{ margin: 0 }}>{project?.clientName ?? "—"}</dd>
         <dt style={muted}>RCCS 코드</dt>
-        <dd style={{ margin: 0 }}>
-          <CodeChip code={code || "—"} />
-        </dd>
+        <dd style={{ margin: 0 }}><CodeChip code={code || "—"} /></dd>
+        <dt style={muted}>BOM 스냅샷</dt>
+        <dd data-testid="document-run" style={{ margin: 0, fontFamily: "var(--font-mono)" }}>{runId ? runId.slice(0, 8) : "없음 — 먼저 BOM Run 을 실행하세요"}</dd>
       </dl>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <button type="button" data-testid="doc-make-quotation" disabled={off} onClick={() => void post("/api/documents", { runId, type: "quotation" })} style={{ ...btn, opacity: off ? 0.5 : 1 }}>견적서 등록 (PCR·Quotation)</button>
+        <button type="button" data-testid="doc-make-techdata" disabled={off} onClick={() => void post("/api/documents", { runId, type: "techdata" })} style={{ ...btn, opacity: off ? 0.5 : 1 }}>Tech Data 등록</button>
+        <button type="button" data-testid="pr-make" disabled={off || !!prOfRun} onClick={() => void post("/api/purchase-requests", { runId })} style={{ ...btn, opacity: off || prOfRun ? 0.5 : 1 }}>
+          {prOfRun ? `구매 요청 있음 · ${prOfRun.prNo}` : "구매 요청 만들기"}
+        </button>
+      </div>
+      {msg && <p data-testid="document-msg" data-ok={msg.ok ? "1" : "0"} style={{ margin: "8px 0 0", fontSize: "var(--fs-12)", color: msg.ok ? "var(--accent)" : "var(--warn)" }}>{msg.text}</p>}
+
+      {docs.length > 0 && (
+        <table data-testid="document-list" style={{ width: "100%", borderCollapse: "collapse", marginTop: 12, fontSize: "var(--fs-12)" }}>
+          <tbody>
+            {docs.map((d) => (
+              <tr key={d.id} data-testid="document-row" data-type={d.docType} data-status={d.status} style={{ borderTop: "1px solid var(--line)" }}>
+                <td style={{ padding: "5px 6px", width: 84, color: "var(--ink-muted)" }}>{DOC_TYPE_LABEL[d.docType] ?? d.docType}</td>
+                <td style={{ padding: "5px 6px" }}>
+                  <a href={`/api/documents/${d.id}/print`} target="_blank" rel="noreferrer" style={{ fontFamily: "var(--font-mono)", color: "var(--accent)" }}>{d.docNo} Rev {d.currentRev}</a>
+                </td>
+                <td style={{ padding: "5px 6px", width: 60 }}>{DOC_LABEL[d.status] ?? d.status}</td>
+                <td style={{ padding: "5px 6px", width: 90, textAlign: "right" }}>
+                  {canEdit && DOC_NEXT[d.status] && (
+                    <button type="button" data-testid={`doc-advance-${d.docNo}-${d.currentRev}`} onClick={() => void advance(d.id, DOC_NEXT[d.status]!)} style={{ ...btn, padding: "2px 8px", background: "transparent" }}>→ {DOC_LABEL[DOC_NEXT[d.status]!]}</button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      {prs.length > 0 && (
+        <p data-testid="document-pr-note" style={{ ...muted, margin: "10px 0 0" }}>
+          구매 요청 {prs.map((p) => `${p.prNo}(${p.lines.length}줄)`).join(" · ")} — Process·Export 는 <a href="/m/purchasing" style={{ color: "var(--accent)" }}>Purchasing</a> 에서.
+        </p>
+      )}
+      <p style={{ ...muted, margin: "10px 0 0" }}>문서 번호를 누르면 인쇄본(흰 A4)이 열립니다. 같은 코드로 다시 등록하면 개정(A→B)이 붙고 앞 개정은 남습니다. 발행된 문서는 잠깁니다.</p>
     </div>
   );
 }

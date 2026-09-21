@@ -6,7 +6,7 @@ import type { SlotValues } from "@/app/lib/rccs";
 import { buildEbom, buildCost } from "@/app/lib/output/bom";
 import { runBomCode, toBomLine, catalogFingerprint, dimsFor } from "@edim/bom-code";
 import { loadCatalog } from "@/app/lib/catalog";
-import { withTenant, saveBomCodeRun, getBomRun, latestRevisionId } from "@edim/db";
+import { withTenant, saveBomCodeRun, getBomRun, revisionIdForSlots } from "@edim/db";
 
 const KINDS = new Set(["bom", "edim", "ebom", "cost"]);
 
@@ -19,7 +19,7 @@ const KINDS = new Set(["bom", "edim", "ebom", "cost"]);
  * P4-a 에서 바뀐 것 (연결 장부 약함 3건):
  *  1. 매크로 값을 **서버가 직접 실행**해서 얻는다. 예전에는 브라우저가 계산해 둔
  *     값을 본문에 담아 보냈다 — 화면을 거치는 연결이라 근거가 약했다.
- *  2. 스냅샷에 **어느 코드 개정으로 돌렸는지**를 박는다.
+ *  2. 스냅샷에 **어느 코드 개정으로 돌렸는지**를 박는다(그 슬롯 조합으로 저장된 개정일 때만).
  *  3. EBOM·Cost 는 다시 계산하지 않고 **스냅샷을 읽는다**(runId 필수).
  */
 export async function POST(
@@ -84,9 +84,15 @@ export async function POST(
 
   // BOM: 매크로 값은 서버가 직접 낸다 — 클라이언트가 보낸 값은 쓰지 않는다.
   let macroValue: number | null = null;
+  // P4-b: 값만이 아니라 **그 값을 낸 매크로 개정**도 스냅샷에 남긴다(Tech Data 의 근거).
+  let macroSrc: { macroId: string; macroRevision: number; macroDsl: string } | null = null;
   if (node) {
     const mr = await runApprovedForSession(node, slots);
-    if (mr && mr.ok && typeof mr.value === "number" && Number.isFinite(mr.value)) macroValue = mr.value;
+    if (mr && mr.ok && typeof mr.value === "number" && Number.isFinite(mr.value)) {
+      macroValue = mr.value;
+      if (mr.macroId && typeof mr.revision === "number" && mr.dsl)
+        macroSrc = { macroId: mr.macroId, macroRevision: mr.revision, macroDsl: mr.dsl };
+    }
   }
   const base = { ok: true, status: "ran", kind, projectId: typeof body.projectId === "string" ? body.projectId : null, code: typeof body.code === "string" ? body.code : null, at };
   const { catalog, rejected } = await loadCatalog(session.tenantId);
@@ -105,7 +111,9 @@ export async function POST(
         stableId: node,
         code: typeof body.code === "string" ? body.code : "", slots: clean, macroValue, parentCode: result.parent,
         catalogFp, lines: result.lines as unknown as object[], cost: cost as unknown as object,
-        codeRevisionId: node ? await latestRevisionId(tx, node) : null,
+        // 이 슬롯 조합으로 저장된 개정만 근거로 삼는다(없으면 null — 최신 개정을 대신 박지 않는다).
+        codeRevisionId: node ? await revisionIdForSlots(tx, node, clean) : null,
+        ...(macroSrc ?? {}),
         createdBy: session.userId,
       }),
     );

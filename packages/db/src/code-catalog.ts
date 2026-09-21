@@ -161,6 +161,10 @@ export interface BomCodeRunInput {
   source?: string;
   /** P4-a — 이 실행이 근거로 삼은 코드 개정(없으면 null) */
   codeRevisionId?: string | null;
+  /** P4-b — 이 값을 낸 승인 매크로(없으면 null). Tech Data 가 근거로 읽는다. */
+  macroId?: string | null;
+  macroRevision?: number | null;
+  macroDsl?: string | null;
   createdBy: string;
 }
 
@@ -182,6 +186,9 @@ export async function saveBomCodeRun(tx: TenantClient, input: BomCodeRunInput): 
       // P4-a: 어느 코드 개정으로 돌렸는지. 이 한 칸이 있어야 견적·도면에서
       // 거꾸로 Rev 까지 따라갈 수 있다(연결 장부 약함 #3).
       codeRevisionId: input.codeRevisionId ?? null,
+      macroId: input.macroId ?? null,
+      macroRevision: input.macroRevision ?? null,
+      macroDsl: input.macroDsl ?? null,
       createdBy: input.createdBy,
     },
   });

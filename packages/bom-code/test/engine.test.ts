@@ -148,3 +148,17 @@ describe("P4-a Key Dimension (p38~40) — 치수는 등록 표에서만 나온�
     if (r.ok) expect(r.dims.W).toBe(2600);
   });
 });
+describe("P4-b — 스냅샷 줄이 품목 종류를 갖는다", () => {
+  it("모든 줄에 등록된 kind 가 붙고, 구매 품목만 걸러낼 수 있다", () => {
+    const r = runBomCode(catalog, S55, 455.4);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const byCode = new Map(catalog.productCodes.map((p) => [p.code, p.kind]));
+    for (const l of r.lines) expect(l.kind).toBe(byCode.get(l.childCode));
+    const buy = r.lines.filter((l) => l.kind === "purchase").map((l) => l.childCode);
+    // 등록 카탈로그에서 purchase 로 올린 코드만 나온다(값을 박아 두지 않는다).
+    expect(buy.length).toBeGreaterThan(0);
+    expect(buy.every((c) => byCode.get(c) === "purchase")).toBe(true);
+    expect(r.lines.filter((l) => l.kind !== "purchase").length + buy.length).toBe(r.lines.length);
+  });
+});

@@ -131,6 +131,11 @@ export interface BomCodeLine extends BomLine {
   resolvedCode: string;
   relSeq: number;
   remarks: string | null;
+  /**
+   * P4-b — 등록된 품목 종류(p33). 스냅샷 줄에 함께 남긴다. 구매 요청은 "지금의
+   * 카탈로그"가 아니라 **그 BOM 을 돌린 시점**에 사 오는 품목이었던 줄만 모은다.
+   */
+  kind: ProductCode["kind"];
 }
 
 export type BomCodeError =
@@ -246,6 +251,7 @@ export function runBomCode(catalog: Catalog, slots: SlotValues, macroValue: numb
         resolvedCode: seqs.length ? `${child.code}-${seqs.join("-")}` : child.code,
         relSeq: r.seq,
         remarks: r.remarks ?? null,
+        kind: child.kind,
       });
     }
   } catch (e) {

@@ -1,0 +1,290 @@
+/**
+ * P4-b — 견적(PCR/Quotation p66) · Tech Data(p15~16) · 구매 요청(p51) 의 **순수 함수**.
+ *
+ * 규칙 하나: 입력은 **BOM 스냅샷**뿐이다. 여기서는 원가를 다시 계산하지 않고, 카탈로그를
+ * 다시 읽지 않는다. 스냅샷에 없는 것은 만들어 내지 않고 거부한다.
+ * (DB·세션을 모른다 — 그래서 단위 테스트가 된다.)
+ */
+
+export interface SnapshotLike {
+  id: string;
+  code: string;
+  slots: unknown;
+  macroValue: number | null;
+  macroId: string | null;
+  macroRevision: number | null;
+  macroDsl: string | null;
+  catalogFp: string;
+  codeRevisionId: string | null;
+  lines: unknown;
+  cost: unknown;
+}
+
+export interface ProjectLike {
+  projectNo: string;
+  name: string;
+  clientName: string | null;
+}
+
+export type Refusal = { ok: false; status: number; error: string };
+
+/** 스냅샷이 어디서 왔는지 — 모든 문서 발치에 그대로 찍힌다(P6 추적의 재료). */
+export interface SourceStamp {
+  runId: string;
+  catalogFp: string;
+  codeRevisionId: string | null;
+  macroRevision: number | null;
+}
+const stampOf = (run: SnapshotLike): SourceStamp => ({
+  runId: run.id, catalogFp: run.catalogFp, codeRevisionId: run.codeRevisionId, macroRevision: run.macroRevision,
+});
+
+/**
+ * 번호의 가운데 — p51 은 Project No. OR-61313-5 에 PR-61313-2 · PO-61313-2 를,
+ * p66 은 QR-61216-01 을 쓴다: 프로젝트 번호의 머리글자와 끝 순번을 뗀 가운데 토막이다.
+ * 프로젝트에 묶이지 않은 실행은 '0' (번호는 나오되 프로젝트를 지어내지 않는다).
+ */
+export function noCoreOf(projectNo: string | null | undefined): string {
+  if (!projectNo) return "0";
+  const parts = projectNo.split("-").filter(Boolean);
+  if (parts.length >= 3) return parts.slice(1, -1).join("-");
+  if (parts.length === 2) return parts[1]!;
+  return parts[0] ?? "0";
+}
+
+/* ───────────── 견적 (p66) ───────────── */
+
+export interface CostLike { material: number; labor: number; overhead: number; total: number; currency?: string }
+
+function costOf(run: SnapshotLike): CostLike | null {
+  const c = run.cost as Partial<CostLike> | null;
+  if (!c || typeof c !== "object") return null;
+  for (const k of ["material", "labor", "overhead", "total"] as const)
+    if (typeof c[k] !== "number" || !Number.isFinite(c[k])) return null;
+  return c as CostLike;
+}
+
+export interface QuotationOptions {
+  qty?: number;
+  deliveryTerms?: string;
+  paymentTerms?: string;
+  validity?: string;
+  warranty?: string;
+}
+
+export interface QuotationBody {
+  kind: "quotation";
+  docNo: string;
+  rev: string;
+  date: string;
+  project: ProjectLike | null;
+  code: string;
+  /** p66 PCR(Table): Material Cost + Manufacturing Cost = Direct Cost → Full cost */
+  pcr: { material: number; manufacturing: number; directCost: number; overhead: number; fullCost: number; currency: string };
+  /** p66 Quotation 표: 장비 번호 · 수량 · 단가 · 합계 */
+  items: { no: number; equipment: string; qty: number; unitPrice: number; amount: number }[];
+  totalQty: number;
+  total: number;
+  vat: "별도";
+  terms: { delivery: string; payment: string; validity: string; warranty: string };
+  source: SourceStamp;
+}
+
+export function buildQuotationBody(
+  run: SnapshotLike, project: ProjectLike | null, opts: QuotationOptions,
+  docNo: string, rev: string, date: string,
+): { ok: true; body: QuotationBody } | Refusal {
+  const cost = costOf(run);
+  if (!cost) return { ok: false, status: 422, error: "이 BOM 스냅샷에는 원가가 없습니다 — BOM Run 을 다시 실행하세요." };
+  const qty = opts.qty ?? 1;
+  if (!Number.isInteger(qty) || qty < 1 || qty > 9999)
+    return { ok: false, status: 400, error: "수량은 1~9999 의 정수여야 합니다." };
+  // 단가 = 스냅샷에 저장된 cost.total **그대로**. 여기서 원가를 다시 세지 않는다.
+  const amount = cost.total * qty;
+  return {
+    ok: true,
+    body: {
+      kind: "quotation", docNo, rev, date, project, code: run.code,
+      pcr: {
+        material: cost.material, manufacturing: cost.labor, directCost: cost.material + cost.labor,
+        overhead: cost.overhead, fullCost: cost.total, currency: cost.currency ?? "KRW",
+      },
+      items: [{ no: 1, equipment: run.code, qty, unitPrice: cost.total, amount }],
+      totalQty: qty, total: amount, vat: "별도",
+      terms: {
+        delivery: opts.deliveryTerms ?? "", payment: opts.paymentTerms ?? "",
+        validity: opts.validity ?? "", warranty: opts.warranty ?? "",
+      },
+      source: stampOf(run),
+    },
+  };
+}
+
+/* ───────────── Tech Data (p15~16) ───────────── */
+
+export interface TechDataBody {
+  kind: "techdata";
+  docNo: string;
+  rev: string;
+  date: string;
+  project: ProjectLike | null;
+  code: string;
+  /** p16 Input Data — 이 실행에 들어간 코드 슬롯 값 */
+  input: { key: string; value: string }[];
+  /** 그 값을 낸 승인 매크로 — 개정과 원문을 함께 박는다 */
+  macro: { id: string; revision: number; dsl: string };
+  /** p16 Output Data */
+  output: { name: string; value: number };
+  source: SourceStamp;
+}
+
+export function buildTechDataBody(
+  run: SnapshotLike, project: ProjectLike | null, docNo: string, rev: string, date: string,
+): { ok: true; body: TechDataBody } | Refusal {
+  if (run.macroValue === null || !Number.isFinite(run.macroValue))
+    return { ok: false, status: 422, error: "이 BOM 스냅샷은 승인 매크로 없이 실행됐습니다 — Tech Data 로 낼 결과값이 없습니다." };
+  if (!run.macroId || run.macroRevision === null || !run.macroDsl)
+    return { ok: false, status: 422, error: "이 BOM 스냅샷에는 매크로 개정 기록이 없습니다(P4-b 이전 실행) — BOM Run 을 다시 실행하세요." };
+  const slots = (run.slots && typeof run.slots === "object" ? run.slots : {}) as Record<string, unknown>;
+  const input = Object.keys(slots).sort()
+    .filter((k) => typeof slots[k] === "string" && slots[k] !== "")
+    .map((k) => ({ key: k, value: String(slots[k]) }));
+  return {
+    ok: true,
+    body: {
+      kind: "techdata", docNo, rev, date, project, code: run.code, input,
+      macro: { id: run.macroId, revision: run.macroRevision, dsl: run.macroDsl },
+      output: { name: "Macro result", value: run.macroValue },
+      source: stampOf(run),
+    },
+  };
+}
+
+/* ───────────── 구매 요청 (p51) ───────────── */
+
+export interface PurchaseLine {
+  bomLineNo: number; childCode: string; resolvedCode: string;
+  part: string; spec: string; qty: number; unit: string; unitPrice: number;
+}
+
+/**
+ * 스냅샷 줄 중 **그때 `purchase` 로 등록돼 있던** 줄만 모은다. 줄에 kind 가 없는
+ * 스냅샷(P4-b 이전 실행)은 지금 카탈로그로 짐작해 채우지 않고 거부한다.
+ */
+export function purchaseLinesOf(run: SnapshotLike): { ok: true; lines: PurchaseLine[] } | Refusal {
+  const raw = Array.isArray(run.lines) ? (run.lines as Record<string, unknown>[]) : [];
+  if (raw.length === 0) return { ok: false, status: 422, error: "이 BOM 스냅샷에는 줄이 없습니다." };
+  if (raw.some((l) => typeof l.kind !== "string"))
+    return { ok: false, status: 422, error: "이 BOM 스냅샷의 줄에는 품목 종류가 없습니다(P4-b 이전 실행) — BOM Run 을 다시 실행하세요." };
+  const lines = raw.filter((l) => l.kind === "purchase").map((l) => ({
+    bomLineNo: Number(l.no), childCode: String(l.childCode), resolvedCode: String(l.resolvedCode ?? l.childCode),
+    part: String(l.part), spec: String(l.spec ?? ""), qty: Number(l.qty), unit: String(l.unit ?? ""), unitPrice: Number(l.unitCost),
+  }));
+  if (lines.length === 0) return { ok: false, status: 422, error: "이 BOM 스냅샷에는 구매 품목이 없습니다." };
+  return { ok: true, lines };
+}
+
+export interface PrForCsv {
+  prNo: string; poNo: string | null; projectNo: string | null; bomRunId: string; code: string; status: string;
+  lines: { lineNo: number; resolvedCode: string; part: string; spec: string; qty: number; unit: string; supplier: string | null; requiredDate: Date | string | null; unitPrice: number }[];
+}
+
+const PROCESS_LABEL: Record<string, string> = { draft: "작성중", rfq: "견적 요청", ordered: "발주" };
+
+/** 셀 하나. 엑셀이 수식으로 읽을 머리글자(= + - @)는 작은따옴표로 죽인다. */
+function cell(v: unknown): string {
+  let s = v === null || v === undefined ? "" : String(v);
+  if (/^[=+\-@\t\r]/.test(s) && !/^-?\d+(\.\d+)?$/.test(s)) s = `'${s}`;
+  return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+const dateOf = (d: Date | string | null): string => (d ? (d instanceof Date ? d.toISOString() : d).slice(0, 10) : "");
+
+/** p51 BOM List 열 순서 그대로. 맨 앞 BOM(\uFEFF)은 엑셀이 한글을 깨뜨리지 않게 하려는 것. */
+export function prToCsv(pr: PrForCsv): string {
+  const head = ["PR No", "PO No", "Project No", "BOM No", "Product Code", "Process", "Item", "Code", "Part", "Spec", "Qty", "Unit", "Supplier", "Required date", "Price", "Amount"];
+  const rows = pr.lines.map((l) => [
+    pr.prNo, pr.poNo ?? "", pr.projectNo ?? "", pr.bomRunId, pr.code, PROCESS_LABEL[pr.status] ?? pr.status,
+    l.lineNo, l.resolvedCode, l.part, l.spec, l.qty, l.unit, l.supplier ?? "", dateOf(l.requiredDate), l.unitPrice, l.qty * l.unitPrice,
+  ]);
+  return "\uFEFF" + [head, ...rows].map((r) => r.map(cell).join(",")).join("\r\n") + "\r\n";
+}
+
+/* ───────────── 인쇄본 (흰 A4) ───────────── */
+
+const esc = (v: unknown): string =>
+  String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+const won = (n: number): string => n.toLocaleString("ko-KR");
+const STATUS_LABEL: Record<string, string> = { draft: "작성중", review: "검토", approved: "승인", issued: "발행" };
+
+const PRINT_CSS = `
+@page { size: A4; margin: 16mm 14mm; }
+* { box-sizing: border-box; }
+body { margin: 0; background: #fff; color: #14202b; font: 12.5px/1.55 "Pretendard", "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif; }
+.sheet { max-width: 182mm; margin: 0 auto; padding: 10mm 0; }
+.top { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid #14202b; padding-bottom: 6px; }
+.top h1 { margin: 0; font-size: 22px; letter-spacing: 6px; }
+.meta { font-size: 11px; color: #44525f; text-align: right; }
+.mono { font-family: "JetBrains Mono", Consolas, monospace; }
+table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+th, td { border: 1px solid #9aa7b3; padding: 5px 8px; text-align: left; vertical-align: top; }
+th { background: #eef2f5; font-weight: 600; white-space: nowrap; }
+td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
+.amount { font-size: 18px; font-weight: 700; color: #0e7c6b; }
+h2 { font-size: 13px; margin: 18px 0 0; }
+.foot { margin-top: 16px; padding-top: 6px; border-top: 1px solid #9aa7b3; font-size: 10.5px; color: #44525f; word-break: break-all; }
+.status { display: inline-block; border: 1px solid #14202b; padding: 1px 8px; font-size: 11px; }
+pre { margin: 0; white-space: pre-wrap; word-break: break-all; font: 11.5px/1.5 "JetBrains Mono", Consolas, monospace; }
+@media print { .noprint { display: none; } }
+`;
+
+function footOf(s: SourceStamp): string {
+  return `<div class="foot">근거 — BOM 스냅샷 <span class="mono">${esc(s.runId)}</span> · 카탈로그 지문 <span class="mono">${esc(s.catalogFp)}</span>`
+    + ` · 코드 개정 <span class="mono">${esc(s.codeRevisionId ?? "—")}</span> · 매크로 개정 <span class="mono">${s.macroRevision === null ? "—" : `r${s.macroRevision}`}</span>`
+    + `<br>이 문서의 숫자는 위 스냅샷에 저장된 값을 그대로 옮긴 것이며, 문서를 만들 때 다시 계산하지 않았습니다.</div>`;
+}
+
+function quotationHtml(b: QuotationBody): string {
+  const p = b.project;
+  return `<h2>PCR · Pre-Calculation Report</h2>
+<table data-testid="pcr-table">
+<tr><th>Material Cost</th><td class="n">${won(b.pcr.material)}</td><th>Manufacturing Cost</th><td class="n">${won(b.pcr.manufacturing)}</td></tr>
+<tr><th>Direct Cost</th><td class="n">${won(b.pcr.directCost)}</td><th>Overhead</th><td class="n">${won(b.pcr.overhead)}</td></tr>
+<tr><th>Full cost</th><td class="n" colspan="3" data-testid="pcr-full">${won(b.pcr.fullCost)} ${esc(b.pcr.currency)}</td></tr>
+</table>
+<h2>Quotation · 견적서</h2>
+<table>
+<tr><th>공사명</th><td>${esc(p?.name ?? "—")}</td><th>견적번호</th><td class="mono">${esc(b.docNo)} · Rev ${esc(b.rev)}</td></tr>
+<tr><th>고객</th><td>${esc(p?.clientName ?? "—")}</td><th>견적일자</th><td>${esc(b.date)}</td></tr>
+<tr><th>견적 금액</th><td><span class="amount" data-testid="quote-total">${won(b.total)}</span> ${esc(b.pcr.currency)} <small>[VAT ${esc(b.vat)}]</small></td><th>Project No.</th><td class="mono">${esc(p?.projectNo ?? "—")}</td></tr>
+<tr><th>납품조건</th><td>${esc(b.terms.delivery || "—")}</td><th>유효기간</th><td>${esc(b.terms.validity || "—")}</td></tr>
+<tr><th>지급조건</th><td>${esc(b.terms.payment || "—")}</td><th>보증기간</th><td>${esc(b.terms.warranty || "—")}</td></tr>
+</table>
+<table>
+<tr><th>No</th><th>장비 번호</th><th class="n">수량</th><th class="n">단가</th><th class="n">합계</th><th>비고</th></tr>
+${b.items.map((i) => `<tr><td>${i.no}</td><td class="mono">${esc(i.equipment)}</td><td class="n">${i.qty}</td><td class="n">${won(i.unitPrice)}</td><td class="n">${won(i.amount)}</td><td></td></tr>`).join("")}
+<tr><th colspan="2">합계</th><td class="n">${b.totalQty}</td><td></td><td class="n"><b>${won(b.total)}</b></td><td></td></tr>
+</table>`;
+}
+
+function techDataHtml(b: TechDataBody): string {
+  return `<h2>Input Data</h2>
+<table><tr><th>Project</th><td>${esc(b.project ? `${b.project.projectNo} · ${b.project.name}` : "—")}</td><th>Document Code</th><td class="mono">${esc(b.code)}</td></tr></table>
+<table data-testid="techdata-input"><tr>${b.input.map((i) => `<th>${esc(i.key)}</th>`).join("")}</tr><tr>${b.input.map((i) => `<td class="mono">${esc(i.value)}</td>`).join("")}</tr></table>
+<h2>Macro · 승인 개정 r${b.macro.revision}</h2>
+<table><tr><th>Macro id</th><td class="mono">${esc(b.macro.id)}</td></tr><tr><th>Coding</th><td><pre data-testid="techdata-dsl">${esc(b.macro.dsl)}</pre></td></tr></table>
+<h2>Output Data</h2>
+<table><tr><th>${esc(b.output.name)}</th><td class="n"><span class="amount" data-testid="techdata-value">${esc(Math.round(b.output.value * 1000) / 1000)}</span></td></tr></table>`;
+}
+
+export function renderDocumentHtml(doc: { docNo: string; currentRev: string; status: string; docType: string; body: unknown }): string {
+  const b = doc.body as QuotationBody | TechDataBody;
+  const title = b.kind === "quotation" ? "견 적 서" : "TECH DATA";
+  const inner = b.kind === "quotation" ? quotationHtml(b) : techDataHtml(b);
+  return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${esc(doc.docNo)} Rev ${esc(doc.currentRev)}</title><style>${PRINT_CSS}</style></head><body><div class="sheet">
+<div class="top"><h1>${title}</h1><div class="meta"><span class="mono">${esc(doc.docNo)}</span> · Rev ${esc(doc.currentRev)} · <span class="status" data-testid="doc-status">${esc(STATUS_LABEL[doc.status] ?? doc.status)}</span><br>${esc(b.date)}</div></div>
+${inner}
+${footOf(b.source)}
+<p class="noprint" style="margin-top:14px"><button onclick="window.print()">인쇄 / PDF 저장</button></p>
+</div></body></html>`;
+}

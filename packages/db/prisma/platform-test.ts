@@ -62,7 +62,7 @@ async function main(): Promise<void> {
   );
 
   // --- 2) 반대 방향: 플랫폼 역할 → 회사 업무 테이블 --------------------------
-  for (const t of ["product_code", "bom_code_run", "project", "membership", "hierarchy_node", "drawing"]) {
+  for (const t of ["product_code", "bom_code_run", "project", "membership", "hierarchy_node", "drawing", "document", "purchase_request", "purchase_request_line"]) {
     check(
       `열람 차단: edim_platform 은 ${t} 을(를) 읽을 수 없다`,
       await denied(() => platformDb.$queryRawUnsafe(`SELECT count(*) FROM ${t}`)),

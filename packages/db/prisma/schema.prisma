@@ -38,6 +38,9 @@ model Tenant {
   bomCodeRuns     BomCodeRun[]
   platformReqs    PlatformRequest[]
   drawings        Drawing[]
+  documents       Document[]
+  purchaseReqs    PurchaseRequest[]
+  purchaseLines   PurchaseRequestLine[]
 
   @@map("tenant")
 }
@@ -64,6 +67,8 @@ model AppUser {
   bomCodeRuns        BomCodeRun[]
   platformReqs       PlatformRequest[]
   drawings           Drawing[]
+  documents          Document[]
+  purchaseReqs       PurchaseRequest[]
 
   @@map("app_user")
 }
@@ -345,13 +350,19 @@ model BomCodeRun {
   source          String   @default("workbench")
   /// P4-a: 이 BOM 을 어느 코드 개정으로 돌렸는지. null = 개정 저장 전 실행.
   codeRevisionId  String?  @map("code_revision_id") @db.Uuid
+  /// P4-b: 이 값을 낸 승인 매크로와 그 개정·원문. null = 매크로 없이 돈 실행.
+  macroId         String?  @map("macro_id") @db.Uuid
+  macroRevision   Int?     @map("macro_revision")
+  macroDsl        String?  @map("macro_dsl")
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   createdBy       String   @map("created_by") @db.Uuid
 
-  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  creator      AppUser       @relation(fields: [createdBy], references: [id])
-  codeRevision CodeRevision? @relation(fields: [codeRevisionId], references: [id], onDelete: SetNull)
-  drawings     Drawing[]
+  tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  creator          AppUser           @relation(fields: [createdBy], references: [id])
+  codeRevision     CodeRevision?     @relation(fields: [codeRevisionId], references: [id], onDelete: SetNull)
+  drawings         Drawing[]
+  documents        Document[]
+  purchaseRequests PurchaseRequest[]
 
   @@index([tenantId, hierarchyStable, createdAt(sort: Desc)], map: "bom_code_run_tenant_node_idx")
   @@map("bom_code_run")
@@ -409,4 +420,81 @@ model Drawing {
   @@unique([tenantId, drawingNo, currentRev], map: "drawing_tenant_no_rev_key")
   @@index([tenantId, hierarchyStable, createdAt(sort: Desc)], map: "drawing_tenant_node_idx")
   @@map("drawing")
+}
+
+/// P4-b — 견적(PCR/Quotation, p66) · Tech Data(p15~16). 도면과 같은 규칙:
+/// BOM 스냅샷 하나에서 나오고, 번호·개정·상태 4단계를 갖고, 발행되면 DB 가 잠근다.
+model Document {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  hierarchyStable String?  @map("hierarchy_stable") @db.Uuid
+  bomRunId        String   @map("bom_run_id") @db.Uuid
+  docNo           String   @map("doc_no")
+  docType         String   @map("doc_type") // 'quotation' | 'techdata'
+  currentRev      String   @default("A") @map("current_rev")
+  status          String   @default("draft") // draft|review|approved|issued
+  code            String
+  body            Json     @db.JsonB
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+  createdBy       String   @map("created_by") @db.Uuid
+
+  tenant  Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  bomRun  BomCodeRun @relation(fields: [bomRunId], references: [id])
+  creator AppUser    @relation(fields: [createdBy], references: [id])
+
+  @@unique([tenantId, docNo, currentRev], map: "document_tenant_no_rev_key")
+  @@index([tenantId, hierarchyStable, createdAt(sort: Desc)], map: "document_tenant_node_idx")
+  @@map("document")
+}
+
+/// P4-b — 구매 요청(p51). 한 BOM 스냅샷에 하나. 발주되면 DB 가 잠근다.
+model PurchaseRequest {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  hierarchyStable String?   @map("hierarchy_stable") @db.Uuid
+  bomRunId        String    @map("bom_run_id") @db.Uuid
+  prNo            String    @map("pr_no")
+  poNo            String?   @map("po_no")
+  projectNo       String?   @map("project_no")
+  code            String
+  status          String    @default("draft") // draft|rfq|ordered (p51 Process: 견적 요청/발주)
+  requiredDate    DateTime? @map("required_date") @db.Date
+  remarks         String?
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+  createdBy       String    @map("created_by") @db.Uuid
+
+  tenant  Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  bomRun  BomCodeRun            @relation(fields: [bomRunId], references: [id])
+  creator AppUser               @relation(fields: [createdBy], references: [id])
+  lines   PurchaseRequestLine[]
+
+  @@unique([tenantId, prNo], map: "purchase_request_tenant_no_key")
+  @@unique([tenantId, bomRunId], map: "purchase_request_tenant_run_key")
+  @@index([tenantId, hierarchyStable, createdAt(sort: Desc)], map: "purchase_request_tenant_node_idx")
+  @@map("purchase_request")
+}
+
+model PurchaseRequestLine {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  prId         String    @map("pr_id") @db.Uuid
+  lineNo       Int       @map("line_no")
+  bomLineNo    Int       @map("bom_line_no")
+  childCode    String    @map("child_code")
+  resolvedCode String    @map("resolved_code")
+  part         String
+  spec         String
+  qty          Float
+  unit         String
+  unitPrice    Int       @map("unit_price")
+  supplier     String?
+  requiredDate DateTime? @map("required_date") @db.Date
+
+  tenant Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  pr     PurchaseRequest @relation(fields: [prId], references: [id], onDelete: Cascade)
+
+  @@unique([prId, lineNo], map: "purchase_request_line_pr_no_key")
+  @@map("purchase_request_line")
 }
