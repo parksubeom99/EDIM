@@ -296,6 +296,44 @@ with sync_playwright() as p:
     ok("S29d 화면: 승인된 것은 BOM 이다 — 화면의 현재 코드(AL)가 승인된 BOM(SS)과 다르면 그렇다고 말한다", (bd.get_attribute("data-differs") if bd else None), bool(bd) and "630SS" in bd.inner_text() and bd.get_attribute("data-differs")=="1" and "다릅니다" in bd.inner_text())
     ok("S29c 화면: Accepted 요청 → 승인 → Accepted · 플랫폼 승인도 같은 BOM 에 묶인다", (st1, [f"{a_['tier']}:{a_['state']}" for a_ in t2.get("approvals",[])]), st1.strip()=="Accepted" and any(a_["tier"]=="platform" and a_["state"]=="approved" for a_ in t2.get("approvals",[])))
     pg.screenshot(path=f"{OUT}/51_accepted.png",full_page=True)
+    # ── S30 변경 전파 — 한 번의 Set-Up 저장이 BOM·원가·구매 수량·도면을 **함께** 움직이고, 앞 스냅샷은 그대로다 (P6 완료 기준 3) ──
+    # 정직 고지: 지금 데이터 모델에서 한 칸이 네 산출물 전부에 닿지는 않는다. filterQty 는 BOM·원가·구매에, 치수 W 는 도면에 닿는다
+    # (BOM 사양의 단면은 cap.face 를, 도면은 dim.W 를 읽는다 — 같은 값이 두 칸에 있다). 그래서 "한 번의 저장(두 칸)"으로 묶는다.
+    CODE55="EU-55-2123-630SS-1-21-13-15"; NODE4="a0000000-0000-4000-8000-000000000004"
+    def run55(): return ctx.request.post(BASE+"/api/run/bom",headers=J0,data=json.dumps({"slots":S55_0,"code":CODE55,"node":NODE4})).json()
+    def eu_now():
+        c_=ctx.request.get(BASE+"/api/setup/catalog").json(); e_=[p_ for p_ in c_.get("productCodes",[]) if p_.get("code")=="EU"][0]
+        dn=[k for k,t_ in e_["tables"].items() if t_.get("role")=="dim"][0]; wk=[c2["key"] for c2 in e_["tables"][dn]["cols"] if c2["name"]=="W"][0]
+        fk=[c2["key"] for c2 in e_["tables"]["cap"]["cols"] if c2["name"]=="filterQty"][0]
+        dr=[r_ for r_ in e_["tables"][dn]["rows"] if r_["item"]=="55"][0]; cr_=[r_ for r_ in e_["tables"]["cap"]["rows"] if r_["item"]=="55"][0]
+        return e_,dr,wk,cr_,fk
+    def facts(run):
+        rid=run.get("runId"); fl={l_["no"]:l_ for l_ in run.get("lines",[]) if "filter" in (l_.get("part") or "").lower()}
+        rest=[(l_["no"],l_.get("part"),l_["qty"],l_["unitCost"]) for l_ in run.get("lines",[]) if l_["no"] not in fl]
+        cost=ctx.request.post(BASE+"/api/run/cost",headers=J0,data=json.dumps({"runId":rid})).json().get("value")
+        meta=ctx.request.get(BASE+f"/api/dxf?runId={rid}&type=plan&meta=1").json(); geo=dxf_stats(ctx.request.get(BASE+f"/api/dxf?runId={rid}&type=plan").text())
+        fp=(ctx.request.get(BASE+f"/api/trace?runId={rid}").json().get("snapshot") or {}).get("catalogFp")
+        return {"rid":rid,"fq":sorted(l_["qty"] for l_ in fl.values()),"fsum":sum(l_["qty"]*l_["unitCost"] for l_ in fl.values()),"rest":rest,"cost":cost,"W":meta.get("widthMm"),"maxy":geo["maxy"],"fp":fp}
+    def pr_filter_qty(rid):
+        q_=ctx.request.post(BASE+"/api/purchase-requests",headers=J0,data=json.dumps({"runId":rid})); i_=q_.json().get("id")
+        row=[x for x in ctx.request.get(BASE+"/api/purchase-requests").json().get("rows",[]) if x.get("id")==i_]
+        return q_.status, sorted(l_["qty"] for l_ in (row[0]["lines"] if row else []) if "filter" in (l_.get("part") or l_.get("spec") or l_.get("name") or "").lower())
+    A=facts(run55()); eu_,dr_,wk_,cr2,fk_=eu_now(); W0=dr_["cells"][wk_]; F0=cr2["cells"][fk_]
+    dr_["cells"][wk_]=W0+100; cr2["cells"][fk_]=F0+2
+    sv=ctx.request.post(BASE+"/api/setup/product-codes",headers=J0,data=json.dumps(eu_))
+    ok("S30a 한 번의 Set-Up 저장: 필터 수량 +2 · 폭 W +100 (두 칸, 저장 1회)", (sv.status,F0,F0+2,W0,W0+100), sv.status==200 and len(A["fq"])==2 and A["fq"]==[F0,F0])
+    B=facts(run55())
+    ok("S30b BOM 이 따라간다 — 필터 두 줄 수량만 바뀌고 나머지 줄은 그대로", (A["fq"],B["fq"],len(B["rest"])), B["fq"]==[F0+2,F0+2] and B["rest"]==A["rest"] and len(B["rest"])>0)
+    dsum=B["fsum"]-A["fsum"]; dcost=(B["cost"] or 0)-(A["cost"] or 0)
+    ok("S30c 원가가 따라간다 — 늘어난 원가 = 늘어난 필터 재료비 × 1.18 × 1.12 (다른 요인 없음)", (dsum,dcost), dsum>0 and abs(dcost-dsum*1.18*1.12)<=1)
+    ok("S30d 도면이 따라간다 — 폭 +100 (메타와 ezdxf 실측 도형 둘 다)", (A["W"],B["W"],B["maxy"]-A["maxy"]), B["W"]==A["W"]+100 and B["maxy"]-A["maxy"]==100)
+    sa,qa=pr_filter_qty(A["rid"]); sb,qb=pr_filter_qty(B["rid"])
+    ok("S30e 구매 수량이 따라간다 — 새 스냅샷의 구매 요청은 새 수량, 앞 스냅샷의 구매 요청은 옛 수량", (sa,qa,sb,qb), sa==200 and sb==200 and qa==[F0,F0] and qb==[F0+2,F0+2])
+    A2=facts({"runId":A["rid"],"lines":[]}); 
+    ok("S30f 앞 스냅샷은 그대로다 — 원가·도면 폭·카탈로그 지문이 저장 전 값 그대로이고, 새 스냅샷은 지문이 다르다", (A["cost"]==A2["cost"],A["W"]==A2["W"],A["fp"]==A2["fp"],A["fp"]!=B["fp"]), A2["cost"]==A["cost"] and A2["W"]==A["W"] and A2["maxy"]==A["maxy"] and A2["fp"]==A["fp"] and bool(A["fp"]) and A["fp"]!=B["fp"])
+    eu_,dr_,wk_,cr2,fk_=eu_now(); dr_["cells"][wk_]=W0; cr2["cells"][fk_]=F0
+    rs=ctx.request.post(BASE+"/api/setup/product-codes",headers=J0,data=json.dumps(eu_)); C=facts(run55())
+    ok("S30g 되돌리면 되돌아온다 — 같은 입력이면 같은 답(수량·원가·폭·지문)", (rs.status,C["fq"],C["cost"]==A["cost"],C["W"]==A["W"],C["fp"]==A["fp"]), rs.status==200 and C["fq"]==A["fq"] and C["cost"]==A["cost"] and C["W"]==A["W"] and C["fp"]==A["fp"])
     # ── P3-a 플랫폼 관리자 계층 · DB①/DB② 소유 분리 (p54 User Management · p59 최종 승인 · p64 Admin.) ──
     # S16 회사 관리자가 Company Info.에서 Special 의뢰를 올린다 = 회사→플랫폼 유일 통로
     pg.goto(BASE+"/m/company",wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=user-management]",timeout=30000); time.sleep(1.5); nuke(pg)
