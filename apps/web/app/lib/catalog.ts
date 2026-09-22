@@ -93,7 +93,10 @@ export function parseSections(v: unknown): SectionDef[] | undefined | "invalid" 
     if (!isObj(s) || typeof s.name !== "string" || !s.name) return "invalid";
     const c = parseCond(s.when);
     if (c === "invalid") return "invalid";
-    out.push(c ? { name: s.name, when: c } : { name: s.name });
+    // Arrangement: 구획 길이(len, mm). 있으면 보존, 없으면 도면이 dim.L 로 폴백한다.
+    if (s.len !== undefined && s.len !== null && !(typeof s.len === "number" && Number.isFinite(s.len) && s.len > 0)) return "invalid";
+    const len = typeof s.len === "number" ? s.len : undefined;
+    out.push({ name: s.name, ...(c ? { when: c } : {}), ...(len !== undefined ? { len } : {}) });
   }
   return out;
 }

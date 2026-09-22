@@ -275,25 +275,80 @@ function DesignCanvas({ code, slots, runs, nodeStable, canEdit }: { code: string
   const runId = runs.find((r) => r.kind === "bom" && r.runId)?.runId ?? null;
   const cap = Number(slots.B ?? 0) || 10;
   const w = 320 + Math.min(cap, 60) * 4;
-  const hasRotor = slots.D === "630";
-  const hasHum = slots.D === "A1";
-  const sections = ["Mixing", "Filter", ...(hasRotor ? ["Rotor"] : []), "Coil", ...(hasHum ? ["Humid."] : []), "Fan"];
+  // Arrangement: 구획은 **등록된 것**을 쓴다(하드코딩 아님). 현재 슬롯에서 활성인 구획 + 등록 길이.
+  const [secs, setSecs] = useState<{ name: string; len: number | null }[]>([]);
+  const [arrOpen, setArrOpen] = useState(false);
+  const [arrBusy, setArrBusy] = useState(false);
+  const [arrMsg, setArrMsg] = useState<string | null>(null);
+  const loadArr = useCallback(async () => {
+    try {
+      const r = await fetch("/api/setup/arrangement?code=" + encodeURIComponent(slots.A ?? "") + "&slots=" + encodeURIComponent(JSON.stringify(slots)));
+      const j = await r.json();
+      if (r.ok) setSecs(j.sections ?? []);
+    } catch { /* 등록 전엔 빈 배열 */ }
+  }, [slots]);
+  useEffect(() => { loadArr(); }, [loadArr]);
+  const sections = secs.length > 0 ? secs.map((s) => s.name) : ["—"];
   const sw = w / sections.length;
+  async function saveArr(next: { name: string; len: number | null }[]) {
+    if (!canEdit) return;
+    setArrBusy(true); setArrMsg(null);
+    const r = await fetch("/api/setup/arrangement", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ code: slots.A ?? "", lengths: Object.fromEntries(next.filter((s) => s.len != null).map((s) => [s.name, s.len])) }) });
+    const j = await r.json().catch(() => ({}));
+    setArrBusy(false);
+    if (r.ok) { setSecs(next); setArrMsg("저장 · 다음 BOM Run 부터 도면 전장에 반영됩니다"); } else setArrMsg(`거부: ${j.error ?? r.status}`);
+  }
   return (
     <div data-testid="design-canvas" style={card}>
       <div style={h}>
         Design · Arrangement <span style={muted}>({code || "—"})</span>
+        {canEdit && (
+          <button type="button" data-testid="arrangement-edit" onClick={() => setArrOpen((v) => !v)}
+            style={{ marginLeft: "auto", fontFamily: "var(--font-mono)", fontSize: 11, color: arrOpen ? "var(--accent-contrast)" : "var(--ink-muted)", background: arrOpen ? "var(--accent)" : "var(--surface-2)", border: "1px solid var(--line)", borderRadius: 4, padding: "2px 8px", cursor: "pointer" }}>
+            Arrangement
+          </button>
+        )}
       </div>
+      {arrOpen && canEdit && (
+        <div data-testid="arrangement-panel" style={{ ...card, margin: "0 0 10px", padding: 10, background: "var(--surface-1)" }}>
+          <p style={{ ...muted, margin: "0 0 6px" }}>구획 길이(mm) — 비우면 도면이 치수표의 L 로 균등 분할합니다. 저장은 다음 BOM Run 부터 반영됩니다.</p>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {secs.map((s, i) => (
+              <label key={s.name} style={{ display: "flex", flexDirection: "column", fontSize: 11, color: "var(--ink-muted)" }}>
+                {s.name}
+                <input type="number" min={0} data-testid={`arr-len-${s.name}`} value={s.len ?? ""} placeholder="L"
+                  onChange={(e) => setSecs((xs) => xs.map((x, j) => (j === i ? { ...x, len: e.target.value === "" ? null : Number(e.target.value) } : x)))}
+                  style={{ width: 76, fontFamily: "var(--font-mono)", fontSize: 12, padding: "3px 5px", border: "1px solid var(--line)", borderRadius: 4, background: "var(--surface-0)", color: "var(--ink)" }} />
+              </label>
+            ))}
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8 }}>
+            <button type="button" data-testid="arr-save" disabled={arrBusy} onClick={() => saveArr(secs)}
+              style={{ fontSize: "var(--fs-12)", fontWeight: 600, color: "var(--accent-contrast)", background: "var(--accent)", border: "none", borderRadius: 4, padding: "4px 12px", cursor: "pointer" }}>
+              저장
+            </button>
+            {arrMsg && <span style={muted}>{arrMsg}</span>}
+          </div>
+        </div>
+      )}
       <svg viewBox={`0 0 ${w + 40} 220`} width="100%" style={{ maxWidth: 760, display: "block" }}>
         <rect x="20" y="40" width={w} height="120" rx="6" fill="var(--surface-1)" stroke="var(--ink)" strokeWidth="1.5" />
-        {sections.map((s, i) => (
-          <g key={s}>
-            <rect x={20 + i * sw} y="40" width={sw} height="120" fill="none" stroke="var(--line)" />
-            <text x={20 + i * sw + sw / 2} y="105" textAnchor="middle" fontSize="13" fill="var(--ink)" fontFamily="var(--font-body)">
-              {s}
-            </text>
-          </g>
-        ))}
+        {secs.length > 0 ? (() => {
+          const total = secs.reduce((a, s) => a + (s.len ?? 900), 0) || 1;
+          let acc = 0;
+          return secs.map((s) => {
+            const x = 20 + (acc / total) * w; const sww = ((s.len ?? 900) / total) * w; acc += s.len ?? 900;
+            return (
+              <g key={s.name}>
+                <rect x={x} y="40" width={sww} height="120" fill="none" stroke="var(--line)" />
+                <text x={x + sww / 2} y="100" textAnchor="middle" fontSize="12" fill="var(--ink)" fontFamily="var(--font-body)">{s.name}</text>
+                <text x={x + sww / 2} y="118" textAnchor="middle" fontSize="10" fill="var(--ink-muted)" fontFamily="var(--font-mono)">{s.len ?? "L"}</text>
+              </g>
+            );
+          });
+        })() : (
+          <text x={20 + w / 2} y="105" textAnchor="middle" fontSize="12" fill="var(--ink-muted)">코드를 고르면 구획이 나타납니다</text>
+        )}
         <line x1="20" y1="180" x2={20 + w} y2="180" stroke="var(--accent)" strokeWidth="1" />
         <text x={20 + w / 2} y="200" textAnchor="middle" fontSize="12" fill="var(--accent)" fontFamily="var(--font-mono)">
           개념도 · 용량 {slots.B ?? "—"} <tspan fill="var(--ink-muted)">(실제 치수는 아래 DXF — 등록 표 기준)</tspan>

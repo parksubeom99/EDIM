@@ -202,6 +202,16 @@ with sync_playwright() as p:
     pg.locator("button", has_text=re.compile(r"^Design$")).first.click(force=True); time.sleep(1.5); nuke(pg)
     body=pg.inner_text("[data-testid=design-canvas]")
     ok("S21a Design 탭에 등록된 도면과 상태가 보인다", ("발행" in body, "Rev" in body), "Rev" in body and ("발행" in body or "작성중" in body))
+    # S31g 화면: Arrangement 버튼 → 구획 길이를 고치고 저장하면 캔버스에 그 길이가 뜬다 (실동 · 버튼 자리만 있던 청사진 p13·58 채움)
+    nuke(pg); pg.click("[data-testid=arrangement-edit]", force=True); pg.wait_for_selector("[data-testid=arrangement-panel]", timeout=15000); nuke(pg)
+    pg.fill("[data-testid=arr-len-Coil]", "1500"); pg.click("[data-testid=arr-save]", force=True)
+    pg.wait_for_selector("[data-testid=design-canvas] >> text=1500", timeout=15000)
+    ok("S31g 화면: Arrangement 편집 → Coil 길이 1500 저장 → 캔버스 구획에 1500 이 뜬다", bool(pg.query_selector("[data-testid=design-canvas] >> text=1500")), True)
+    pg.screenshot(path=f"{OUT}/16_design_tab.png")
+    # 되돌린다 — API 로 EU 제품 코드의 모든 구획 len 을 지운다(빈 화면 입력이 불안정). 뒤 시나리오가 균등 도면을 기대한다.
+    _c=ctx.request.get(BASE+"/api/setup/catalog").json(); _eu=[p_ for p_ in _c.get("productCodes",[]) if p_.get("code")=="EU"][0]
+    for sd in _eu["sections"]: sd.pop("len",None)
+    ctx.request.post(BASE+"/api/setup/product-codes",headers=J0,data=json.dumps(_eu))
     pg.click("button:has-text('BOM Run')"); time.sleep(3); nuke(pg)
     kd=pg.inner_text("body")
     ok("S21b 핵심 치수가 등록 표 값을 그대로 보여 준다 (화면이 따로 계산하지 않는다)", "2600×2472" in kd, "2600×2472" in kd)
@@ -346,6 +356,31 @@ with sync_playwright() as p:
     rs=ctx.request.post(BASE+"/api/setup/product-codes",headers=J0,data=json.dumps(eu_)); C=facts(run55())
     b_after=ctx.request.get(BASE+f"/api/dxf?runId={B['rid']}&type=plan&meta=1").json().get("widthMm")
     ok("S30g 되돌리면 되돌아온다 — 같은 입력이면 같은 답(수량·원가·폭·지문) · 그래도 바뀐 표로 뜬 스냅샷 B 의 도면은 여전히 +100 (스냅샷마다 제 치수)", (rs.status,C["fq"],C["cost"]==A["cost"],C["W"]==A["W"],C["fp"]==A["fp"],b_after), rs.status==200 and C["fq"]==A["fq"] and C["cost"]==A["cost"] and C["W"]==A["W"] and C["fp"]==A["fp"] and b_after==A["W"]+100)
+    # ── S31 Arrangement 1차 — 구획 길이를 등록하면 도면 전장이 그 합으로 바뀐다 (스냅샷에 박혀 앞 것은 그대로) ──
+    def eu_pc():
+        c_=ctx.request.get(BASE+"/api/setup/catalog").json(); return [p_ for p_ in c_.get("productCodes",[]) if p_.get("code")=="EU"][0]
+    def dxf_of(rid): return dxf_stats(ctx.request.get(BASE+f"/api/dxf?runId={rid}&type=plan").text())
+    P0=eu_pc(); secs0=[sd.get("len") for sd in P0.get("sections",[])]
+    ok("S31a 처음엔 구획에 길이가 없다 — 도면은 dim 표의 L(900) 로 균등 분할한다", secs0, all(x is None for x in secs0))
+    rA=run55("SA31"); gA=dxf_of(rA["runId"]); nActive=len([sd for sd in P0.get("sections",[])])  # 조건부 구획 제외 전 값이라 도면 실측으로
+    L0=gA["maxx"]  # 전장 = 활성 구획수 × 900
+    ok("S31b 시작 도면 전장 = 활성 구획수 × 900 (균등)", (L0, L0%900==0), L0>0 and L0%900==0)
+    P=eu_pc()
+    for sd in P["sections"]:
+        if sd["name"]=="Coil": sd["len"]=1500  # Coil 구획만 1500 으로
+    up=ctx.request.post(BASE+"/api/setup/product-codes",headers=J0,data=json.dumps(P))
+    ok("S31c 구획 하나(Coil)에 길이 1500 을 등록·저장한다", up.status, up.status==200)
+    rB=run55("SB31"); gB=dxf_of(rB["runId"])
+    ok("S31d 새 BOM 의 도면 전장이 그만큼 늘었다 (Coil 900→1500, +600)", (L0, gB["maxx"], gB["maxx"]-L0), gB["maxx"]-L0==600 and gB["n"]==gA["n"])
+    gA2=dxf_of(rA["runId"])
+    ok("S31e 앞 스냅샷의 도면 전장은 그대로 (구획 길이도 스냅샷에 박힌다)", (L0, gA2["maxx"]), gA2["maxx"]==L0)
+    P=eu_pc()
+    for sd in P["sections"]:
+        if sd["name"]=="Coil": sd.pop("len",None)
+    ctx.request.post(BASE+"/api/setup/product-codes",headers=J0,data=json.dumps(P))
+    rC=run55(); gC=dxf_of(rC["runId"])
+    ok("S31f 되돌리면(길이 제거) 전장이 원래대로 균등", (L0, gC["maxx"]), gC["maxx"]==L0)
+
     # ── P3-a 플랫폼 관리자 계층 · DB①/DB② 소유 분리 (p54 User Management · p59 최종 승인 · p64 Admin.) ──
     # S16 회사 관리자가 Company Info.에서 Special 의뢰를 올린다 = 회사→플랫폼 유일 통로
     pg.goto(BASE+"/m/company",wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=user-management]",timeout=30000); time.sleep(1.5); nuke(pg)

@@ -120,3 +120,9 @@ P6 완료 기준 3 — **됨(단서 있음)**. 한 번의 Set-Up 저장(필터 �
 
 #### 단면 치수 참조 이관 (2026-09-22 · 회장님 결정)
 BOM 사양 문자열(패널·댐퍼·코일·드레인팬)이 `{cap.face}` 대신 `{dim.W}`·`{dim.H}` 를 읽는다 — 도면과 같은 표. `cap.face` 열은 남겼다(지우면 매크로의 열 글자 주소 A~O 가 밀린다 · `cap.face08` 코일 유효면은 유지). e2e S30b2: W 한 칸 +100 → 패널 사양 "2600×2472" → "2700×2472". 109/109. 시드 카탈로그를 바꿨으므로 기존 DB 는 `pnpm --filter @edim/db seed:catalog` 재실행 필요(회장님 PC).
+
+#### Arrangement 1차 슬라이스 (2026-09-22 · 청사진 p13·35·36·46·58 · 코퍼스 EDIM_ARRANGEMENT_SETUP_DRAWING_VIEW_MODEL.md MVP)
+버튼 자리만 있던 Arrangement 를 **구획 길이**부터 실동으로. 스키마 변경 없음 — 길이는 제품 코드 sections 배열에 `len` 으로 얹혀 저장되고, BOM Run 때 스냅샷 dims 에 구획 배열로 박힌다. 도면(평면·조립)은 균등 분할 대신 **구획별 길이**로 전장을 그린다(len 미등록 구획은 dim.L 폴백).
+- API `/api/setup/arrangement` GET(활성 구획+등록 길이) / POST(len 병합 upsert). 화면: Design 탭 Toolbar `Arrangement` 버튼 → 구획 길이 편집 → 저장 → 캔버스가 등록 구획을 폭 비례로 그림.
+- e2e S31a~g(엔진 전장 = 구획 길이 합 · 앞 스냅샷 보존 · 되돌리면 균등 · 화면 편집 실동). drawing:test 18 · bom-code 18 · 116/116.
+- **2차(코퍼스 MVP · 회장님 결정 대기)**: 방향(L0~R270) · Component 배치 규칙 · 2D 3각법(Front/Top/Right) · 3D View · Design Tool Binding. Move/Delete/Add/DWG/View/Free CAD 버튼은 아직 자리만 있다.

@@ -60,6 +60,8 @@ export interface DxfInput {
   /** 치수 표에서 고른 행(용량 등) — 표제란에 남긴다 */
   dimItem: string;
   sections: string[];
+  /** Arrangement: 구획별 길이(mm). 없으면 sections.length × L 로 균등 분할. */
+  secDims?: { name: string; len: number }[];
   items?: DrawingItem[];
 }
 
@@ -77,15 +79,20 @@ export interface DxfMeta {
 /** 평면 배치도 — 외형·섹션 분할·치수선. 치수는 전부 등록 표에서 온다. */
 export function buildPlanDxf(input: DxfInput): { dxf: string; meta: DxfMeta } {
   const { W, L } = input.dims;
-  const sections = input.sections.length > 0 ? input.sections : ["Unit"];
-  const length = sections.length * L;
+  const secs = (input.secDims && input.secDims.length > 0)
+    ? input.secDims
+    : (input.sections.length > 0 ? input.sections : ["Unit"]).map((name) => ({ name, len: L }));
+  const offs: number[] = []; let acc = 0;
+  for (const s of secs) { offs.push(acc); acc += s.len; }
+  const length = acc;
+  const sections = secs.map((s) => s.name);
   let ents = "";
   let n = 0;
 
   ents += rect(0, 0, length, W, "OUTLINE"); n += 4;
-  sections.forEach((s, i) => {
-    if (i > 0) { ents += line(i * L, 0, i * L, W, "SECTION"); n++; }
-    ents += text(i * L + 120, W / 2, 60, s.toUpperCase()); n++;
+  secs.forEach((s, i) => {
+    if (i > 0) { ents += line(offs[i]!, 0, offs[i]!, W, "SECTION"); n++; }
+    ents += text(offs[i]! + 120, W / 2, 60, s.name.toUpperCase()); n++;
   });
   ents += line(0, -300, length, -300, "DIM"); ents += text(length / 2 - 200, -420, 70, `L=${length}`); n += 2;
   ents += line(-300, 0, -300, W, "DIM"); ents += text(-900, W / 2, 70, `W=${W}`); n += 2;
@@ -104,16 +111,21 @@ export function buildPlanDxf(input: DxfInput): { dxf: string; meta: DxfMeta } {
  */
 export function buildAssemblyDxf(input: DxfInput): { dxf: string; meta: DxfMeta } {
   const { W, H, L } = input.dims;
-  const sections = input.sections.length > 0 ? input.sections : ["Unit"];
+  const secs = (input.secDims && input.secDims.length > 0)
+    ? input.secDims
+    : (input.sections.length > 0 ? input.sections : ["Unit"]).map((name) => ({ name, len: L }));
+  const offs: number[] = []; let acc = 0;
+  for (const s of secs) { offs.push(acc); acc += s.len; }
   const items = (input.items ?? []).slice(0, 20);
-  const length = sections.length * L;
+  const length = acc;
+  const sections = secs.map((s) => s.name);
   let ents = "";
   let n = 0;
 
   ents += rect(0, 0, length, W, "OUTLINE"); n += 4;
-  sections.forEach((s, i) => {
-    if (i > 0) { ents += line(i * L, 0, i * L, W, "SECTION"); n++; }
-    ents += text(i * L + 120, W - 200, 55, s.toUpperCase()); n++;
+  secs.forEach((s, i) => {
+    if (i > 0) { ents += line(offs[i]!, 0, offs[i]!, W, "SECTION"); n++; }
+    ents += text(offs[i]! + 120, W - 200, 55, s.name.toUpperCase()); n++;
   });
 
   const r = 130;

@@ -18,13 +18,17 @@ interface SnapLine {
   childCode?: unknown; remarks?: unknown;
 }
 
-function parseDims(v: unknown): { dims: Dims; item: string } | null {
+function parseDims(v: unknown): { dims: Dims; item: string; secDims: { name: string; len: number }[] } | null {
   if (!v || typeof v !== "object") return null;
   const o = v as Record<string, unknown>;
   const n = (k: string) => (typeof o[k] === "number" && Number.isFinite(o[k]) ? (o[k] as number) : null);
   const W = n("W"), H = n("H"), L = n("L");
   if (W === null || H === null || L === null || typeof o.item !== "string") return null;
-  return { dims: { W, H, L }, item: o.item };
+  const secDims = Array.isArray(o.sections)
+    ? (o.sections as unknown[]).flatMap((s) => (s && typeof s === "object" && typeof (s as Record<string, unknown>).name === "string" && typeof (s as Record<string, unknown>).len === "number"
+        ? [{ name: (s as { name: string }).name, len: (s as { len: number }).len }] : []))
+    : [];
+  return { dims: { W, H, L }, item: o.item, secDims };
 }
 
 export async function dxfSourceFromRun(tenantId: string, runId: string): Promise<DxfSource> {
@@ -53,7 +57,7 @@ export async function dxfSourceFromRun(tenantId: string, runId: string): Promise
 
   return {
     ok: true,
-    input: { code: run.code, dims: d.dims, dimItem: d.item, sections, items },
+    input: { code: run.code, dims: d.dims, dimItem: d.item, sections, secDims: d.secDims, items },
     run: { id: run.id, code: run.code, stableId: run.hierarchyStable, codeRevisionId: run.codeRevisionId },
   };
 }

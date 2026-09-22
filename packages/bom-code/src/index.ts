@@ -72,6 +72,14 @@ export type Cond = { slot: SlotKey; eq: string } | { macro: true };
 export interface SectionDef {
   name: string;
   when?: Cond;
+  /** Arrangement: 구획 길이(mm). 없으면 도면이 dim 표의 L 로 폴백한다. */
+  len?: number;
+}
+
+/** Arrangement: 한 구획의 이름 + 길이(mm). len 이 없으면 fallbackL 을 쓴다. */
+export interface SectionDim {
+  name: string;
+  len: number;
 }
 
 /** p33 — a registered code (product / part / purchased item). */
@@ -155,6 +163,18 @@ function holds(c: Cond | undefined, slots: SlotValues, macroValue: number | null
 
 export function sectionsFor(product: ProductCode, slots: SlotValues, macroValue: number | null = null): string[] {
   return (product.sections ?? []).filter((s) => holds(s.when, slots, macroValue)).map((s) => s.name);
+}
+
+/** 활성 구획의 이름 + 길이. len 미등록 구획은 fallbackL(도면 치수표의 L)을 쓴다. */
+export function sectionDimsFor(
+  product: ProductCode,
+  slots: SlotValues,
+  fallbackL: number,
+  macroValue: number | null = null,
+): SectionDim[] {
+  return (product.sections ?? [])
+    .filter((s) => holds(s.when, slots, macroValue))
+    .map((s) => ({ name: s.name, len: typeof s.len === "number" && s.len > 0 ? s.len : fallbackL }));
 }
 
 class RefError extends Error {}

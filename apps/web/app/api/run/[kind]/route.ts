@@ -4,7 +4,7 @@ import { canEditProject } from "@/app/lib/project-perms";
 import { runApprovedForSession } from "@/app/lib/macro/run";
 import type { SlotValues } from "@/app/lib/rccs";
 import { buildEbom, buildCost } from "@/app/lib/output/bom";
-import { runBomCode, toBomLine, catalogFingerprint, dimsFor } from "@edim/bom-code";
+import { runBomCode, toBomLine, catalogFingerprint, dimsFor, sectionDimsFor } from "@edim/bom-code";
 import { loadCatalog } from "@/app/lib/catalog";
 import { withTenant, saveBomCodeRun, getBomRun, revisionIdForSlots } from "@edim/db";
 
@@ -109,7 +109,8 @@ export async function POST(
     // 0011: 치수는 스냅샷을 뜨는 이 순간의 등록 표 값으로 함께 박는다 — 도면은 이후 이 값만 읽는다.
     const productForDims = catalog.productCodes.find((p) => p.code === result.parent && p.kind === "product");
     const drSnap = productForDims ? dimsFor(productForDims, slots) : null;
-    const dimsSnap = drSnap && drSnap.ok ? { ...drSnap.dims, item: drSnap.item, tableName: drSnap.tableName } : null;
+    const secDims = productForDims && drSnap && drSnap.ok ? sectionDimsFor(productForDims, slots, drSnap.dims.L, macroValue) : [];
+    const dimsSnap = drSnap && drSnap.ok ? { ...drSnap.dims, item: drSnap.item, tableName: drSnap.tableName, sections: secDims } : null;
     const snap = await withTenant(session.tenantId, async (tx) =>
       saveBomCodeRun(tx, {
         stableId: node,

@@ -46,15 +46,15 @@ pnpm --filter @edim/db hierarchy:test  # 09-21 수리 — 트리 생성·이동�
 pnpm --filter @edim/db macro:test      # 09-21 수리 — 첫 승인 r1·반려는 번호 소비 안 함 (※ 매크로를 전부 지운다 → 아래 reset:demo 필수)
 pip install playwright ezdxf ; playwright install chromium   # ezdxf = 도면(DXF)을 파싱해 검증
 pnpm db:reset:demo         # ★ 리허설 흔적 제거 (테스트·이전 e2e가 남긴 Rev·매크로 revision)
-python scripts\demo_e2e.py http://localhost:3000 shots   # ★ 109/109 PASS면 발표 가능
+python scripts\demo_e2e.py http://localhost:3000 shots   # ★ 116/116 PASS면 발표 가능
 pnpm db:reset:demo         # ★ e2e 자신도 흔적을 남긴다 → 시연 직전 반드시 한 번 더
 ```
 
-`demo_e2e.py`가 109/109이면 아래 시연 11장면은 **기계적으로 재현이 보장된** 상태다.
+`demo_e2e.py`가 116/116이면 아래 시연 11장면은 **기계적으로 재현이 보장된** 상태다.
 
 **리허설 잔재 규칙** — `code_revision`은 append-only라 앱에서 지울 수 없다. e2e·`revision:test`·손 리허설을 한 번이라도 돌린 DB에서는 본 시연의 첫 저장이 "Rev A"가 아니라 "Rev C/E…"로 찍히고, 매크로도 시드된 r1 이 아니라 r2+ 로 보인다. e2e의 `S2d`가 이 상태를 FAIL로 잡아준다.
 
-**발표 당일 아침 순서 (이 순서 그대로):** `docker ps` healthy → `pnpm db:reset:demo` → `demo_e2e.py` 109/109 → **`pnpm db:reset:demo` 한 번 더** → 브라우저 강력 새로고침(Ctrl+Shift+R) → 이후 시연 시작 전까지 화면 클릭·저장 금지.
+**발표 당일 아침 순서 (이 순서 그대로):** `docker ps` healthy → `pnpm db:reset:demo` → `demo_e2e.py` 116/116 → **`pnpm db:reset:demo` 한 번 더** → 브라우저 강력 새로고침(Ctrl+Shift+R) → 이후 시연 시작 전까지 화면 클릭·저장 금지.
 
 ---
 
@@ -104,7 +104,7 @@ pnpm db:reset:demo         # ★ e2e 자신도 흔적을 남긴다 → 시연 �
 | "숫자가 진짜냐" | 아니다. 단가·배율(18%/12%)은 샘플이다. **사양은 p14 그대로**고, 단가는 `provider.ts`/`bom.ts` 상수 한 곳만 바꾸면 된다. 데이터 문제지 구조 문제가 아니다 |
 | "도면이 이게 다냐" | 평면도·조립도(Item 표+풍선번호) 2종, 선과 글자 수준. 승인도·제작도·상세는 청사진 p37~44 범위이며 다음 단계다. 지금 도면은 스냅샷의 순수 함수이고 번호·개정·발행 잠금이 있다는 점이 핵심 |
 | "AI가 틀리면?" | 실행에 AI가 없다. AI는 설계 시점에 규칙을 쓰는 데만 쓰이고, 그 규칙은 검증·승인 후에만 실행된다 |
-| "혼자 만들었나" | 설계 회장님 + 구현 AI 에이전트 협업. 단위 테스트 189건 · DB 검증 9종(RLS·append-only·발행/발주 잠금·플랫폼 열람 차단) · 발표 시나리오 e2e 109단계로 품질을 보증한다 |
+| "혼자 만들었나" | 설계 회장님 + 구현 AI 에이전트 협업. 단위 테스트 189건 · DB 검증 9종(RLS·append-only·발행/발주 잠금·플랫폼 열람 차단) · 발표 시나리오 e2e 116단계로 품질을 보증한다 |
 | "저장은 되나 (새로고침하면?)" | 된다. 조립 코드는 `code_revision`에 Rev A, B, C…로 append-only 저장(UPDATE/DELETE 권한 자체가 없음), 테넌트 RLS, 감사 로그. 화면에서 새로고침해 보여주면 끝 |
 | "청사진 70장 중 얼마나 됐나" | 구현 대상 51장 중 실동 18 · 부분 22 · 미착수 11(`docs/00-corpus/page-map.md` 에 쪽마다 근거). 시연 등뼈(코드 → BOM → 도면·견적·Tech Data → 구매 → 승인 → 추적)는 끝까지 돈다. 가장 큰 빈 곳은 Arrangement(p13·35·36·46) · Drawing Data Set-Up(p42~44) · AI 학습 DB(p23) |
 
@@ -115,5 +115,5 @@ pnpm db:reset:demo         # ★ e2e 자신도 흔적을 남긴다 → 시연 �
 지금 열린 브랜치는 **`feat/p6-followup`** 하나(main 은 P6 까지 머지됨). 검증 2종 수리 · S30 변경 전파 시나리오 · 도면 지문 가드가 들어 있다.
 
 1. 탭: https://github.com/parksubeom99/EDIM/compare/main...feat/p6-followup → **Create pull request** → **Merge**(ff 가능)
-2. `git pull` → `pnpm db:generate && pnpm db:migrate` → §1 확인 블록 → 109/109 이면 회장님 PC 첫 실측
+2. `git pull` → `pnpm db:generate && pnpm db:migrate` → §1 확인 블록 → 116/116 이면 회장님 PC 첫 실측
 3. `docs/ci/ci.yml` 을 `.github/workflows/ci.yml` 로 복사해 커밋(엘 토큰은 Workflows 권한 403)
