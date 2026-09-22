@@ -303,7 +303,11 @@ with sync_playwright() as p:
     # 정직 고지: 지금 데이터 모델에서 한 칸이 네 산출물 전부에 닿지는 않는다. filterQty 는 BOM·원가·구매에, 치수 W 는 도면에 닿는다
     # (BOM 사양의 단면은 cap.face 를, 도면은 dim.W 를 읽는다 — 같은 값이 두 칸에 있다). 그래서 "한 번의 저장(두 칸)"으로 묶는다.
     CODE55="EU-55-2123-630SS-1-21-13-15"; NODE4="a0000000-0000-4000-8000-000000000004"
-    def run55(): return ctx.request.post(BASE+"/api/run/bom",headers=J0,data=json.dumps({"slots":S55_0,"code":CODE55,"node":NODE4})).json()
+    run55_lines_cache={}
+    def run55(tag=None):
+        r_=ctx.request.post(BASE+"/api/run/bom",headers=J0,data=json.dumps({"slots":S55_0,"code":CODE55,"node":NODE4})).json()
+        if tag: run55_lines_cache[tag]=r_.get("lines",[])
+        return r_
     def eu_now():
         c_=ctx.request.get(BASE+"/api/setup/catalog").json(); e_=[p_ for p_ in c_.get("productCodes",[]) if p_.get("code")=="EU"][0]
         dn=[k for k,t_ in e_["tables"].items() if t_.get("role")=="dim"][0]; wk=[c2["key"] for c2 in e_["tables"][dn]["cols"] if c2["name"]=="W"][0]
@@ -321,12 +325,14 @@ with sync_playwright() as p:
         q_=ctx.request.post(BASE+"/api/purchase-requests",headers=J0,data=json.dumps({"runId":rid})); i_=q_.json().get("id")
         row=[x for x in ctx.request.get(BASE+"/api/purchase-requests").json().get("rows",[]) if x.get("id")==i_]
         return q_.status, sorted(l_["qty"] for l_ in (row[0]["lines"] if row else []) if "filter" in (l_.get("part") or l_.get("spec") or l_.get("name") or "").lower())
-    A=facts(run55()); eu_,dr_,wk_,cr2,fk_=eu_now(); W0=dr_["cells"][wk_]; F0=cr2["cells"][fk_]
+    A=facts(run55("A")); eu_,dr_,wk_,cr2,fk_=eu_now(); W0=dr_["cells"][wk_]; F0=cr2["cells"][fk_]
     dr_["cells"][wk_]=W0+100; cr2["cells"][fk_]=F0+2
     sv=ctx.request.post(BASE+"/api/setup/product-codes",headers=J0,data=json.dumps(eu_))
     ok("S30a 한 번의 Set-Up 저장: 필터 수량 +2 · 폭 W +100 (두 칸, 저장 1회)", (sv.status,F0,F0+2,W0,W0+100), sv.status==200 and len(A["fq"])==2 and A["fq"]==[F0,F0])
-    B=facts(run55())
+    B=facts(run55("B"))
     ok("S30b BOM 이 따라간다 — 필터 두 줄 수량만 바뀌고 나머지 줄은 그대로", (A["fq"],B["fq"],len(B["rest"])), B["fq"]==[F0+2,F0+2] and B["rest"]==A["rest"] and len(B["rest"])>0)
+    specA=[l_["spec"] for l_ in run55_lines_cache["A"] if "Panel" in (l_.get("part") or "")]; specB=[l_["spec"] for l_ in run55_lines_cache["B"] if "Panel" in (l_.get("part") or "")]
+    ok("S30b2 BOM 사양 문자열도 함께 바뀐다 — 패널 단면이 dim 표를 읽는다 (W 만 +100, H 는 그대로)", (specA[:1], specB[:1]), bool(specA) and f" {W0}×" in specA[0] and f" {W0+100}×" in specB[0])
     dsum=B["fsum"]-A["fsum"]; dcost=(B["cost"] or 0)-(A["cost"] or 0)
     ok("S30c 원가가 따라간다 — 늘어난 원가 = 늘어난 필터 재료비 × 1.18 × 1.12 (다른 요인 없음)", (dsum,dcost), dsum>0 and abs(dcost-dsum*1.18*1.12)<=1)
     ok("S30d 도면이 따라간다 — 폭 +100 (메타와 ezdxf 실측 도형 둘 다)", (A["W"],B["W"],B["maxy"]-A["maxy"]), B["W"]==A["W"]+100 and B["maxy"]-A["maxy"]==100)
@@ -345,7 +351,7 @@ with sync_playwright() as p:
     pg.goto(BASE+"/m/company",wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=user-management]",timeout=30000); time.sleep(1.5); nuke(pg)
     subj="Special 의뢰 (demo) "+str(int(time.time()))
     pg.fill("[data-testid=request-subject]",subj); pg.fill("[data-testid=request-detail]","코일 열교환 계산 — 매크로로 안 됩니다")
-    pg.click("[data-testid=request-submit]"); time.sleep(2.5); nuke(pg)
+    pg.click("[data-testid=request-submit]"); pg.wait_for_selector(f"[data-testid=platform-requests] >> text={subj}", timeout=30000); time.sleep(0.4); nuke(pg)  # 고정 sleep 금지 — 첫 컴파일이 4초를 넘긴다
     body=pg.inner_text("[data-testid=platform-requests]"); ok("S16a 회사 owner가 Special 의뢰를 올린다 (회사→플랫폼 유일 통로, 상태 '대기')", subj[-14:], subj in body and "대기" in body)
     pg.screenshot(path=f"{OUT}/40_company_admin.png",full_page=True)
     # S16b 회사 세션으로는 플랫폼 영역이 열리지 않는다 (API·화면 둘 다)

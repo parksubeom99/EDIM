@@ -1268,7 +1268,7 @@
       "kind": "part",
       "category": "Specification/Casing",
       "unit": "ea",
-      "specTemplate": "{cap.panelMm}T {cap.face}×{cap.face} · 칼라강판 0.8T/아연도(G.I) 강판 0.8T · G/Wool 48K 50T",
+      "specTemplate": "{cap.panelMm}T {dim.W}×{dim.H} · 칼라강판 0.8T/아연도(G.I) 강판 0.8T · G/Wool 48K 50T",
       "materialTemplate": "{mat.label}",
       "tables": {}
     },
@@ -1288,7 +1288,7 @@
       "kind": "part",
       "category": "Specification/Damper",
       "unit": "ea",
-      "specTemplate": "{cap.face}×600 opposed · OA/EA/BYPASS Link식 SGCC 1.6T/AL 1.2T · 5~7 m/s 이하",
+      "specTemplate": "{dim.W}×600 opposed · OA/EA/BYPASS Link식 SGCC 1.6T/AL 1.2T · 5~7 m/s 이하",
       "materialTemplate": "{mat.label}",
       "tables": {}
     },
@@ -1318,7 +1318,7 @@
       "kind": "part",
       "category": "Specification/Coil",
       "unit": "ea",
-      "specTemplate": "{cap.coilRows}R {cap.face}×{cap.face08} · AL Fin 8FPI 0.12mmT · Cu 1/2\"×0.5mmT · Frame SGCC 1.6T",
+      "specTemplate": "{cap.coilRows}R {dim.W}×{cap.face08} · AL Fin 8FPI 0.12mmT · Cu 1/2\"×0.5mmT · Frame SGCC 1.6T",
       "materialTemplate": "Cu/Al",
       "tables": {}
     },
@@ -1328,7 +1328,7 @@
       "kind": "part",
       "category": "Specification/Coil",
       "unit": "ea",
-      "specTemplate": "{cap.face}×600 SUS",
+      "specTemplate": "{dim.W}×600 SUS",
       "materialTemplate": "SUS304",
       "tables": {}
     },
@@ -1378,7 +1378,7 @@
       "kind": "part",
       "category": "Specification/Coil",
       "unit": "ea",
-      "specTemplate": "{cap.coilRows}R {cap.face}×{cap.face08}",
+      "specTemplate": "{cap.coilRows}R {dim.W}×{cap.face08}",
       "materialTemplate": "Cu/Al",
       "tables": {}
     },
