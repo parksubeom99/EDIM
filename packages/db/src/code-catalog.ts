@@ -165,6 +165,8 @@ export interface BomCodeRunInput {
   macroId?: string | null;
   macroRevision?: number | null;
   macroDsl?: string | null;
+  /** 0011: 실행 시점 치수 스냅샷. */
+  dims?: object | null;
   createdBy: string;
 }
 
@@ -189,6 +191,7 @@ export async function saveBomCodeRun(tx: TenantClient, input: BomCodeRunInput): 
       macroId: input.macroId ?? null,
       macroRevision: input.macroRevision ?? null,
       macroDsl: input.macroDsl ?? null,
+      dims: (input.dims ?? undefined) as never,
       createdBy: input.createdBy,
     },
   });

@@ -106,6 +106,10 @@ export async function POST(
     const cost = buildCost(lines);
     const clean: Record<string, string> = {};
     for (const [k, v] of Object.entries(slots)) if (typeof v === "string" && v) clean[k] = v;
+    // 0011: 치수는 스냅샷을 뜨는 이 순간의 등록 표 값으로 함께 박는다 — 도면은 이후 이 값만 읽는다.
+    const productForDims = catalog.productCodes.find((p) => p.code === result.parent && p.kind === "product");
+    const drSnap = productForDims ? dimsFor(productForDims, slots) : null;
+    const dimsSnap = drSnap && drSnap.ok ? { ...drSnap.dims, item: drSnap.item, tableName: drSnap.tableName } : null;
     const snap = await withTenant(session.tenantId, async (tx) =>
       saveBomCodeRun(tx, {
         stableId: node,
@@ -114,13 +118,12 @@ export async function POST(
         // 이 슬롯 조합으로 저장된 개정만 근거로 삼는다(없으면 null — 최신 개정을 대신 박지 않는다).
         codeRevisionId: node ? await revisionIdForSlots(tx, node, clean) : null,
         ...(macroSrc ?? {}),
+        dims: dimsSnap,
         createdBy: session.userId,
       }),
     );
     // 등록된 Key Dimension 을 함께 돌려준다 — 화면이 치수를 따로 계산하지 않도록.
-    const product = catalog.productCodes.find((p) => p.code === result.parent && p.kind === "product");
-    const dr = product ? dimsFor(product, slots) : null;
-    const dims = dr && dr.ok ? { ...dr.dims, item: dr.item, sections: result.sections?.length ?? 0 } : null;
+    const dims = dimsSnap ? { W: dimsSnap.W, H: dimsSnap.H, L: dimsSnap.L, item: dimsSnap.item, sections: result.sections?.length ?? 0 } : null;
     return NextResponse.json({ ...base, lines, trace, mainCode: result.mainCode, catalogFp, runId: snap.id, macroValue, dims, message: `BOM ${lines.length}행 · 코드 관계 ${result.parent} · 스냅샷 ${snap.id.slice(0, 8)}` });
   }
   return NextResponse.json({

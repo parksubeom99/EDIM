@@ -331,12 +331,12 @@ with sync_playwright() as p:
     ok("S30e 구매 수량이 따라간다 — 새 스냅샷의 구매 요청은 새 수량, 앞 스냅샷의 구매 요청은 옛 수량", (sa,qa,sb,qb), sa==200 and sb==200 and qa==[F0,F0] and qb==[F0+2,F0+2])
     a_cost=ctx.request.post(BASE+"/api/run/cost",headers=J0,data=json.dumps({"runId":A["rid"]})).json().get("value")
     a_fp=(ctx.request.get(BASE+f"/api/trace?runId={A['rid']}").json().get("snapshot") or {}).get("catalogFp")
-    a_dx=ctx.request.get(BASE+f"/api/dxf?runId={A['rid']}&type=plan&meta=1"); a_rg=ctx.request.post(BASE+"/api/drawings",headers=J0,data=json.dumps({"runId":A["rid"],"type":"plan"}))
-    ok("S30f 앞 스냅샷은 그대로다 — 원가·지문은 저장 전 값 그대로 · 표가 바뀐 뒤에는 옛 스냅샷으로 도면을 새로 그리지도 등록하지도 못한다 (409 — 승인 안 된 치수가 옛 BOM 으로 나가지 않는다)", (a_cost==A["cost"], a_fp==A["fp"], A["fp"]!=B["fp"], a_dx.status, a_rg.status), a_cost==A["cost"] and a_fp==A["fp"] and bool(A["fp"]) and A["fp"]!=B["fp"] and a_dx.status==409 and a_rg.status==409)
+    a_dx=ctx.request.get(BASE+f"/api/dxf?runId={A['rid']}&type=plan&meta=1"); a_geo=dxf_stats(ctx.request.get(BASE+f"/api/dxf?runId={A['rid']}&type=plan").text())
+    ok("S30f 앞 스냅샷은 그대로다 — 원가·지문뿐 아니라 **도면 치수도 스냅샷에 박힌 값**이라, 표가 바뀐 뒤에도 옛 스냅샷의 도면은 옛 폭 그대로 나온다 (0011)", (a_cost==A["cost"], a_fp==A["fp"], A["fp"]!=B["fp"], a_dx.status, a_dx.json().get("widthMm"), a_geo["maxy"]==A["maxy"]), a_cost==A["cost"] and a_fp==A["fp"] and bool(A["fp"]) and A["fp"]!=B["fp"] and a_dx.status==200 and a_dx.json().get("widthMm")==A["W"] and a_geo["maxy"]==A["maxy"])
     eu_,dr_,wk_,cr2,fk_=eu_now(); dr_["cells"][wk_]=W0; cr2["cells"][fk_]=F0
     rs=ctx.request.post(BASE+"/api/setup/product-codes",headers=J0,data=json.dumps(eu_)); C=facts(run55())
-    a_back=ctx.request.get(BASE+f"/api/dxf?runId={A['rid']}&type=plan&meta=1")
-    ok("S30g 되돌리면 되돌아온다 — 같은 입력이면 같은 답(수량·원가·폭·지문) · 표가 원래대로면 옛 스냅샷의 도면도 원래 폭으로 다시 나온다", (rs.status,C["fq"],C["cost"]==A["cost"],C["W"]==A["W"],C["fp"]==A["fp"],a_back.status), rs.status==200 and C["fq"]==A["fq"] and C["cost"]==A["cost"] and C["W"]==A["W"] and C["fp"]==A["fp"] and a_back.status==200 and a_back.json().get("widthMm")==A["W"])
+    b_after=ctx.request.get(BASE+f"/api/dxf?runId={B['rid']}&type=plan&meta=1").json().get("widthMm")
+    ok("S30g 되돌리면 되돌아온다 — 같은 입력이면 같은 답(수량·원가·폭·지문) · 그래도 바뀐 표로 뜬 스냅샷 B 의 도면은 여전히 +100 (스냅샷마다 제 치수)", (rs.status,C["fq"],C["cost"]==A["cost"],C["W"]==A["W"],C["fp"]==A["fp"],b_after), rs.status==200 and C["fq"]==A["fq"] and C["cost"]==A["cost"] and C["W"]==A["W"] and C["fp"]==A["fp"] and b_after==A["W"]+100)
     # ── P3-a 플랫폼 관리자 계층 · DB①/DB② 소유 분리 (p54 User Management · p59 최종 승인 · p64 Admin.) ──
     # S16 회사 관리자가 Company Info.에서 Special 의뢰를 올린다 = 회사→플랫폼 유일 통로
     pg.goto(BASE+"/m/company",wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=user-management]",timeout=30000); time.sleep(1.5); nuke(pg)

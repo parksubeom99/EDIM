@@ -358,6 +358,8 @@ model BomCodeRun {
   macroId         String?  @map("macro_id") @db.Uuid
   macroRevision   Int?     @map("macro_revision")
   macroDsl        String?  @map("macro_dsl")
+  /// 0011: 실행 시점의 Key Dimension {W,H,L,item,tableName}. null = 0011 이전 스냅샷(도면 재생성 불가).
+  dims            Json?    @db.JsonB
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   createdBy       String   @map("created_by") @db.Uuid
 

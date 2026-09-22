@@ -126,6 +126,19 @@ async function main(): Promise<void> {
   const seenByB = await withTenant(IDS.tenantB, (tx) => listDrawings(tx));
   check("RLS: 테넌트 B 는 A 의 도면을 못 본다", !seenByB.some((d) => d.id === d1.id));
 
+  // 0011: 치수는 스냅샷에 박힌다 — 저장한 값이 그대로 읽히고, 없으면(0011 이전) null 이다.
+  const withDims = await withTenant(IDS.tenantA, (tx) =>
+    saveBomCodeRun(tx, { stableId: IDS.a_proj, code: "EU-55-TEST", slots: { A: "EU", B: "55" }, macroValue: null, parentCode: "EU", catalogFp: "fp-dims", lines: [], cost: { total: 0 }, dims: { W: 2472, H: 2472, L: 900, item: "55", tableName: "dim" }, createdBy: IDS.ownerA }),
+  );
+  const rd = await withTenant(IDS.tenantA, (tx) => tx.bomCodeRun.findFirst({ where: { id: withDims.id } }));
+  const dm = (rd?.dims ?? null) as { W?: number; item?: string } | null;
+  check("0011: 스냅샷에 치수가 박힌다 (W=2472 · item 55)", dm?.W === 2472 && dm?.item === "55");
+  const noDims = await withTenant(IDS.tenantA, (tx) =>
+    saveBomCodeRun(tx, { stableId: IDS.a_proj, code: "EU-55-TEST2", slots: { A: "EU", B: "55" }, macroValue: null, parentCode: "EU", catalogFp: "fp-dims", lines: [], cost: { total: 0 }, createdBy: IDS.ownerA }),
+  );
+  const rn = await withTenant(IDS.tenantA, (tx) => tx.bomCodeRun.findFirst({ where: { id: noDims.id } }));
+  check("0011: 치수 없이 뜬 스냅샷은 dims 가 null (도면 입구가 422 로 거부할 근거)", rn?.dims === null);
+
   // 정리 (발행 잠금 때문에 트리거를 내리고 지운다 — 검증용 잔재만)
   await adminPrisma.$executeRawUnsafe(`ALTER TABLE "drawing" DISABLE TRIGGER USER`);
   await adminPrisma.drawing.deleteMany({ where: { drawingNo: "TEST-PLN" } });

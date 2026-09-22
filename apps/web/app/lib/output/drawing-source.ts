@@ -1,6 +1,5 @@
 import { withTenant, getBomRun } from "@edim/db";
-import { dimsFor, catalogFingerprint } from "@edim/bom-code";
-import { loadCatalog } from "../catalog";
+import type { Dims } from "@edim/bom-code";
 import type { DxfInput, DrawingItem } from "./dxf";
 
 /**
@@ -19,28 +18,23 @@ interface SnapLine {
   childCode?: unknown; remarks?: unknown;
 }
 
+function parseDims(v: unknown): { dims: Dims; item: string } | null {
+  if (!v || typeof v !== "object") return null;
+  const o = v as Record<string, unknown>;
+  const n = (k: string) => (typeof o[k] === "number" && Number.isFinite(o[k]) ? (o[k] as number) : null);
+  const W = n("W"), H = n("H"), L = n("L");
+  if (W === null || H === null || L === null || typeof o.item !== "string") return null;
+  return { dims: { W, H, L }, item: o.item };
+}
+
 export async function dxfSourceFromRun(tenantId: string, runId: string): Promise<DxfSource> {
   const run = await withTenant(tenantId, (tx) => getBomRun(tx, runId));
   if (!run) return { ok: false, status: 404, error: "BOM 스냅샷을 찾을 수 없습니다" };
 
-  const { catalog } = await loadCatalog(tenantId);
-  const product = catalog.productCodes.find((p) => p.code === run.parentCode && p.kind === "product");
-  if (!product)
-    return { ok: false, status: 422, error: `제품 코드 ${run.parentCode} 가 등록되어 있지 않습니다` };
-
-  // 치수는 아직 스냅샷에 박혀 있지 않고 **현재 등록 표**에서 읽는다. 그래서 스냅샷을 뜬 뒤 표가 바뀌었으면
-  // 이 스냅샷의 도면은 그릴 수 없다 — 그리면 "승인된 BOM + 승인된 적 없는 치수"의 도면이 나간다(S30f 가 잡은 결함).
-  // 지문이 다르면 거짓 도면 대신 거절한다. 이미 등록된 도면은 내용이 저장돼 있어 영향받지 않는다.
-  // (근본 해법 = 스냅샷에 치수를 함께 박는 것 · 스키마 변경이라 회장님 승인 대기 — 그때 이 가드는 걷어낸다.)
-  if (run.catalogFp !== catalogFingerprint(catalog))
-    return {
-      ok: false, status: 409,
-      error: "이 BOM 스냅샷을 뜬 뒤 등록 표가 바뀌었습니다 — 이 스냅샷으로는 도면을 새로 그릴 수 없습니다. BOM Run 을 다시 하십시오(새 BOM 은 다시 승인받아야 발행됩니다).",
-    };
-
-  // 치수는 등록 표에서만 온다. 없으면 **추측하지 않고 거부**한다.
-  const d = dimsFor(product, (run.slots ?? {}) as Record<string, string>);
-  if (!d.ok) return { ok: false, status: 422, error: d.message };
+  // 0011: 치수는 스냅샷에 박힌 값만 읽는다 — 표가 나중에 바뀌어도 이 BOM 의 도면은 그때 승인된 치수로 그려진다.
+  // 0011 이전 스냅샷(dims 없음)은 추측하지 않고 거부한다.
+  const d = parseDims(run.dims);
+  if (!d) return { ok: false, status: 422, error: "이 BOM 스냅샷에는 치수가 저장돼 있지 않습니다(0011 이전 실행) — BOM Run 을 다시 하십시오" };
 
   const raw = Array.isArray(run.lines) ? (run.lines as SnapLine[]) : [];
   const items: DrawingItem[] = raw.map((l, i) => ({
