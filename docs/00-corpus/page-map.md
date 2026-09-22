@@ -1,4 +1,4 @@
-# 청사진 페이지 색인 — 70장의 지금 (main `fd31d88+P6` · 2026-09-21)
+# 청사진 페이지 색인 — 70장의 지금 (main `edba335` · 2026-09-21)
 
 > 이 파일은 `docs/02-reports/build_blueprint_match.py` 의 판정 데이터에서 **자동 생성**된다. 손으로 고치지 말 것.
 > 실동 18 · 부분 22 · 미착수 11 · 개념·표지 19 (합 70). 판정은 엘의 것 — 회장님 조정 대상.
@@ -43,7 +43,7 @@
 | p24 | 실동 | Projects · Drawings · Revisions | Revisions: 개정 번호(A,B,…)·사유·개정자, append-only(앱 역할에 UPDATE/DELETE 권한 없음)<br>Drawings: 번호·유형·현재 개정·상태(작성중/검토/승인/발행), 발행은 DB 트리거가 잠근다 | Parts · BOM · Material 테이블은 코드 카탈로그 + BOM 스냅샷 구조로 대체(GAP1 결정)<br>scale · size 열 없음 | revision:test · drawing:test 14 · e2e S2b~S2d · S19 |
 | p25 | 부분 | 사용자 UI Form — Command button · Combo box · Templet | Command button set-up ✓ — 보이기·순서 변경이 MainForm Action Bar 에 즉시 반영, 기본값 복원 | Combo box set-up · 여러 동작을 정의한 Templet · Canvas Drag 없음(화면에도 그렇게 적혀 있다)<br>UI 개발 AI(설명을 주면 UI 자동 설계) 없음 | e2e S14a · S14b |
 | p26 | 미착수 | UI Design 작업장 | — | Set-Up 안의 UI Design 작업장(Work Hierarchy 별 UI · Sample Templet 호출)은 없다<br>p25 의 Command button 한 가지만 Toolbox 창에 있다 | — |
-| p27 | 실동 | 매크로 — 제안 → 검토 → 승인 | Verify(정적 검증 + dry-run) → 초안 → 승인 → revision 상승, 승인본만 공식 Run<br>Table 참조 · Flowchart · Description(결정론 역번역) ✓ | Prompt → Macro 는 경로만 있고 실모델 호출 0회(API 키 없음)<br>함수 마법사 · 그래프 마법사 · Address 찾기 없음 | macro 테스트 · e2e S4a~S4c · S13b~S13f |
+| p27 | 실동 | 매크로 — 제안 → 검토 → 승인 | Verify(정적 검증 + dry-run) → 초안 → 승인 → revision 상승, 승인본만 공식 Run<br>Table 참조 · Flowchart · Description(결정론 역번역) ✓ | Prompt → Macro 는 경로만 있고 실모델 호출 0회(API 키 없음)<br>함수 마법사 · 그래프 마법사 · Address 찾기 없음 | macro:test 10(첫 승인 r1 · 반려는 번호 소비 안 함 — 09-21 수리) · e2e S4a~S4c · S13b~S13f |
 | p28 | 부분 | 도면 풍선번호 · Item 표 · KAD-□□□ 슬롯 | 조립도에 Item 표와 풍선번호가 들어간다 | 부품 더블클릭 정보 관리 없음<br>KAD-□□□ 슬롯 ↔ Key Dimension 대응 문법 미정<br>조립순서·주의사항 없음 | e2e S18f |
 
 ## BOM Code Set-Up (p29–36)
@@ -64,7 +64,7 @@
 | 쪽 | 판정 | 제목 | 도는 것 | 없는 것 | 근거 |
 |---|---|---|---|---|---|
 | p37 | 개념·표지 | EDIM Drawing Management — DWG Set-Up | — | — | — |
-| p38 | 부분 | 치수 전파 — 표를 고치면 도면이 바뀐다 | Key Dimension 표(W·H·L) → DXF. 한 칸 2472→2600 이면 폭만 따라 바뀐다(ezdxf 로 파싱해 확인)<br>평면도·조립도 2종 · 번호·개정·상태·발행 잠금 | 도면은 아직 선과 글자 수준 — 제작도가 아니다<br>Detail Dimension · 부품도 · KAD-□ 슬롯 문법 없음 | e2e S18a~S18f · S19a~S19e · drawing:test 14 |
+| p38 | 부분 | 치수 전파 — 표를 고치면 도면이 바뀐다 | Key Dimension 표(W·H·L) → DXF. 한 칸 2472→2600 이면 폭만 따라 바뀐다(ezdxf 로 파싱해 확인)<br>한 번의 저장으로 BOM 수량·원가·구매 수량·도면 폭이 함께 바뀌고 앞 스냅샷은 그대로(S30)<br>평면도·조립도 2종 · 번호·개정·상태·발행 잠금 · 표가 바뀐 뒤 옛 스냅샷으로는 도면을 못 그린다(409) | 도면은 아직 선과 글자 수준 — 제작도가 아니다<br>단면 치수가 cap.face(BOM 사양)·dim.W(도면) 두 칸에 중복 — 한 칸 수정이 둘 다에 닿지 않는다(회장님 결정 대기)<br>Detail Dimension · 부품도 · KAD-□ 슬롯 문법 없음 | e2e S18a~S18f · S19a~S19e · S30a~g · drawing:test 16 |
 | p39 | 부분 | 도면 Templet 호출 설정 6단계 | 1) Product Item 호출 ✓ · 도면 치수 ✓ · 사용 승인 절차(상태 4단계) ✓ | 하부 도면 호출 · 도면 구성 설정 · 설계 우선순위 · 조립 방식/설계 검증 Macro 없음 | e2e S7 · S18a |
 | p40 | 부분 | Call Sub Drawing · Assembling · Detail Design | 조립도 1장에 Item 표 + 풍선번호 | Sub Drawing 호출 · Detail Design 없음 | e2e S18f |
 | p41 | 개념·표지 | EDIM Drawing Management — Data Set-Up | — | — | — |

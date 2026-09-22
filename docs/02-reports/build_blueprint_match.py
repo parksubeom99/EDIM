@@ -115,7 +115,7 @@ PAGES = {
  27: pg("L", "S-2-2 · EDIM Toolbox Macro", "매크로 — 제안 → 검토 → 승인",
         ["Verify(정적 검증 + dry-run) → 초안 → 승인 → revision 상승, 승인본만 공식 Run", "Table 참조 · Flowchart · Description(결정론 역번역) ✓"],
         ["Prompt → Macro 는 경로만 있고 **실모델 호출 0회**(API 키 없음)", "함수 마법사 · 그래프 마법사 · Address 찾기 없음"],
-        "macro 테스트 · e2e S4a~S4c · S13b~S13f", "13_macro_approved", "회장님 몫: API 키로 Prompt 1회 확인"),
+        "macro:test 10(첫 승인 r1 · 반려는 번호 소비 안 함 — 09-21 수리) · e2e S4a~S4c · S13b~S13f", "13_macro_approved", "회장님 몫: API 키로 Prompt 1회 확인"),
  28: pg("P", "Macro 예제", "도면 풍선번호 · Item 표 · KAD-□□□ 슬롯",
         ["조립도에 Item 표와 풍선번호가 들어간다"], ["부품 더블클릭 정보 관리 없음", "KAD-□□□ 슬롯 ↔ Key Dimension 대응 **문법 미정**", "조립순서·주의사항 없음"],
         "e2e S18f", "49_dxf_assembly", "슬롯 문법은 RCCS 사안 — 회장님 결정"),
@@ -140,9 +140,9 @@ PAGES = {
         [], ["Key Dimension 만 표로 존재(→ p38). Detail Dimension · Component 배치 · 방향(L0~R270) · Design Verification(Macro) 없음"], "", None, "p35 와 한 묶음"),
  37: pg("C", "간지", "EDIM Drawing Management — DWG Set-Up"),
  38: pg("P", "PLM / Design Drawing / Set-Up / Macro", "치수 전파 — 표를 고치면 도면이 바뀐다",
-        ["Key Dimension 표(W·H·L) → DXF. 한 칸 2472→2600 이면 **폭만** 따라 바뀐다(ezdxf 로 파싱해 확인)", "평면도·조립도 2종 · 번호·개정·상태·발행 잠금"],
-        ["도면은 아직 **선과 글자** 수준 — 제작도가 아니다", "Detail Dimension · 부품도 · KAD-□ 슬롯 문법 없음"],
-        "e2e S18a~S18f · S19a~S19e · drawing:test 14", "43_drawings", "DXF 연구 결과와 CAD 담당의 Drawing Set-Up 입력이 필요"),
+        ["Key Dimension 표(W·H·L) → DXF. 한 칸 2472→2600 이면 **폭만** 따라 바뀐다(ezdxf 로 파싱해 확인)", "한 번의 저장으로 BOM 수량·원가·구매 수량·도면 폭이 **함께** 바뀌고 앞 스냅샷은 그대로(S30)", "평면도·조립도 2종 · 번호·개정·상태·발행 잠금 · 표가 바뀐 뒤 옛 스냅샷으로는 도면을 못 그린다(409)"],
+        ["도면은 아직 **선과 글자** 수준 — 제작도가 아니다", "단면 치수가 cap.face(BOM 사양)·dim.W(도면) 두 칸에 중복 — 한 칸 수정이 둘 다에 닿지 않는다(회장님 결정 대기)", "Detail Dimension · 부품도 · KAD-□ 슬롯 문법 없음"],
+        "e2e S18a~S18f · S19a~S19e · S30a~g · drawing:test 16", "43_drawings", "DXF 연구 결과와 CAD 담당의 Drawing Set-Up 입력이 필요"),
  39: pg("P", "Set-Up / PLM / Work Process / Design", "도면 Templet 호출 설정 6단계",
         ["1) Product Item 호출 ✓ · 도면 치수 ✓ · 사용 승인 절차(상태 4단계) ✓"], ["하부 도면 호출 · 도면 구성 설정 · 설계 우선순위 · 조립 방식/설계 검증 Macro 없음"],
         "e2e S7 · S18a", "48_dxf_plan"),
@@ -273,7 +273,7 @@ def s_rule():
     return f'''<section class="slide"><div class="stage"><header><span class="no">01</span><h2>읽는 법 — 판정 기준과 실측</h2></header>
 <div class="honest">
 <div class="h"><b>판정 네 가지</b><p><u>실동</u> 그 장의 핵심 동작이 화면에서 끝까지 돌고, e2e 나 DB 검증이 그것을 못 박고 있다.<br><u>부분</u> 일부만 돈다 — 도는 것과 없는 것을 둘 다 적는다.<br><u>미착수</u> 구현 대상인데 도는 것이 없다. <b>버튼 자리만 있는 것은 미착수로 셌다.</b><br><u>개념·표지</u> 구현 대상이 아닌 장. 반영된 곳이 있으면 적었다.</p></div>
-<div class="h hb"><b>실측 (main {MAIN} · 엘 샌드박스)</b><p>typecheck 11 · 단위 테스트 189 · 발표 시나리오 e2e <b>99/99</b><br>DB 검증: rls · revision · backbone 13 · platform 25 · drawing 16 · document 37 · auth<br>회귀: 슬롯 1,200 조합에서 BOM 불변<br>각 장의 근거 칸에 적힌 S번호는 <code>scripts/demo_e2e.py</code> 의 단계 이름이다.</p></div>
+<div class="h hb"><b>실측 (main {MAIN} · 엘 샌드박스)</b><p>typecheck 11 · 단위 테스트 189 · 발표 시나리오 e2e <b>106/106</b><br>DB 검증: rls · revision · project · hierarchy · macro · backbone 13 · platform 25 · drawing 16 · document 37 · auth<br>회귀: 슬롯 1,200 조합에서 BOM 불변<br>각 장의 근거 칸에 적힌 S번호는 <code>scripts/demo_e2e.py</code> 의 단계 이름이다.</p></div>
 <div class="h"><b>오른쪽 화면은 전부 실제 캡처</b><p>목업이 아니다. <code>demo_e2e.py</code> 가 매번 새로 찍는 화면이고, 이번부터 <code>docs/screens/</code> 에 함께 올렸다. 도면은 내려받은 DXF 를 ezdxf 로 다시 그린 것이다.</p></div>
 <div class="h hc"><b>여전히 검증되지 않은 것</b><p><b>회장님 Windows PC 실행 0회</b> — 위 수치는 전부 엘 샌드박스(Linux) 기준.<br>표·단가는 샘플 · Prompt→Macro 실모델 호출 0회 · 도면은 선과 글자 수준.</p></div>
 </div></div></section>'''
