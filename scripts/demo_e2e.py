@@ -17,9 +17,9 @@ with sync_playwright() as p:
     pg.click("text=PS-61313"); time.sleep(1.5); insp=pg.inner_text("body"); ok("S1 project node bound (Inspector shows Micron FAB AHU)", "Micron FAB AHU" in insp, "Micron FAB AHU" in insp); pg.screenshot(path=f"{OUT}/10_project_bound.png")
     # S2 코드 조립 D=630 E=SS
     sel=pg.query_selector_all("select")
-    sel[3].select_option(value="630"); sel[4].select_option(value="SS"); time.sleep(0.8)
+    sel[3].select_option(value="630"); sel[4].select_option(value="SS"); sel[5].select_option(value="1-21-13-15"); time.sleep(0.8)  # F 포함 (2026-09-22 회장님 결정: 개정 = A~F 전체 코드)
     code=pg.inner_text("text=조립 결과").strip() if pg.query_selector("text=조립 결과") else ""
-    body=pg.inner_text("body"); m=re.search(r"EU-55-2123-630SS",body); ok("S2 code assembled",m.group(0) if m else body[:80],m); pg.screenshot(path=f"{OUT}/11_code_builder.png")
+    body=pg.inner_text("body"); m=re.search(r"EU-55-2123-630SS-1-21-13-15",body); ok("S2 code assembled (A~F · F 순번 포함)",m.group(0) if m else body[:80],m); pg.screenshot(path=f"{OUT}/11_code_builder.png")
     # S2b Tier B — save Rev A, reload, still there; change → Rev B
     nuke(pg); pg.fill("[data-testid=rev-reason]","initial selection"); pg.click("[data-testid=rev-save]", force=True); time.sleep(2)
     pg.reload(wait_until="domcontentloaded"); pg.wait_for_selector("text=Code Builder", timeout=30000); time.sleep(2)
@@ -221,12 +221,14 @@ with sync_playwright() as p:
     bk=ctx.request.patch(BASE+f"/api/documents/{q2.get('id')}",headers=J0,data=json.dumps({"status":"review"})); bk2=ctx.request.patch(BASE+f"/api/documents/{q2.get('id')}",headers=J0,data=json.dumps({"status":"draft"}))
     ok("S22e 발행된 견적은 잠기고(409), 상태는 되돌릴 수 없다(409)", (pr_.status, lk.status, bk2.status), pr_.status==200 and lk.status==409 and bk.status==200 and bk2.status==409)
     # S22f 견적서 발치의 '코드 개정' 근거 — 최신 개정이 아니라 **그 슬롯으로 저장된** 개정만 찍힌다
-    revA=[x for x in rv if x.get("revNo")==1][0]; SA={"A":"EU","B":"55","C":"2123","D":"630","E":"SS"}
+    revA=[x for x in rv if x.get("revNo")==1][0]; SA=revA["slots"]; ok("S2e Rev A 에 F 순번이 저장돼 있다 (개정 = A~F 전체 코드)", (revA.get("code"), SA.get("F")), revA.get("code")=="EU-55-2123-630SS-1-21-13-15" and SA.get("F")=="1-21-13-15")
     ra=ctx.request.post(BASE+"/api/run/bom",headers=J0,data=json.dumps({"slots":SA,"code":"EU-55-2123-630SS","node":"a0000000-0000-4000-8000-000000000004"})).json()
     qa=ctx.request.post(BASE+"/api/documents",headers=J0,data=json.dumps({"runId":ra.get("runId"),"type":"quotation"})).json()
     srcA=ctx.request.get(BASE+f"/api/documents/{qa.get('id')}").json().get("body",{}).get("source",{})
     src1=ctx.request.get(BASE+f"/api/documents/{q1.get('id')}").json().get("body",{}).get("source",{})
-    ok("S22f Rev A 의 슬롯으로 돌리면 Rev A 가 근거로 찍히고(최신은 Rev B), 저장한 적 없는 조합은 비워 둔다", (srcA.get("codeRevisionId")==revA.get("id"), src1.get("codeRevisionId")), srcA.get("codeRevisionId")==revA.get("id") and src1.get("codeRevisionId") is None)
+    SU=dict(SA); SU["F"]="1-21-13-16"; ru=ctx.request.post(BASE+"/api/run/bom",headers=J0,data=json.dumps({"slots":SU,"code":"EU-55-2123-630SS-1-21-13-16","node":"a0000000-0000-4000-8000-000000000004"})).json()
+    qu=ctx.request.post(BASE+"/api/documents",headers=J0,data=json.dumps({"runId":ru.get("runId"),"type":"quotation"})).json(); srcU=ctx.request.get(BASE+f"/api/documents/{qu.get('id')}").json().get("body",{}).get("source",{})
+    ok("S22f 견적 발치의 근거 개정 = 그 슬롯(A~F)으로 저장된 개정만 — Rev A 슬롯 → Rev A(최신 Rev B 가 아님) · F 만 다른 미저장 조합(…-16) → 빈 값", (srcA.get("codeRevisionId")==revA.get("id"), src1.get("codeRevisionId")==revA.get("id"), srcU.get("codeRevisionId")), srcA.get("codeRevisionId")==revA.get("id") and src1.get("codeRevisionId")==revA.get("id") and srcU.get("codeRevisionId") is None)
     # S23 Tech Data: 값 + 그 값을 낸 승인 매크로 개정 + 입력
     t1=ctx.request.post(BASE+"/api/documents",headers=J0,data=json.dumps({"runId":RUN1,"type":"techdata"})).json()
     tb=ctx.request.get(BASE+f"/api/documents/{t1.get('id')}").json().get("body",{})
@@ -272,6 +274,7 @@ with sync_playwright() as p:
     t1=ctx.request.get(BASE+f"/api/trace?runId={RUN1}").json(); ta=ctx.request.get(BASE+f"/api/trace?runId={ra.get('runId')}").json()
     ok("S28a 추적: 발주된 구매 요청의 BOM 은 승인돼 있고, 매크로 개정·도면·문서·PO 가 한 번에 따라온다", (t1.get("approved"), (t1.get("macro") or {}).get("revision"), len(t1.get("drawings",[])), len(t1.get("documents",[])), (t1.get("purchaseRequest") or {}).get("poNo")), t1.get("approved") is True and isinstance((t1.get("macro") or {}).get("revision"),int) and len(t1.get("drawings",[]))>=2 and len(t1.get("documents",[]))>=3 and str((t1.get("purchaseRequest") or {}).get("poNo","")).startswith("PO-61313-") and t1["snapshot"]["total"]==cr.get("value"))
     ok("S28b 추적: Rev A 슬롯으로 돌린 BOM 은 코드 개정 Rev A 까지 거슬러 올라간다 · 그 BOM 은 미승인", ((ta.get("codeRevision") or {}).get("rev"), ta.get("approved")), (ta.get("codeRevision") or {}).get("rev")==1 and ta.get("approved") is False)
+    ok("S28e F 가 붙은 실행(S18 의 RUN1 = 630SS-1-21-13-15)도 근거 개정이 있다 — Rev A (F 포함 전엔 빈 값이었다)", ((t1.get("codeRevision") or {}).get("rev"), (t1.get("codeRevision") or {}).get("code")), (t1.get("codeRevision") or {}).get("rev")==1 and str((t1.get("codeRevision") or {}).get("code","")).endswith("1-21-13-15"))
     other=[x for x in ctx.request.get(BASE+"/api/purchase-requests").json().get("rows",[]) if x.get("id")!=pj.get("id")][0]; ONO=other["prNo"]
     nuke(pg); pg.click(f"[data-testid='pr-trace-{PRNO}']", force=True); time.sleep(1.5); nuke(pg); pg.click(f"[data-testid='pr-trace-{ONO}']", force=True); time.sleep(1.5)
     tp=[(e.get_attribute("data-approved"), e.inner_text()) for e in pg.query_selector_all("[data-testid=pr-trace]")]

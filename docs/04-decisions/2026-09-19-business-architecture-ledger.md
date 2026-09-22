@@ -51,3 +51,10 @@
 - 구현 0: Set-Up 등록 화면(p29–44) · 플랫폼 관리자 계층 · 관리자/사용자 영역 분리 · Special 제공 슬롯 · Drawings.status · 컨설팅 BM.
 - 의도된 범위 밖(베타 정의상 정상): CPQ 문서·Print, 구매·공정, Digital Twin.
 - 미결: 로컬 전용 88md 코퍼스 보호 백업(2026-08-17부터).
+
+## 2026-09-22 회장님 결정 (이 세션)
+- **코드 개정(code_revision)에 슬롯 F 포함** — 개정 = A~F 전체 코드(예 `EU-55-2123-630SS-1-21-13-15`). BOM 스냅샷의 근거 개정은 A~F 가 정확히 같은 개정만(F 만 달라도 미저장 조합 = 빈 값). e2e S2·S2e·S22f·S28e.
+- **치수를 BOM 스냅샷에 저장(0011 · Tier B)** — 도면은 스냅샷 치수만 읽는다. 09-21 지문 가드 제거.
+- **BOM 사양 문자열의 단면 치수 참조를 dim 표로 이관**(cap.face 열은 유지) — 아래 절.
+- **Arrangement 묶음(p13·35·36·46·58) 착수** — 설계 코퍼스 `docs/00-corpus/design-md/EDIM_ARRANGEMENT_SETUP_DRAWING_VIEW_MODEL.md` MVP 범위를 출발점으로.
+- 설계 코퍼스 85md 를 repo `docs/00-corpus/design-md/` 에 원문 보존(08-17 부터 미결이던 백업 종료).
