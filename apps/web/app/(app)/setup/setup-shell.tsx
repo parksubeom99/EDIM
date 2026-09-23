@@ -222,6 +222,13 @@ function ProductTab({ cat, reload, say }: TabProps) {
                 <div style={{ display: "flex", gap: 8, alignItems: "baseline", marginBottom: 4 }}>
                   <span style={{ ...mono, color: "var(--accent)" }}>Table{t.no}</span><span style={mono}>{tName}</span>
                   <span style={muted}>Item = 슬롯 {t.by} 값 · 빈 슬롯이면 “{t.default || "(없음)"}” 행 · Macro에서는 <span style={mono}>Table{t.no}(열글자, 행번호:행번호)</span></span>
+                  <select data-testid={`tbl-role-${tName}`} value={t.role ?? "tech"} disabled={!cat.canEdit}
+                    onChange={(e) => setDraft({ ...draft, tables: { ...draft.tables, [tName]: { ...t, role: e.target.value as TechTable["role"] } } })}
+                    style={{ ...input, ...mono, padding: "1px 4px", width: 148 }} title="표의 쓰임 — dim 은 도면 치수(p38) · buy 는 구매 속성(p32)">
+                    <option value="tech">tech · 기술/원가</option>
+                    <option value="dim">dim · 도면 치수</option>
+                    <option value="buy">buy · 구매 속성</option>
+                  </select>
                   {cat.canEdit && <><button type="button" onClick={() => addRow(tName)} style={{ ...btn(), padding: "2px 8px", marginLeft: "auto" }}>+ 행</button><button type="button" onClick={() => addCol(tName)} style={{ ...btn(), padding: "2px 8px" }}>+ 열</button></>}
                 </div>
                 <table style={{ borderCollapse: "collapse", width: "100%" }}>

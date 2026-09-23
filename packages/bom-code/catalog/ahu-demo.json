@@ -1300,7 +1300,53 @@
       "unit": "ea",
       "specTemplate": "MERV 8 592×592×50",
       "materialTemplate": "Synthetic",
-      "tables": {}
+      "tables": {
+        "buy": {
+          "no": 9,
+          "by": "F",
+          "default": "",
+          "role": "buy",
+          "cols": [
+            {
+              "key": "A",
+              "name": "Supplier",
+              "label": "공급처(p32 F:Supplier)"
+            },
+            {
+              "key": "B",
+              "name": "V",
+              "label": "전압"
+            },
+            {
+              "key": "C",
+              "name": "Hz",
+              "label": "주파수"
+            },
+            {
+              "key": "D",
+              "name": "IP",
+              "label": "보호등급"
+            },
+            {
+              "key": "E",
+              "name": "Insulation",
+              "label": "절연종"
+            }
+          ],
+          "rows": [
+            {
+              "item": "",
+              "cells": {
+                "A": "신성 E&C",
+                "B": "",
+                "C": "",
+                "D": "",
+                "E": ""
+              }
+            }
+          ]
+        }
+      }
     },
     {
       "code": "PFB 1",
@@ -1310,7 +1356,53 @@
       "unit": "ea",
       "specTemplate": "MERV 13 592×592×600",
       "materialTemplate": "Glass fiber",
-      "tables": {}
+      "tables": {
+        "buy": {
+          "no": 9,
+          "by": "F",
+          "default": "",
+          "role": "buy",
+          "cols": [
+            {
+              "key": "A",
+              "name": "Supplier",
+              "label": "공급처(p32 F:Supplier)"
+            },
+            {
+              "key": "B",
+              "name": "V",
+              "label": "전압"
+            },
+            {
+              "key": "C",
+              "name": "Hz",
+              "label": "주파수"
+            },
+            {
+              "key": "D",
+              "name": "IP",
+              "label": "보호등급"
+            },
+            {
+              "key": "E",
+              "name": "Insulation",
+              "label": "절연종"
+            }
+          ],
+          "rows": [
+            {
+              "item": "",
+              "cells": {
+                "A": "신성 E&C",
+                "B": "",
+                "C": "",
+                "D": "",
+                "E": ""
+              }
+            }
+          ]
+        }
+      }
     },
     {
       "code": "KCC 1",
@@ -1350,7 +1442,53 @@
       "unit": "ea",
       "specTemplate": "{cap.fanKw}kW VFD",
       "materialTemplate": "—",
-      "tables": {}
+      "tables": {
+        "buy": {
+          "no": 9,
+          "by": "F",
+          "default": "",
+          "role": "buy",
+          "cols": [
+            {
+              "key": "A",
+              "name": "Supplier",
+              "label": "공급처(p32 F:Supplier)"
+            },
+            {
+              "key": "B",
+              "name": "V",
+              "label": "전압"
+            },
+            {
+              "key": "C",
+              "name": "Hz",
+              "label": "주파수"
+            },
+            {
+              "key": "D",
+              "name": "IP",
+              "label": "보호등급"
+            },
+            {
+              "key": "E",
+              "name": "Insulation",
+              "label": "절연종"
+            }
+          ],
+          "rows": [
+            {
+              "item": "",
+              "cells": {
+                "A": "LS ELECTRIC",
+                "B": "380",
+                "C": "60",
+                "D": "IP20",
+                "E": "F"
+              }
+            }
+          ]
+        }
+      }
     },
     {
       "code": "KHR 1",
@@ -1370,7 +1508,53 @@
       "unit": "ea",
       "specTemplate": "{cap.humidKgh} kg/h",
       "materialTemplate": "SUS304",
-      "tables": {}
+      "tables": {
+        "buy": {
+          "no": 9,
+          "by": "F",
+          "default": "",
+          "role": "buy",
+          "cols": [
+            {
+              "key": "A",
+              "name": "Supplier",
+              "label": "공급처(p32 F:Supplier)"
+            },
+            {
+              "key": "B",
+              "name": "V",
+              "label": "전압"
+            },
+            {
+              "key": "C",
+              "name": "Hz",
+              "label": "주파수"
+            },
+            {
+              "key": "D",
+              "name": "IP",
+              "label": "보호등급"
+            },
+            {
+              "key": "E",
+              "name": "Insulation",
+              "label": "절연종"
+            }
+          ],
+          "rows": [
+            {
+              "item": "",
+              "cells": {
+                "A": "한국전열",
+                "B": "380",
+                "C": "60",
+                "D": "IP44",
+                "E": "F"
+              }
+            }
+          ]
+        }
+      }
     },
     {
       "code": "KHP 1",
@@ -1390,7 +1574,53 @@
       "unit": "ea",
       "specTemplate": "for {macro} kg (macro)",
       "materialTemplate": "Rubber/SS",
-      "tables": {}
+      "tables": {
+        "buy": {
+          "no": 9,
+          "by": "F",
+          "default": "",
+          "role": "buy",
+          "cols": [
+            {
+              "key": "A",
+              "name": "Supplier",
+              "label": "공급처(p32 F:Supplier)"
+            },
+            {
+              "key": "B",
+              "name": "V",
+              "label": "전압"
+            },
+            {
+              "key": "C",
+              "name": "Hz",
+              "label": "주파수"
+            },
+            {
+              "key": "D",
+              "name": "IP",
+              "label": "보호등급"
+            },
+            {
+              "key": "E",
+              "name": "Insulation",
+              "label": "절연종"
+            }
+          ],
+          "rows": [
+            {
+              "item": "",
+              "cells": {
+                "A": "대한방진",
+                "B": "",
+                "C": "",
+                "D": "",
+                "E": ""
+              }
+            }
+          ]
+        }
+      }
     }
   ],
   "relationships": [

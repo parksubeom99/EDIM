@@ -165,6 +165,8 @@ export function buildTechDataBody(
 export interface PurchaseLine {
   bomLineNo: number; childCode: string; resolvedCode: string;
   part: string; spec: string; qty: number; unit: string; unitPrice: number;
+  /** p32·p51 — 스냅샷 줄에 박힌 공급처. 지금 카탈로그를 다시 읽지 않는다(0011 원칙). */
+  supplier: string | null;
 }
 
 /**
@@ -179,6 +181,7 @@ export function purchaseLinesOf(run: SnapshotLike): { ok: true; lines: PurchaseL
   const lines = raw.filter((l) => l.kind === "purchase").map((l) => ({
     bomLineNo: Number(l.no), childCode: String(l.childCode), resolvedCode: String(l.resolvedCode ?? l.childCode),
     part: String(l.part), spec: String(l.spec ?? ""), qty: Number(l.qty), unit: String(l.unit ?? ""), unitPrice: Number(l.unitCost),
+    supplier: typeof l.supplier === "string" && l.supplier ? l.supplier : null,
   }));
   if (lines.length === 0) return { ok: false, status: 422, error: "이 BOM 스냅샷에는 구매 품목이 없습니다." };
   return { ok: true, lines };

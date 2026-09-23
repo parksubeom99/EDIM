@@ -468,6 +468,45 @@ with sync_playwright() as p:
        (regF.get("drawingNo"), regF.get("rev"), regR.get("drawingNo")),
        str(regF.get("drawingNo","")).endswith("-FRT") and str(regR.get("drawingNo","")).endswith("-RHT") and regF.get("rev")=="A")
 
+    # ── S34 p32 자재·구매 품목 — 등록한 공급처가 BOM 스냅샷에 박히고 구매 요청까지 간다 ──
+    # 원칙은 0011 과 같다: 구매 요청은 "지금 등록된 공급처"가 아니라 **그 BOM 을 돌린 시점**의 공급처를 산다.
+    def pc_of(code):
+        c_=ctx.request.get(BASE+"/api/setup/catalog").json(); return [p_ for p_ in c_.get("productCodes",[]) if p_.get("code")==code][0]
+    inv=pc_of("PVF 1")
+    buy=[t for k,t in inv.get("tables",{}).items() if t.get("role")=="buy"]
+    ok("S34a 구매 품목 코드에 **구매 속성표(buy)** 가 등록돼 있다 (p32 A:V·B:Hz·C:IP·D:Insulation·F:Supplier)",
+       (list(inv.get("tables",{}).keys()), [c["name"] for c in buy[0]["cols"]] if buy else None),
+       bool(buy) and "Supplier" in [c["name"] for c in buy[0]["cols"]])
+    rP=run55("S34"); RIDP=rP["runId"]
+    scr=[l for l in rP.get("lines",[]) if "supplier" in l]
+    ok("S34b 화면 응답에는 공급처가 없다 — 공급처는 **스냅샷 줄**에 박히고, 구매 요청이 거기서 복사한다(화면이 값을 나르지 않는다)",
+       len(scr), len(scr)==0)
+    prr=ctx.request.post(BASE+"/api/purchase-requests",headers=J0,data=json.dumps({"runId":RIDP})).json()
+    prs=ctx.request.get(BASE+"/api/purchase-requests").json()
+    mine=[x for x in prs.get("rows",[]) if x.get("prNo")==prr.get("prNo")]
+    pl=[(l.get("part"), l.get("supplier")) for l in (mine[0].get("lines") if mine else [])]
+    ok("S34c 구매 요청 줄이 그 공급처를 그대로 받는다 (p51 Supplier 열이 더 이상 비지 않는다)",
+       (prr.get("prNo"), pl), any(p_=="Inverter" and s_=="LS ELECTRIC" for p_,s_ in pl))
+    # 등록 공급처를 바꿔도 **이미 뜬 스냅샷**의 구매 요청은 옛 공급처다
+    inv2=pc_of("PVF 1")
+    for k,t in inv2["tables"].items():
+        if t.get("role")=="buy": t["rows"][0]["cells"]["A"]="현대일렉트릭"
+    up2=ctx.request.post(BASE+"/api/setup/product-codes",headers=J0,data=json.dumps(inv2))
+    rP2=run55("S34b")
+    pr2=ctx.request.post(BASE+"/api/purchase-requests",headers=J0,data=json.dumps({"runId":rP2["runId"]})).json()
+    rows3_=ctx.request.get(BASE+"/api/purchase-requests").json().get("rows",[])
+    mine3=[x for x in rows3_ if x.get("prNo")==pr2.get("prNo")]
+    new_sup=[l.get("supplier") for l in (mine3[0].get("lines") if mine3 else []) if l.get("part")=="Inverter"]
+    rows2_=ctx.request.get(BASE+"/api/purchase-requests").json().get("rows",[])
+    mine2=[x for x in rows2_ if x.get("prNo")==prr.get("prNo")]
+    old_pr=[l.get("supplier") for l in (mine2[0].get("lines") if mine2 else []) if l.get("part")=="Inverter"]
+    ok("S34d 공급처를 바꾸면 **새 BOM** 부터 바뀐다 — 앞서 뜬 구매 요청은 옛 공급처 그대로(스냅샷이 근거)",
+       (up2.status, new_sup, old_pr), up2.status==200 and new_sup==["현대일렉트릭"] and old_pr==["LS ELECTRIC"])
+    # 되돌린다 (뒤 장면·CSV 기대값 보존)
+    for k,t in inv2["tables"].items():
+        if t.get("role")=="buy": t["rows"][0]["cells"]["A"]="LS ELECTRIC"
+    ctx.request.post(BASE+"/api/setup/product-codes",headers=J0,data=json.dumps(inv2))
+
     # ── P3-a 플랫폼 관리자 계층 · DB①/DB② 소유 분리 (p54 User Management · p59 최종 승인 · p64 Admin.) ──
     # S16 회사 관리자가 Company Info.에서 Special 의뢰를 올린다 = 회사→플랫폼 유일 통로
     pg.goto(BASE+"/m/company",wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=user-management]",timeout=30000); time.sleep(1.5); nuke(pg)
@@ -497,9 +536,13 @@ with sync_playwright() as p:
     plp.goto(BASE+"/platform",wait_until="domcontentloaded"); plp.wait_for_selector("[data-testid=request-queue]",timeout=30000); time.sleep(1.0); nuke(plp)
     plp.fill("[data-testid=decision-note]","Special 개발 착수")
     row=plp.locator("[data-testid=request-row]").filter(has_text=subj).first
-    row.locator("[data-testid=approve]").click(); time.sleep(2.5)
+    row.locator("[data-testid=approve]").click()
+    row.wait_for(state="attached", timeout=30000)
+    plp.wait_for_function("""(sub)=>{const r=[...document.querySelectorAll('[data-testid=request-row]')].find(e=>e.textContent.includes(sub)); return r && r.getAttribute('data-state')==='approved';}""", arg=subj, timeout=30000)  # 고정 sleep 금지(09-21·09-22 반복 실수)
     ok("S16i 플랫폼이 승인한다", row.get_attribute("data-state"), row.get_attribute("data-state")=="approved")
-    pg.goto(BASE+"/m/company",wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=platform-requests]",timeout=30000); time.sleep(1.8); nuke(pg)
+    pg.goto(BASE+"/m/company",wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=platform-requests]",timeout=30000)
+    pg.wait_for_function("""()=>{const e=document.querySelector('[data-testid=platform-requests]'); return e && e.innerText.includes('승인됨');}""", timeout=30000)  # 상태 대기
+    nuke(pg)
     body=pg.inner_text("[data-testid=platform-requests]")
     ok("S16j 결정이 회사 화면으로 돌아온다 ('승인됨' + 결정 메모)", subj[-14:], subj in body and "승인됨" in body and "Special 개발 착수" in body)
     pl.close()

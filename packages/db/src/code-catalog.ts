@@ -93,7 +93,13 @@ export async function upsertProductCode(tx: TenantClient, input: ProductCodeInpu
     specTemplate: input.specTemplate ?? "",
     materialTemplate: input.materialTemplate ?? "",
     tables: input.tables ?? {},
-    sections: input.sections === undefined || input.sections === null ? Prisma.DbNull : input.sections,
+    /**
+     * 구획 없음 = **빈 배열**로 저장한다. 예전에는 Prisma.DbNull 센티널을 썼는데,
+     * @prisma/client 인스턴스가 둘이면(workspace 중복) 센티널을 못 알아보고 `{}` 가 저장돼
+     * 그 코드가 카탈로그 검증에서 통째로 탈락했다(2026-09-23 실측 — 화면에서 저장하면 코드가 사라짐).
+     * 배열은 센티널이 아니라 값이라 인스턴스와 무관하게 안전하다.
+     */
+    sections: input.sections ?? [],
   };
   const row = before
     ? await tx.productCode.update({ where: { id: before.id }, data: { ...data, updatedAt: new Date() } })

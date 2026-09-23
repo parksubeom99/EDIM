@@ -53,9 +53,9 @@ export function parseTables(v: unknown): Record<string, TechTable> | "invalid" {
     if (typeof t.no !== "number" || !Number.isInteger(t.no) || t.no < 1 || nos.has(t.no)) return "invalid"; // TableN must be unique
     nos.add(t.no);
     // p16/p51 Table Type — 기본은 tech. dim(Key Dimension)은 제품 코드당 하나만.
-    let role: "tech" | "dim" | undefined;
+    let role: "tech" | "dim" | "buy" | undefined;
     if (t.role !== undefined && t.role !== null) {
-      if (t.role !== "tech" && t.role !== "dim") return "invalid";
+      if (t.role !== "tech" && t.role !== "dim" && t.role !== "buy") return "invalid";  // buy = p32 구매 속성표
       role = t.role;
       if (role === "dim") { if (dimSeen) return "invalid"; dimSeen = true; }
     }
@@ -87,6 +87,9 @@ export function parseTables(v: unknown): Record<string, TechTable> | "invalid" {
 
 export function parseSections(v: unknown): SectionDef[] | undefined | "invalid" {
   if (v === null || v === undefined) return undefined;
+  // 옛 행 방어: 구획 없는 코드가 `{}` 로 저장된 적이 있다(DbNull 센티널 사고 · 2026-09-23 수리).
+  // 그 행까지 "형식 오류"로 버리면 코드가 카탈로그에서 사라진다 → 구획 없음으로 읽는다.
+  if (isObj(v) && Object.keys(v).length === 0) return undefined;
   if (!Array.isArray(v)) return "invalid";
   const out: SectionDef[] = [];
   for (const s of v) {

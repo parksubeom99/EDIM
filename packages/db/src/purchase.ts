@@ -55,6 +55,8 @@ export interface PrLineInput {
   qty: number;
   unit: string;
   unitPrice: number;
+  /** p32 등록 공급처(스냅샷 줄에서 옴). 미등록이면 null */
+  supplier?: string | null;
 }
 
 export interface CreatePrInput {
@@ -105,6 +107,7 @@ export async function createPurchaseRequest(tx: TenantClient, input: CreatePrInp
         create: input.lines.map((l, i) => ({
           tenantId, lineNo: i + 1, bomLineNo: l.bomLineNo, childCode: l.childCode, resolvedCode: l.resolvedCode,
           part: l.part, spec: l.spec, qty: l.qty, unit: l.unit, unitPrice: l.unitPrice, requiredDate: input.requiredDate,
+          supplier: l.supplier ?? null,   // p32 등록 공급처 — 스냅샷 줄에서 복사
         })),
       },
     },

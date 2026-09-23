@@ -59,7 +59,12 @@ export interface TechTable {
    *   "dim"         : 도면(P4-a)이 읽는 Key Dimension 표. 제품 코드당 1개.
    * 종류를 표에 붙이는 것이라 새 화면·새 테이블이 없다.
    */
-  role?: "tech" | "dim";
+  /**
+   * tech = 기술 표(사양·원가 참조) · dim = Key Dimension(도면) ·
+   * buy  = 구매 속성(p32 Material code & General purchase items — Supplier·V·Hz·IP·Insulation…).
+   *   buy 표는 슬롯으로 행을 고르지 않는 경우가 많아, 행이 하나면 그 행을 쓴다.
+   */
+  role?: "tech" | "dim" | "buy";
   by: SlotKey;
   /** Item used when the slot is EMPTY (a chosen value without a row is an error) */
   default: string;
@@ -156,6 +161,12 @@ export interface BomCodeLine extends BomLine {
    * 카탈로그"가 아니라 **그 BOM 을 돌린 시점**에 사 오는 품목이었던 줄만 모은다.
    */
   kind: ProductCode["kind"];
+  /**
+   * p32·p51 — 구매 품목의 공급처. **BOM Run 시점에 스냅샷 줄에 박는다**(0011 치수와 같은 원칙):
+   * 구매 요청은 "지금 등록된 공급처"가 아니라 그 BOM 을 돌린 시점의 공급처를 산다.
+   * 등록 안 된 코드는 null.
+   */
+  supplier: string | null;
 }
 
 export type BomCodeError =
@@ -175,6 +186,24 @@ function holds(c: Cond | undefined, slots: SlotValues, macroValue: number | null
 
 export function sectionsFor(product: ProductCode, slots: SlotValues, macroValue: number | null = null): string[] {
   return (product.sections ?? []).filter((s) => holds(s.when, slots, macroValue)).map((s) => s.name);
+}
+
+/**
+ * p32 구매 속성 — 그 코드에 등록된 role="buy" 표에서 열 **이름**으로 값을 읽는다.
+ * 행 선택: 슬롯 값에 맞는 행 → 없으면 default 행 → 없으면 첫 행(구매 품목은 대개 한 행이다).
+ * 값이 없으면 빈 객체다. 여기서 만들어 내지 않는다(등록 안 한 것은 없는 것).
+ */
+export function buyAttrsOf(code: ProductCode, slots: SlotValues = {}): Record<string, string> {
+  const t = Object.values(code.tables ?? {}).find((x) => x.role === "buy");
+  if (!t || t.rows.length === 0) return {};
+  const want = (slots[t.by] ?? "") || t.default;
+  const row = t.rows.find((r) => r.item === want) ?? t.rows[0]!;
+  const out: Record<string, string> = {};
+  for (const c of t.cols) {
+    const v = row.cells[c.key];
+    if (v !== undefined && v !== null && String(v) !== "") out[c.name] = String(v);
+  }
+  return out;
 }
 
 /** 활성 구획의 이름 + 길이. len 미등록 구획은 fallbackL(도면 치수표의 L)을 쓴다. */
@@ -288,6 +317,8 @@ export function runBomCode(catalog: Catalog, slots: SlotValues, macroValue: numb
         relSeq: r.seq,
         remarks: r.remarks ?? null,
         kind: child.kind,
+        // p32 → p51: 구매 품목이면 등록된 공급처를 이 줄에 박는다(스냅샷이 근거)
+        supplier: child.kind === "purchase" ? (buyAttrsOf(child, slots).Supplier ?? null) : null,
       });
     }
   } catch (e) {

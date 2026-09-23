@@ -3,7 +3,7 @@
  * RLS 격리 · FK(등록 안 된 child 거부, 쓰이는 child 삭제 거부) · 스냅샷 append-only · 시드 수량.
  */
 import { withTenant } from "../src/tenant";
-import { appPrisma } from "../src/client";
+import { appPrisma, adminPrisma } from "../src/client";
 import { loadCatalogRows, addRelationship, upsertProductCode, saveBomCodeRun, listBomCodeRuns } from "../src/code-catalog";
 import { IDS } from "./seed";
 
@@ -47,6 +47,14 @@ async function main(): Promise<void> {
     withTenant(IDS.tenantA, (tx) => tx.bomCodeRun.delete({ where: { id: run.id } }))));
   const audit = await withTenant(IDS.tenantA, (tx) => tx.auditLog.count({ where: { entity: "bom_code_run", entityId: run.id } }));
   check("audit: run is logged", audit === 1);
+
+  // 2026-09-23 수리: 구획 없는 코드를 저장해도 sections 가 `{}` 로 남지 않는다(카탈로그 탈락 원인).
+  await withTenant(IDS.tenantA, (tx) =>
+    upsertProductCode(tx, { code: "TST-BUY", name: "테스트 구매품", kind: "purchase", category: "t", unit: "ea", specTemplate: "", materialTemplate: "", tables: {}, createdBy: IDS.ownerA }),
+  );
+  const saved = await adminPrisma.productCode.findFirst({ where: { code: "TST-BUY" }, select: { sections: true } });
+  check("구획 없는 코드의 sections 는 빈 배열이다 (`{}` 가 아니다 — 카탈로그 탈락 방지)", Array.isArray(saved?.sections) && (saved!.sections as unknown[]).length === 0);
+  await adminPrisma.productCode.deleteMany({ where: { code: "TST-BUY" } });
 
   console.log(fail === 0 ? `\nALL PASS (${pass})` : `\n${fail} FAILED / ${pass} passed`);
   await appPrisma.$disconnect();
