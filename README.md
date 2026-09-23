@@ -3,7 +3,7 @@
 **제품 코드 한 줄에서 BOM · 도면 · 원가 · 견적 · 기술 자료 · 구매 요청이 나온다.**
 공기조화기(AHU) 같은 주문 생산(Configure-to-Order) 제품을 위한 CPQ + PLM + ERP 통합 플랫폼의 베타입니다.
 
-> 상태(2026-09-23 · main): 발표 시나리오 e2e **135/135** · 단위 테스트 **189**(vitest) + auth PASS · DB 검증 **9종** PASS · 청사진 70장 중 **실동 18 · 부분 24 · 미착수 9**(개념·표지 19)
+> 상태(2026-09-23 · main): 발표 시나리오 e2e **140/140** · 단위 테스트 **189**(vitest) + auth PASS · DB 검증 **9종** PASS · 청사진 70장 중 **실동 18 · 부분 24 · 미착수 9**(개념·표지 19)
 > 이 수치는 전부 개발 샌드박스(Linux) 실측입니다. **Windows 로컬 실행은 아직 0회**입니다 — 아래 [정직 고지](#정직-고지) 참조.
 
 ## 📸 화면
@@ -88,7 +88,7 @@ packages/macro-verify       정적 검증 + dry-run            packages/macro-re
 packages/hierarchy-address  Work Hierarchy 주소 체계        packages/core-ontology    순수 도메인 타입
 packages/db                 스키마 · 마이그레이션 · RLS · DB 검증 스크립트(prisma/*-test.ts)
 packages/auth · packages/ui 세션/RBAC · 디자인 시스템
-scripts/demo_e2e.py         발표 시나리오 135단계 (화면 + API + DXF 파싱)
+scripts/demo_e2e.py         발표 시나리오 140단계 (화면 + API + DXF 파싱)
 scripts/publish_screens.py  스크린샷 → docs/screens/*.webp
 docs/                       00-corpus(청사진 색인) · 01-design(설계) · 02-reports(보고서 생성기) · plan · deck · DEMO.md
 ```
@@ -113,7 +113,7 @@ pnpm typecheck                                        # 11 패키지
 pnpm -r --workspace-concurrency=1 test                # 단위 테스트 189 (PostgreSQL 필요)
 pnpm --filter @edim/db rls:test                       # + revision · backbone · platform · drawing · document
 pnpm db:reset:demo && pnpm dev &                      # 발표 시나리오
-python scripts/demo_e2e.py http://localhost:3000 shots   # 135/135 이면 시연 11장면이 기계적으로 재현된다
+python scripts/demo_e2e.py http://localhost:3000 shots   # 140/140 이면 시연 11장면이 기계적으로 재현된다
 ```
 
 | 검증 | 무엇을 못 박는가 |

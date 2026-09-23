@@ -4,6 +4,7 @@ import { getModule, canAccessModule } from "@/app/lib/modules";
 import { listProjectsForSession } from "@/app/lib/project";
 import { CompanyAdmin } from "../company-admin";
 import { Purchasing } from "../purchasing";
+import { Register } from "../register";
 import { canEditProject } from "@/app/lib/project-perms";
 
 /**
@@ -27,7 +28,7 @@ export default async function ModulePage({
     allowed && key === "project" ? await listProjectsForSession() : null;
 
   return (
-    <main style={{ maxWidth: key === "purchasing" ? 960 : 640, margin: "10vh auto", padding: 24 }}>
+    <main style={{ maxWidth: key === "purchasing" || key === "register" ? 960 : 640, margin: "10vh auto", padding: 24 }}>
       <Link
         href="/"
         style={{ color: "var(--accent)", fontSize: "var(--fs-13)" }}
@@ -45,7 +46,9 @@ export default async function ModulePage({
           >
             {mod!.label}
           </h1>
-          {key === "company" ? (
+          {key === "register" ? (
+            <Register />
+          ) : key === "company" ? (
             <CompanyAdmin myRole={session!.role} />
           ) : key === "purchasing" ? (
             <Purchasing canEdit={canEditProject(session!.role)} />

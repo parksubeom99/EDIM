@@ -507,6 +507,31 @@ with sync_playwright() as p:
         if t.get("role")=="buy": t["rows"][0]["cells"]["A"]="LS ELECTRIC"
     ctx.request.post(BASE+"/api/setup/product-codes",headers=J0,data=json.dumps(inv2))
 
+    # ── S35 승인 대장 (p55 EDIM Approval Management) — 문서와 도면을 한 표로 ──
+    reg=ctx.request.get(BASE+"/api/register").json()
+    kinds=set(r["kind"] for r in reg.get("rows",[]))
+    ok("S35a 대장이 문서와 도면을 함께 모은다 (번호·개정·상태·발행 시각)",
+       (reg.get("total"), sorted(kinds), reg.get("counts")), reg.get("total",0)>0 and kinds=={"document","drawing"})
+    iss=ctx.request.get(BASE+"/api/register?status=issued").json()
+    ok("S35b 상태로 거른다 — 발행본만 (발행 시각이 채워져 있다)",
+       (iss.get("total"), [r["releasedAt"] is not None for r in iss.get("rows",[])][:3]),
+       iss.get("total",0)>0 and all(r["status"]=="issued" and r["releasedAt"] for r in iss["rows"]))
+    dw=ctx.request.get(BASE+"/api/register?kind=drawing").json()
+    ok("S35c 종류로 거른다 — 도면만 (3각법 4종이 같은 대장에 있다)",
+       sorted(set(r["type"] for r in dw.get("rows",[]))), all(r["kind"]=="drawing" for r in dw.get("rows",[])) and dw.get("total",0)>0)
+    badr=ctx.request.get(BASE+"/api/register?status=released")
+    ok("S35d 없는 상태 이름은 400 으로 막는다 (조용히 전체를 주지 않는다)", badr.status, badr.status==400)
+    pg.goto(BASE+"/m/register",wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=register]",timeout=30000)
+    pg.wait_for_function("()=>document.querySelectorAll('[data-testid=reg-row]').length>0", timeout=30000)
+    allrows=pg.eval_on_selector_all("[data-testid=reg-row]","e=>e.length")
+    pg.click("[data-testid=reg-f-issued]")
+    pg.wait_for_function("()=>[...document.querySelectorAll('[data-testid=reg-row]')].every(e=>e.dataset.status==='issued')", timeout=30000)
+    onlyissued=pg.eval_on_selector_all("[data-testid=reg-row]","e=>e.length")
+    chips=pg.inner_text("[data-testid=register]")
+    ok("S35e 화면: 대장이 뜨고 '발행' 칩을 누르면 발행본만 남는다 · 칩 숫자는 걸러도 그대로다(전체 수가 0 이 되지 않는다)",
+       (allrows, onlyissued, chips.split("\n")[1][:40]), allrows>onlyissued>0 and f"전체 {allrows}" in chips)
+    pg.screenshot(path=f"{OUT}/52_register.png",full_page=True)
+
     # ── P3-a 플랫폼 관리자 계층 · DB①/DB② 소유 분리 (p54 User Management · p59 최종 승인 · p64 Admin.) ──
     # S16 회사 관리자가 Company Info.에서 Special 의뢰를 올린다 = 회사→플랫폼 유일 통로
     pg.goto(BASE+"/m/company",wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=user-management]",timeout=30000); time.sleep(1.5); nuke(pg)

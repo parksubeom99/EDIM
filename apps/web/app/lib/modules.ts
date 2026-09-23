@@ -25,6 +25,8 @@ export const MODULES: ModuleDef[] = [
   { key: "sales", label: "Sales", roles: ["owner", "sales"] },
   { key: "tech", label: "Tech", roles: ["owner", "engineer", "cad"] },
   { key: "purchasing", label: "Purchasing", roles: ["owner", "engineer"] },
+  // p55 승인 대장 — 문서·도면을 한 표로 본다(읽기 전용). 보기만 하므로 열람 역할까지 연다.
+  { key: "register", label: "승인 대장", roles: ALL },
   { key: "material", label: "Material", roles: ["owner", "engineer"] },
   { key: "product", label: "Product", roles: ["owner", "engineer"] },
   { key: "qc", label: "QC", roles: ["owner", "engineer"] },
