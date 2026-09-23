@@ -53,9 +53,9 @@ export function parseTables(v: unknown): Record<string, TechTable> | "invalid" {
     if (typeof t.no !== "number" || !Number.isInteger(t.no) || t.no < 1 || nos.has(t.no)) return "invalid"; // TableN must be unique
     nos.add(t.no);
     // p16/p51 Table Type — 기본은 tech. dim(Key Dimension)은 제품 코드당 하나만.
-    let role: "tech" | "dim" | "buy" | undefined;
+    let role: "tech" | "dim" | "buy" | "rule" | undefined;
     if (t.role !== undefined && t.role !== null) {
-      if (t.role !== "tech" && t.role !== "dim" && t.role !== "buy") return "invalid";  // buy = p32 구매 속성표
+      if (t.role !== "tech" && t.role !== "dim" && t.role !== "buy" && t.role !== "rule") return "invalid";  // buy = p32 구매 속성 · rule = p36 설계 검증
       role = t.role;
       if (role === "dim") { if (dimSeen) return "invalid"; dimSeen = true; }
     }

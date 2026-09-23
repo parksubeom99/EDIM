@@ -228,6 +228,7 @@ function ProductTab({ cat, reload, say }: TabProps) {
                     <option value="tech">tech · 기술/원가</option>
                     <option value="dim">dim · 도면 치수</option>
                     <option value="buy">buy · 구매 속성</option>
+                    <option value="rule">rule · 설계 검증</option>
                   </select>
                   {cat.canEdit && <><button type="button" onClick={() => addRow(tName)} style={{ ...btn(), padding: "2px 8px", marginLeft: "auto" }}>+ 행</button><button type="button" onClick={() => addCol(tName)} style={{ ...btn(), padding: "2px 8px" }}>+ 열</button></>}
                 </div>

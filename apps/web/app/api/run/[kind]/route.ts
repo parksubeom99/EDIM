@@ -4,7 +4,7 @@ import { canEditProject } from "@/app/lib/project-perms";
 import { runApprovedForSession } from "@/app/lib/macro/run";
 import type { SlotValues } from "@/app/lib/rccs";
 import { buildEbom, buildCost } from "@/app/lib/output/bom";
-import { runBomCode, toBomLine, catalogFingerprint, dimsFor, sectionDimsFor } from "@edim/bom-code";
+import { runBomCode, toBomLine, catalogFingerprint, dimsFor, sectionDimsFor, designRulesOf, checkDesign } from "@edim/bom-code";
 import { loadCatalog } from "@/app/lib/catalog";
 import { withTenant, saveBomCodeRun, getBomRun, revisionIdForSlots } from "@edim/db";
 
@@ -110,7 +110,13 @@ export async function POST(
     const productForDims = catalog.productCodes.find((p) => p.code === result.parent && p.kind === "product");
     const drSnap = productForDims ? dimsFor(productForDims, slots) : null;
     const secDims = productForDims && drSnap && drSnap.ok ? sectionDimsFor(productForDims, slots, drSnap.dims.L, macroValue) : [];
-    const dimsSnap = drSnap && drSnap.ok ? { ...drSnap.dims, item: drSnap.item, tableName: drSnap.tableName, sections: secDims } : null;
+    // 설계 검증(p36 Design Verification) — 규칙은 등록된 role="rule" 표에서 오고, 결과를 **스냅샷에 박는다**.
+    // 지금 규칙을 나중에 고쳐도 이미 뜬 스냅샷의 판정은 그대로다(0011 과 같은 원칙).
+    const rules = productForDims ? designRulesOf(productForDims) : [];
+    const violations = drSnap && drSnap.ok ? checkDesign(rules, drSnap.dims, secDims) : [];
+    const dimsSnap = drSnap && drSnap.ok
+      ? { ...drSnap.dims, item: drSnap.item, tableName: drSnap.tableName, sections: secDims, rules: rules.length, violations }
+      : null;
     const snap = await withTenant(session.tenantId, async (tx) =>
       saveBomCodeRun(tx, {
         stableId: node,
@@ -124,7 +130,7 @@ export async function POST(
       }),
     );
     // 등록된 Key Dimension 을 함께 돌려준다 — 화면이 치수를 따로 계산하지 않도록.
-    const dims = dimsSnap ? { W: dimsSnap.W, H: dimsSnap.H, L: dimsSnap.L, item: dimsSnap.item, sections: result.sections?.length ?? 0 } : null;
+    const dims = dimsSnap ? { W: dimsSnap.W, H: dimsSnap.H, L: dimsSnap.L, item: dimsSnap.item, sections: result.sections?.length ?? 0, rules: rules.length, violations } : null;
     return NextResponse.json({ ...base, lines, trace, mainCode: result.mainCode, catalogFp, runId: snap.id, macroValue, dims, message: `BOM ${lines.length}행 · 코드 관계 ${result.parent} · 스냅샷 ${snap.id.slice(0, 8)}` });
   }
   return NextResponse.json({

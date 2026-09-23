@@ -437,6 +437,29 @@ with sync_playwright() as p:
     ok("S32h Delete — 관계가 없는 구획은 지워지고 도면에서도 사라진다 (전장도 그만큼 줄어든다)",
        (rm.status, "Silencer" in metaG.get("sections",[]), metaF.get("lengthMm")-metaG.get("lengthMm")),
        rm.status==200 and "Silencer" not in metaG.get("sections",[]) and metaF.get("lengthMm")-metaG.get("lengthMm")==600)
+    # ── S40 Design Tool Binding — Design Verification (p36·p60 · 코퍼스 Arrangement Design Tool Binding) ──
+    rV1=run55("S40"); dv=rV1.get("dims",{})
+    ok("S40a 등록된 설계 규칙이 BOM Run 마다 돌고, 판정이 스냅샷에 박힌다 (지금은 통과)",
+       (dv.get("rules"), dv.get("violations")), dv.get("rules",0)>0 and dv.get("violations")==[])
+    okdxf=ctx.request.get(BASE+f"/api/dxf?runId={rV1['runId']}&type=plan")
+    ok("S40b 통과면 도면이 나온다", okdxf.status, okdxf.status==200)
+    # 구획을 늘려 전장 운반 한계(L max 9000)를 일부러 넘긴다
+    g3=ctx.request.get(ARR+"?code=EU&slots="+json.dumps({"A":"EU","B":"55","C":"2123","D":"630","E":"SS","F":"1-21-13-15"})).json()
+    big=[{"name":x["name"], "len":4000, **({"dir":x["dir"]} if x.get("dir") else {}), "components":x.get("components",[])} for x in g3["sections"]]
+    put(big)
+    rV2=run55("S40BAD"); dv2=rV2.get("dims",{})
+    ok("S40c 규칙을 넘기면 위반이 그 스냅샷에 박힌다 (전장 운반 한계 L max 9000)",
+       (dv2.get("violations") or [{}])[0], any(v.get("target")=="L" for v in dv2.get("violations",[])))
+    bad5=ctx.request.get(BASE+f"/api/dxf?runId={rV2['runId']}&type=plan")
+    ok("S40d 위반이면 **도면을 뜨지 않는다** (422 · 검증 안 된 도면이 밖으로 나가지 않게)",
+       (bad5.status, bad5.text()[:60]), bad5.status==422)
+    bad6=ctx.request.post(BASE+"/api/drawings",headers=J0,data=json.dumps({"runId":rV2["runId"],"type":"iso"}))
+    ok("S40e 등록도 같은 이유로 막힌다 (3D 투영도 예외 없음)", bad6.status, bad6.status==422)
+    # 원상 복구 후, 앞서 통과한 스냅샷은 여전히 도면이 나온다
+    put([{"name":x["name"], **({"len":x["len"]} if x.get("len") is not None else {}), **({"dir":x["dir"]} if x.get("dir") else {}), "components":x.get("components",[])} for x in g3["sections"]])
+    still=ctx.request.get(BASE+f"/api/dxf?runId={rV1['runId']}&type=plan")
+    ok("S40f 규칙을 고쳐도 앞서 통과한 스냅샷의 판정은 그대로다 (판정도 스냅샷 — 0011 원칙)", still.status, still.status==200)
+
     # ── S39 3D View 1차 (0013 · 코퍼스 "3D View" ISO·Exploded) ──
     # 형상 모델이 아니라 **같은 스냅샷의 등각 투영**이다 — 치수가 2D 뷰와 어긋나지 않는 것이 핵심.
     rI=run55("S39"); RIDI=rI["runId"]

@@ -52,6 +52,15 @@ export async function dxfSourceFromRun(tenantId: string, runId: string): Promise
   // 0011 이전 스냅샷(dims 없음)은 추측하지 않고 거부한다.
   const d = parseDims(run.dims);
   if (!d) return { ok: false, status: 422, error: "이 BOM 스냅샷에는 치수가 저장돼 있지 않습니다(0011 이전 실행) — BOM Run 을 다시 하십시오" };
+  // 설계 검증(p36) — 스냅샷에 박힌 판정이 위반이면 도면을 뜨지 않는다. 검증 안 된 도면이 밖으로 나가지 않게.
+  const vio = (run.dims as Record<string, unknown> | null)?.violations;
+  if (Array.isArray(vio) && vio.length > 0) {
+    const why = vio.map((v) => {
+      const o2 = v as Record<string, unknown>;
+      return `${String(o2.name)}(${String(o2.target)} ${String(o2.op)} ${String(o2.limit)} · 지금 ${String(o2.actual)})`;
+    }).join(", ");
+    return { ok: false, status: 422, error: `설계 검증 위반이라 도면을 뜰 수 없습니다: ${why} — 치수·구획을 고치고 BOM Run 을 다시 하십시오` };
+  }
 
   const raw = Array.isArray(run.lines) ? (run.lines as SnapLine[]) : [];
   const items: DrawingItem[] = raw.map((l, i) => ({

@@ -61,10 +61,11 @@ export interface TechTable {
    */
   /**
    * tech = 기술 표(사양·원가 참조) · dim = Key Dimension(도면) ·
-   * buy  = 구매 속성(p32 Material code & General purchase items — Supplier·V·Hz·IP·Insulation…).
+   * buy  = 구매 속성(p32 Material code & General purchase items — Supplier·V·Hz·IP·Insulation…) ·
+   * rule = 설계 검증 규칙(p36·p60 Design Verification Tool · 코퍼스 "Design Tool Binding").
    *   buy 표는 슬롯으로 행을 고르지 않는 경우가 많아, 행이 하나면 그 행을 쓴다.
    */
-  role?: "tech" | "dim" | "buy";
+  role?: "tech" | "dim" | "buy" | "rule";
   by: SlotKey;
   /** Item used when the slot is EMPTY (a chosen value without a row is an error) */
   default: string;
@@ -225,6 +226,59 @@ export function buyAttrsOf(code: ProductCode, slots: SlotValues = {}): Record<st
   for (const c of t.cols) {
     const v = row.cells[c.key];
     if (v !== undefined && v !== null && String(v) !== "") out[c.name] = String(v);
+  }
+  return out;
+}
+
+/**
+ * 설계 검증 규칙 (p36·p60 "Design Verification" · 코퍼스 Arrangement Design Tool Binding).
+ * role="rule" 표의 한 행 = 규칙 하나. 열 이름으로 읽는다 — target · op · value (· name 은 선택).
+ *   target: L(전장=구획 길이 합) · W · H · SECTIONS(구획 수) · COMPONENTS(배치된 부품 수)
+ *   op: max(이하) · min(이상)
+ * 규칙이 없으면 검사도 없다 — 없는 규칙을 지어내지 않는다.
+ */
+export interface DesignRule { name: string; target: string; op: "max" | "min"; value: number }
+export interface RuleViolation { name: string; target: string; op: "max" | "min"; limit: number; actual: number }
+
+const RULE_TARGETS = ["L", "W", "H", "SECTIONS", "COMPONENTS"] as const;
+
+export function designRulesOf(product: ProductCode): DesignRule[] {
+  const t = Object.values(product.tables ?? {}).find((x) => x.role === "rule");
+  if (!t) return [];
+  const colOf = (nm: string) => t.cols.find((c) => c.name.toLowerCase() === nm)?.key;
+  const kT = colOf("target"), kO = colOf("op"), kV = colOf("value"), kN = colOf("name");
+  if (!kT || !kO || !kV) return [];
+  const out: DesignRule[] = [];
+  for (const r of t.rows) {
+    const target = String(r.cells[kT] ?? "").toUpperCase();
+    const op = String(r.cells[kO] ?? "").toLowerCase();
+    const value = Number(r.cells[kV]);
+    if (!(RULE_TARGETS as readonly string[]).includes(target)) continue;
+    if (op !== "max" && op !== "min") continue;
+    if (!Number.isFinite(value)) continue;
+    out.push({ name: String(r.cells[kN ?? ""] ?? r.item ?? target), target, op, value });
+  }
+  return out;
+}
+
+/** 규칙을 지금 치수·구획에 대 본다. 통과면 빈 배열. */
+export function checkDesign(
+  rules: DesignRule[],
+  dims: { W: number; H: number; L: number },
+  secDims: SectionDim[],
+): RuleViolation[] {
+  const totalL = secDims.length > 0 ? secDims.reduce((a, s) => a + s.len, 0) : dims.L;
+  const actualOf = (target: string): number =>
+    target === "L" ? totalL
+    : target === "W" ? dims.W
+    : target === "H" ? dims.H
+    : target === "SECTIONS" ? secDims.length
+    : secDims.reduce((a, s) => a + (s.components?.length ?? 0), 0);
+  const out: RuleViolation[] = [];
+  for (const r of rules) {
+    const actual = actualOf(r.target);
+    const bad = r.op === "max" ? actual > r.value : actual < r.value;
+    if (bad) out.push({ name: r.name, target: r.target, op: r.op, limit: r.value, actual });
   }
   return out;
 }

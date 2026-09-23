@@ -194,3 +194,12 @@ Inspector 의 "일정 없음" 한 줄을 실제 일정 상자로 바꿨다 — *
 - 등록 번호 `-ISO` · `-EXP`, 승인 대장에 여섯 종이 한 표로 뜬다(S39g). 실제 형상 모델(gltf)은 400 으로 막는다 — 있는 척하지 않는다(S39h) · DB CHECK 도 거부(drawing:test 23).
 - 기운 선 실측으로 투영이 진짜 돌아갔음을 단언한다(S39d: 등각도는 기운 선 있음 · 평면도는 0).
 - e2e S39a~h → **159/159**. 남은 Arrangement: Design Tool Binding · 실제 3D 뷰어(glTF/WebGL).
+
+#### Design Tool Binding 1차 — Design Verification (2026-09-23 · 청사진 p36·p60 · 코퍼스 "Arrangement Design Tool Binding")
+제품 코드에 role="rule" 표를 등록하면 그것이 **설계 검증 도구**가 된다. 한 행 = 규칙 하나: `target`(L 전장 · W · H · SECTIONS 구획 수 · COMPONENTS 배치 부품 수) · `op`(max/min) · `value`. 규칙이 없으면 검사도 없다 — 없는 기준을 지어내지 않는다.
+- **판정을 스냅샷에 박는다**: BOM Run 때 검사해 `dims.violations` 로 저장한다. 규칙을 나중에 고쳐도 앞서 통과한 스냅샷의 판정은 그대로다(S40f · 0011 원칙).
+- **위반이면 도면을 뜨지 않는다** — /api/dxf 와 등록 모두 422, 이유(규칙 이름 · 한계 · 지금 값)를 문장으로 돌려준다. 3D 투영도 예외 없다(S40e). 검증 안 된 도면이 밖으로 나가지 않게.
+- 화면: Design 탭 도면 줄 위에 "설계 검증 통과 · 규칙 3" 또는 위반 내역 배지. 화면은 판정을 다시 재지 않고 스냅샷 값을 보여 준다.
+- 시드 규칙 3건(전장 운반 한계 9000 · 최소 폭 600 · 구획 수 상한 9)은 **샘플** — 회사 실 설계 기준으로 교체 대상(회장님 몫).
+- e2e S40a~f → **165/165**.
+- 청사진 p60 Design Tool 범례 현황: Key Dimension ✓(dim 표) · Component Placement ✓(p36 배치) · Assembly Sequence ✓(분해도 번호) · **Design Verification ✓(이번)** · Detail Dimension ✗ · QC/Material Note ✗ · Macro Run Tool 은 Toolbox 쪽에만.

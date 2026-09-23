@@ -493,7 +493,7 @@ function DesignCanvas({ code, slots, runs, nodeStable, canEdit }: { code: string
         >
           조립도 DXF
         </a>
-        <DrawingRegister runId={runId} nodeStable={nodeStable} canEdit={canEdit} />
+        <DrawingRegister runId={runId} nodeStable={nodeStable} canEdit={canEdit} verify={runs.find((r) => r.kind === "bom" && r.runId)?.dims} />
         <span style={muted}>
           {runId
             ? "치수는 등록된 Key Dimension 표(p38~40)에서 옵니다. R12 DXF — AutoCAD·FreeCAD"
@@ -637,7 +637,7 @@ function KeyDims({ slots, runs }: { slots: SlotValues; runs: RunResult[] }) {
 const DRAW_LABEL: Record<string, string> = { draft: "작성중", review: "검토", approved: "승인", issued: "발행" };
 const DRAW_NEXT: Record<string, string> = { draft: "review", review: "approved", approved: "issued" };
 
-function DrawingRegister({ runId, nodeStable, canEdit }: { runId: string | null; nodeStable: string | null; canEdit: boolean }) {
+function DrawingRegister({ runId, nodeStable, canEdit, verify }: { runId: string | null; nodeStable: string | null; canEdit: boolean; verify?: RunResult["dims"] }) {
   const [rows, setRows] = useState<{ id: string; drawingNo: string; currentRev: string; status: string; drawingType: string; meta: unknown }[]>([]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -669,6 +669,21 @@ function DrawingRegister({ runId, nodeStable, canEdit }: { runId: string | null;
   return (
     <span data-testid="drawing-register" style={{ display: "inline-flex", flexDirection: "column", gap: 6 }}>
       <span style={{ display: "inline-flex", gap: 8 }}>
+        {(() => {
+          // p36 Design Verification — 판정은 BOM Run 때 스냅샷에 박힌 값을 그대로 보여 준다(화면이 다시 재지 않는다)
+          const d = verify;
+          if (!d || !d.rules) return null;
+          const v = d.violations ?? [];
+          return (
+            <span data-testid="design-verify" data-ok={v.length === 0}
+              style={{ fontSize: "var(--fs-12)", padding: "5px 10px", borderRadius: "var(--radius-sm)", border: "1px solid var(--line)",
+                background: v.length === 0 ? "var(--surface-2)" : "#fdecec", color: v.length === 0 ? "var(--ink-muted)" : "#b4232a" }}>
+              {v.length === 0
+                ? `설계 검증 통과 · 규칙 ${d.rules}`
+                : `설계 검증 위반 ${v.length} — ${v.map((x) => `${x.name}(${x.target} ${x.op} ${x.limit} · 지금 ${x.actual})`).join(", ")} · 도면은 뜨지 않습니다`}
+            </span>
+          );
+        })()}
         <button type="button" data-testid="drawing-make-plan" disabled={!runId || !canEdit || busy} onClick={() => void make("plan")}
           style={{ fontSize: "var(--fs-12)", padding: "5px 10px", background: "var(--surface-2)", color: "var(--ink)", border: "1px solid var(--line)", borderRadius: "var(--radius-sm)", opacity: runId && canEdit ? 1 : 0.5 }}>
           평면도 등록

@@ -480,6 +480,63 @@
               }
             }
           ]
+        },
+        "rule": {
+          "no": 8,
+          "by": "F",
+          "default": "",
+          "role": "rule",
+          "cols": [
+            {
+              "key": "A",
+              "name": "name",
+              "label": "규칙"
+            },
+            {
+              "key": "B",
+              "name": "target",
+              "label": "대상"
+            },
+            {
+              "key": "C",
+              "name": "op",
+              "label": "연산"
+            },
+            {
+              "key": "D",
+              "name": "value",
+              "label": "값"
+            }
+          ],
+          "rows": [
+            {
+              "item": "R1",
+              "cells": {
+                "A": "전장 운반 한계",
+                "B": "L",
+                "C": "max",
+                "D": "9000"
+              }
+            },
+            {
+              "item": "R2",
+              "cells": {
+                "A": "최소 폭",
+                "B": "W",
+                "C": "min",
+                "D": "600"
+              }
+            },
+            {
+              "item": "R3",
+              "cells": {
+                "A": "구획 수 상한",
+                "B": "SECTIONS",
+                "C": "max",
+                "D": "9"
+              }
+            }
+          ]
         }
       },
       "sections": [
