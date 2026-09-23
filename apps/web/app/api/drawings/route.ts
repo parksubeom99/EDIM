@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
 
   const { dxf, meta } = buildView(type, src.input);
   // 도면번호 = 코드 + 종류. 같은 번호를 다시 뜨면 개정(A→B)이 붙는다.
-  const NO: Record<string, string> = { plan: "PLN", assembly: "ASM", front: "FRT", right: "RHT" };
+  const NO: Record<string, string> = { plan: "PLN", assembly: "ASM", front: "FRT", right: "RHT", iso: "ISO", exploded: "EXP" };
   const drawingNo = `${src.run.code}-${NO[type]}`;
   const row = await withTenant(session.tenantId, (tx) =>
     saveDrawing(tx, {

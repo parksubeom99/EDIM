@@ -43,7 +43,7 @@ export interface SaveDrawingInput {
   stableId: string | null;
   bomRunId: string;
   drawingNo: string;
-  drawingType: "plan" | "assembly" | "front" | "right";
+  drawingType: "plan" | "assembly" | "front" | "right" | "iso" | "exploded";
   code: string;
   dxf: string;
   meta: object;

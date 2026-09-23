@@ -148,18 +148,24 @@ async function main(): Promise<void> {
     saveDrawing(tx, { stableId: IDS.a_proj, bomRunId: withDims.id, drawingNo: "TEST-RHT", drawingType: "right", code: "EU-55-TEST", dxf: "0\nEOF\n", meta: { type: "right" }, createdBy: IDS.ownerA }),
   );
   check("0012: 우측면도(right) 가 저장된다", right.drawingType === "right");
+  for (const t of ["iso", "exploded"] as const) {
+    const row = await withTenant(IDS.tenantA, (tx) =>
+      saveDrawing(tx, { stableId: IDS.a_proj, bomRunId: withDims.id, drawingNo: `TEST-${t.toUpperCase()}`, drawingType: t, code: "EU-55-TEST", dxf: "0\nEOF\n", meta: { type: t }, createdBy: IDS.ownerA }),
+    );
+    check(`0013: 3D 투영 ${t} 가 저장된다`, row.drawingType === t);
+  }
   let badBlocked = false;
   try {
     await adminPrisma.$executeRawUnsafe(
       `INSERT INTO "drawing" (tenant_id, bom_run_id, drawing_no, drawing_type, code, dxf, created_by)
-       VALUES ('${IDS.tenantA}','${withDims.id}','TEST-BAD','iso_3d','EU-55-TEST','0\nEOF\n','${IDS.ownerA}')`,
+       VALUES ('${IDS.tenantA}','${withDims.id}','TEST-BAD','gltf_3d','EU-55-TEST','0\nEOF\n','${IDS.ownerA}')`,
     );
   } catch { badBlocked = true; }
-  check("0012: 목록 밖 종류(iso_3d · 아직 3D 미착수)는 DB 가 거부한다 — 앱을 우회해도", badBlocked);
+  check("0013: 목록 밖 종류(gltf_3d · 실제 형상 모델은 미착수)는 DB 가 거부한다 — 앱을 우회해도", badBlocked);
 
   // 정리 (발행 잠금 때문에 트리거를 내리고 지운다 — 검증용 잔재만)
   await adminPrisma.$executeRawUnsafe(`ALTER TABLE "drawing" DISABLE TRIGGER USER`);
-  await adminPrisma.drawing.deleteMany({ where: { drawingNo: { in: ["TEST-PLN", "TEST-FRT", "TEST-RHT"] } } });
+  await adminPrisma.drawing.deleteMany({ where: { drawingNo: { in: ["TEST-PLN", "TEST-FRT", "TEST-RHT", "TEST-ISO", "TEST-EXPLODED"] } } });
   await adminPrisma.$executeRawUnsafe(`ALTER TABLE "drawing" ENABLE TRIGGER USER`);
   await adminPrisma.projectApproval.deleteMany({ where: { note: { contains: "· test" } } });
   await adminPrisma.projectApproval.deleteMany({ where: { bomRun: { catalogFp: "test" } } });

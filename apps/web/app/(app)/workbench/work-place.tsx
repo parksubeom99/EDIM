@@ -473,6 +473,20 @@ function DesignCanvas({ code, slots, runs, nodeStable, canEdit }: { code: string
           우측면도 DXF
         </a>
         <a
+          data-testid="dxf-iso"
+          href={runId ? `/api/dxf?runId=${runId}&type=iso` : "#"}
+          style={{ fontSize: "var(--fs-12)", color: "var(--ink)", background: "var(--surface-2)", border: "1px solid var(--line)", borderRadius: "var(--radius-sm)", padding: "5px 10px", textDecoration: "none", opacity: runId ? 1 : 0.5, pointerEvents: runId ? "auto" : "none" }}
+        >
+          3D 등각도 DXF
+        </a>
+        <a
+          data-testid="dxf-exploded"
+          href={runId ? `/api/dxf?runId=${runId}&type=exploded` : "#"}
+          style={{ fontSize: "var(--fs-12)", color: "var(--ink)", background: "var(--surface-2)", border: "1px solid var(--line)", borderRadius: "var(--radius-sm)", padding: "5px 10px", textDecoration: "none", opacity: runId ? 1 : 0.5, pointerEvents: runId ? "auto" : "none" }}
+        >
+          분해도 DXF
+        </a>
+        <a
           data-testid="dxf-assembly"
           href={runId ? `/api/dxf?runId=${runId}&type=assembly` : "#"}
           style={{ fontSize: "var(--fs-12)", color: "var(--ink)", background: "var(--surface-2)", border: "1px solid var(--line)", borderRadius: "var(--radius-sm)", padding: "5px 10px", textDecoration: "none", opacity: runId ? 1 : 0.5, pointerEvents: runId ? "auto" : "none" }}
@@ -635,7 +649,7 @@ function DrawingRegister({ runId, nodeStable, canEdit }: { runId: string | null;
   }, [nodeStable]);
   useEffect(() => { void load(); }, [load]);
 
-  async function make(type: "plan" | "front" | "right" | "assembly") {
+  async function make(type: "plan" | "front" | "right" | "assembly" | "iso" | "exploded") {
     if (!runId || busy) return;
     setBusy(true); setErr(null);
     const r = await fetch("/api/drawings", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ runId, type }) });
@@ -667,6 +681,15 @@ function DrawingRegister({ runId, nodeStable, canEdit }: { runId: string | null;
         <button type="button" data-testid="drawing-make-right" disabled={!runId || !canEdit || busy} onClick={() => void make("right")}
           style={{ fontSize: "var(--fs-12)", padding: "5px 10px", background: "var(--surface-2)", color: "var(--ink)", border: "1px solid var(--line)", borderRadius: "var(--radius-sm)", opacity: runId && canEdit ? 1 : 0.5 }}>
           우측면도 등록
+        </button>
+        {/* 3D 투영(0013 · 코퍼스 3D View) — 형상 모델이 아니라 같은 스냅샷의 등각 투영이다 */}
+        <button type="button" data-testid="drawing-make-iso" disabled={!runId || !canEdit || busy} onClick={() => void make("iso")}
+          style={{ fontSize: "var(--fs-12)", padding: "5px 10px", background: "var(--surface-2)", color: "var(--ink)", border: "1px solid var(--line)", borderRadius: "var(--radius-sm)", opacity: runId && canEdit ? 1 : 0.5 }}>
+          3D 등각도 등록
+        </button>
+        <button type="button" data-testid="drawing-make-exploded" disabled={!runId || !canEdit || busy} onClick={() => void make("exploded")}
+          style={{ fontSize: "var(--fs-12)", padding: "5px 10px", background: "var(--surface-2)", color: "var(--ink)", border: "1px solid var(--line)", borderRadius: "var(--radius-sm)", opacity: runId && canEdit ? 1 : 0.5 }}>
+          분해도 등록
         </button>
         <button type="button" data-testid="drawing-make-assembly" disabled={!runId || !canEdit || busy} onClick={() => void make("assembly")}
           style={{ fontSize: "var(--fs-12)", padding: "5px 10px", background: "var(--surface-2)", color: "var(--ink)", border: "1px solid var(--line)", borderRadius: "var(--radius-sm)", opacity: runId && canEdit ? 1 : 0.5 }}>

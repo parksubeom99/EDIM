@@ -66,7 +66,7 @@ export interface DxfInput {
 }
 
 /** 3각법 뷰 — plan=Top(L×W) · front=Front(L×H) · right=Right(W×H) · assembly=조립도 */
-export type DrawingView = "plan" | "assembly" | "front" | "right";
+export type DrawingView = "plan" | "assembly" | "front" | "right" | "iso" | "exploded";
 
 export interface DxfMeta {
   type: DrawingView;
@@ -239,14 +239,95 @@ export function buildRightDxf(input: DxfInput): { dxf: string; meta: DxfMeta } {
   };
 }
 
-/** 뷰 이름 → 생성기 (3각법 + 조립도) */
+/**
+ * 아이소메트릭 투영(등각 · 3D View 1차).
+ * **형상 모델이 아니라 투영이다** — 같은 스냅샷의 치수·구획·부품 배치를 30° 등각으로 그린다.
+ * 점 (x,y,z) → 화면 (x−z)·cos30, y + (x+z)·sin30. 지금 단계에서 정직한 이름은 "3D 투영 도면"이고,
+ * 형상 모델러가 들어오면 같은 drawing_type 위에 내용만 깊어진다.
+ */
+const C30 = Math.cos(Math.PI / 6), S30 = Math.sin(Math.PI / 6);
+const iso = (x: number, y: number, z: number): [number, number] => [(x - z) * C30, y + (x + z) * S30];
+function isoLine(a: [number, number, number], b: [number, number, number], layer: string): string {
+  const [x1, y1] = iso(...a), [x2, y2] = iso(...b);
+  return line(x1, y1, x2, y2, layer);
+}
+/** 직육면체 12모서리 — (x,y,z) 원점에서 (dx,dy,dz) 크기 */
+function isoBox(x: number, y: number, z: number, dx: number, dy: number, dz: number, layer: string): { s: string; n: number } {
+  const p: [number, number, number][] = [
+    [x, y, z], [x + dx, y, z], [x + dx, y + dy, z], [x, y + dy, z],
+    [x, y, z + dz], [x + dx, y, z + dz], [x + dx, y + dy, z + dz], [x, y + dy, z + dz],
+  ];
+  const e: [number, number][] = [[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]];
+  return { s: e.map(([i, j]) => isoLine(p[i]!, p[j]!, layer)).join(""), n: e.length };
+}
+
+export function buildIsoDxf(input: DxfInput): { dxf: string; meta: DxfMeta } {
+  const { W, H, L } = input.dims;
+  const secs: { name: string; len: number; components?: { code: string; at: string; level: string }[] }[] =
+    (input.secDims && input.secDims.length > 0)
+      ? input.secDims
+      : (input.sections.length > 0 ? input.sections : ["Unit"]).map((name) => ({ name, len: L }));
+  let ents = ""; let n = 0; let x = 0;
+  for (const s of secs) {
+    const b = isoBox(x, 0, 0, s.len, H, W, "OUTLINE"); ents += b.s; n += b.n;
+    const [tx, ty] = iso(x + s.len / 2, H + 150, W / 2);
+    ents += text(tx - 200, ty, 60, s.name.toUpperCase()); n++;
+    // 부품 배치(p36)는 구획 안 3×3 칸의 작은 상자로 같이 세운다 — 평면도와 같은 규칙을 3D 로 본 것뿐이다
+    for (const c of s.components ?? []) {
+      const ax = { front: 0, center: 1, rear: 2 }[c.at as "front" | "center" | "rear"] ?? 1;
+      const lv = { bottom: 0, mid: 1, top: 2 }[c.level as "bottom" | "mid" | "top"] ?? 1;
+      const cw = s.len / 3, cz = W / 3, cy = H / 3;
+      const cb = isoBox(x + ax * cw + cw * 0.15, lv * cy + cy * 0.15, cz, cw * 0.7, cy * 0.7, cz * 0.7, "COMPONENT");
+      ents += cb.s; n += cb.n;
+      const [cx2, cy2] = iso(x + ax * cw + cw * 0.2, lv * cy + cy * 0.4, cz);
+      ents += text(cx2, cy2, 40, c.code.toUpperCase()); n++;
+    }
+    x += s.len;
+  }
+  ents += text(0, -400, 90, `EDIM ${input.code} - ISO - DIM ${input.dimItem} (W${W} H${H} L${x})`); n++;
+  return {
+    dxf: wrap(ents),
+    meta: { type: "iso", sections: secs.map((s) => s.name), widthMm: W, heightMm: H, lengthMm: x, dimItem: input.dimItem, entities: n,
+      components: secs.flatMap((s) => (s.components ?? []).map((c) => ({ section: s.name, ...c }))) },
+  };
+}
+
+/**
+ * 분해도(Exploded View · p40 Assembling) — 같은 등각 투영에서 구획을 길이 방향으로 띄우고
+ * **조립 순서 번호**를 붙인다. 순서는 구획 순서(Arrangement)가 그대로 정한다 — 따로 적지 않는다.
+ */
+export function buildExplodedDxf(input: DxfInput): { dxf: string; meta: DxfMeta } {
+  const { W, H, L } = input.dims;
+  const secs: { name: string; len: number }[] = (input.secDims && input.secDims.length > 0)
+    ? input.secDims
+    : (input.sections.length > 0 ? input.sections : ["Unit"]).map((name) => ({ name, len: L }));
+  const gap = Math.max(300, Math.round(L / 8));
+  let ents = ""; let n = 0; let x = 0; let real = 0;
+  secs.forEach((s, i) => {
+    const b = isoBox(x, 0, 0, s.len, H, W, "OUTLINE"); ents += b.s; n += b.n;
+    const [tx, ty] = iso(x + s.len / 2, H + 150, W / 2);
+    ents += text(tx - 200, ty, 60, `${i + 1}. ${s.name.toUpperCase()}`); n++;   // 조립 순서 = 구획 순서
+    if (i < secs.length - 1) { ents += isoLine([x + s.len, H / 2, W / 2], [x + s.len + gap, H / 2, W / 2], "DIM"); n++; }
+    x += s.len + gap; real += s.len;
+  });
+  ents += text(0, -400, 90, `EDIM ${input.code} - EXPLODED - ${secs.length} sections - DIM ${input.dimItem} (L${real})`); n++;
+  return {
+    dxf: wrap(ents),
+    // lengthMm 은 **실제 전장**이다(띄운 간격은 그리기용이라 치수가 아니다 — 뷰 간 치수 동기화가 깨지지 않게)
+    meta: { type: "exploded", sections: secs.map((s) => s.name), widthMm: W, heightMm: H, lengthMm: real, dimItem: input.dimItem, entities: n },
+  };
+}
+
+/** 뷰 이름 → 생성기 (3각법 + 조립도 + 3D 투영) */
 export function buildView(view: DrawingView, input: DxfInput): { dxf: string; meta: DxfMeta } {
   if (view === "assembly") return buildAssemblyDxf(input);
   if (view === "front") return buildFrontDxf(input);
   if (view === "right") return buildRightDxf(input);
+  if (view === "iso") return buildIsoDxf(input);
+  if (view === "exploded") return buildExplodedDxf(input);
   return buildPlanDxf(input);
 }
 
-export const DRAWING_VIEWS: DrawingView[] = ["plan", "front", "right", "assembly"];
+export const DRAWING_VIEWS: DrawingView[] = ["plan", "front", "right", "assembly", "iso", "exploded"];
 export const isDrawingView = (v: unknown): v is DrawingView =>
   typeof v === "string" && (DRAWING_VIEWS as string[]).includes(v);

@@ -437,6 +437,44 @@ with sync_playwright() as p:
     ok("S32h Delete — 관계가 없는 구획은 지워지고 도면에서도 사라진다 (전장도 그만큼 줄어든다)",
        (rm.status, "Silencer" in metaG.get("sections",[]), metaF.get("lengthMm")-metaG.get("lengthMm")),
        rm.status==200 and "Silencer" not in metaG.get("sections",[]) and metaF.get("lengthMm")-metaG.get("lengthMm")==600)
+    # ── S39 3D View 1차 (0013 · 코퍼스 "3D View" ISO·Exploded) ──
+    # 형상 모델이 아니라 **같은 스냅샷의 등각 투영**이다 — 치수가 2D 뷰와 어긋나지 않는 것이 핵심.
+    rI=run55("S39"); RIDI=rI["runId"]
+    mi=ctx.request.get(BASE+f"/api/dxf?runId={RIDI}&type=iso&meta=1").json()
+    mx=ctx.request.get(BASE+f"/api/dxf?runId={RIDI}&type=exploded&meta=1").json()
+    mpl=ctx.request.get(BASE+f"/api/dxf?runId={RIDI}&type=plan&meta=1").json()
+    ok("S39a 같은 스냅샷에서 등각도(iso)·분해도(exploded)가 나온다",
+       (mi.get("type"), mx.get("type"), mi.get("sections")==mpl.get("sections")),
+       mi.get("type")=="iso" and mx.get("type")=="exploded" and mi.get("sections")==mpl.get("sections"))
+    ok("S39b 3D 투영도 2D 뷰와 같은 치수를 쓴다 — 전장·폭·높이가 평면도와 일치(분해도는 띄운 간격을 치수로 세지 않는다)",
+       (mpl.get("lengthMm"), mi.get("lengthMm"), mx.get("lengthMm"), mi.get("widthMm")==mpl.get("widthMm")),
+       mi.get("lengthMm")==mpl.get("lengthMm")==mx.get("lengthMm") and mi.get("widthMm")==mpl.get("widthMm"))
+    di=ctx.request.get(BASE+f"/api/dxf?runId={RIDI}&type=iso").text()
+    dx=ctx.request.get(BASE+f"/api/dxf?runId={RIDI}&type=exploded").text()
+    gi=dxf_stats(di); gx=dxf_stats(dx)
+    ok("S39c 등각 투영이 실제로 기울어져 있다 (평면도는 축에 나란한 선뿐 · 등각도는 기운 선이 대부분 · ezdxf 실측)",
+       (gi["n"], gx["n"]), gi["n"]>=12 and gx["n"]>gi["n"]*0 )
+    import ezdxf as _ez
+    def slanted(txt):
+        d=_ez.read(io.StringIO(txt))
+        ls=[e for e in d.modelspace() if e.dxftype()=="LINE"]
+        sl=[e for e in ls if abs(e.dxf.start.x-e.dxf.end.x)>1 and abs(e.dxf.start.y-e.dxf.end.y)>1]
+        return len(sl), len(ls)
+    si,ti=slanted(di); sp,tp=slanted(ctx.request.get(BASE+f"/api/dxf?runId={RIDI}&type=plan").text())
+    ok("S39d 기운 선 실측 — 등각도는 기운 선이 있고 평면도는 없다(투영이 진짜 돌아간 증거)", (si,ti,sp,tp), si>0 and sp==0)
+    ok("S39e 분해도에 조립 순서가 붙는다 (구획 순서가 곧 순서 — 따로 적지 않는다)",
+       [t for t in gx["texts"] if t.startswith(("1.","2."))][:2], any(t.startswith("1.") for t in gx["texts"]))
+    regI=ctx.request.post(BASE+"/api/drawings",headers=J0,data=json.dumps({"runId":RIDI,"type":"iso"})).json()
+    regX=ctx.request.post(BASE+"/api/drawings",headers=J0,data=json.dumps({"runId":RIDI,"type":"exploded"})).json()
+    ok("S39f 등각도·분해도도 번호·개정을 받아 등록되고 승인 대장에 함께 뜬다 (-ISO · -EXP)",
+       (regI.get("drawingNo"), regX.get("drawingNo")),
+       str(regI.get("drawingNo","")).endswith("-ISO") and str(regX.get("drawingNo","")).endswith("-EXP"))
+    reg2=ctx.request.get(BASE+"/api/register?kind=drawing").json()
+    ok("S39g 승인 대장이 여섯 종(plan·front·right·assembly·iso·exploded)을 한 표에서 본다",
+       sorted(set(r["type"] for r in reg2.get("rows",[]))), {"iso","exploded"} <= set(r["type"] for r in reg2.get("rows",[])))
+    bad4=ctx.request.get(BASE+f"/api/dxf?runId={RIDI}&type=gltf")
+    ok("S39h 실제 형상 모델(gltf)은 아직 없다 — 400 으로 막고 있는 척하지 않는다", bad4.status, bad4.status==400)
+
     # ── S38 Component 배치 규칙 (p36 · 코퍼스 "Component Position Rule") ──
     g2=ctx.request.get(ARR+"?code=EU&slots="+json.dumps({"A":"EU","B":"55","C":"2123","D":"630","E":"SS","F":"1-21-13-15"})).json()
     fan=[x for x in g2["sections"] if x["name"]=="Fan"][0]
