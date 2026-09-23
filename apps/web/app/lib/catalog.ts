@@ -1,8 +1,8 @@
 import type { Role } from "@edim/core-ontology";
 import { withTenant, loadCatalogRows, type CatalogRows } from "@edim/db";
 import { slotDefsFromSubCodes, type SlotDef } from "./rccs";
-import { macroTablesOf, isDirection } from "@edim/bom-code";
-import type { Catalog, Cond, CostBind, QtyBind, SectionDef, SlotKey, TechTable, Cell } from "@edim/bom-code";
+import { macroTablesOf, isDirection, isAt, isLevel } from "@edim/bom-code";
+import type { Catalog, Cond, CostBind, QtyBind, SectionDef, ComponentPos, SlotKey, TechTable, Cell } from "@edim/bom-code";
 
 /**
  * P1 — BOM Code Set-Up boundary (server). DB rows ⇄ the pure engine's Catalog.
@@ -102,7 +102,20 @@ export function parseSections(v: unknown): SectionDef[] | undefined | "invalid" 
     // Arrangement 2차: 방향(p36 L0~R270). 값이 목록 밖이면 그 코드 전체를 무효로 본다(조용한 무시 금지).
     if (s.dir !== undefined && s.dir !== null && !isDirection(s.dir)) return "invalid";
     const dir = isDirection(s.dir) ? s.dir : undefined;
-    out.push({ name: s.name, ...(c ? { when: c } : {}), ...(len !== undefined ? { len } : {}), ...(dir ? { dir } : {}) });
+    // Component 배치(p36) — 형식이 틀리면 조용히 버리지 않고 그 코드를 무효로 본다.
+    let comps: ComponentPos[] | undefined;
+    if (s.components !== undefined && s.components !== null) {
+      if (!Array.isArray(s.components)) return "invalid";
+      const acc: ComponentPos[] = [];
+      for (const raw of s.components) {
+        if (!isObj(raw)) return "invalid";
+        if (typeof raw.code !== "string" || !raw.code.trim()) return "invalid";
+        if (!isAt(raw.at) || !isLevel(raw.level)) return "invalid";
+        acc.push({ code: raw.code, at: raw.at, level: raw.level });
+      }
+      comps = acc;
+    }
+    out.push({ name: s.name, ...(c ? { when: c } : {}), ...(len !== undefined ? { len } : {}), ...(dir ? { dir } : {}), ...(comps && comps.length > 0 ? { components: comps } : {}) });
   }
   return out;
 }

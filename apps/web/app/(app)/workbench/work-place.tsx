@@ -272,7 +272,11 @@ function nextRevLabel(count: number): string {
 /* ───────────── Arrangement (p13·35·36·46·58) ───────────── */
 /** 청사진 p36 Fan Direction — 좌/우 × 0·90·180·270 */
 const DIRS = ["L0", "L90", "L180", "L270", "R0", "R90", "R180", "R270"] as const;
-interface ArrSection { name: string; len: number | null; dir: string | null; when: boolean; active: boolean; locked: boolean }
+interface ArrComp { code: string; at: string; level: string }
+interface ArrSection { name: string; len: number | null; dir: string | null; when: boolean; active: boolean; locked: boolean; components?: ArrComp[]; children?: string[] }
+/** p36 Component 배치 — 구획 안 3×3 칸 */
+const ATS: [string, string][] = [["front", "앞"], ["center", "중"], ["rear", "뒤"]];
+const LVS: [string, string][] = [["top", "상"], ["mid", "중"], ["bottom", "하"]];
 const arrTh: CSSProperties = { textAlign: "left", fontWeight: 600, padding: "2px 8px 4px 0", borderBottom: "1px solid var(--line)" };
 const arrTd: CSSProperties = { padding: "3px 8px 3px 0", borderBottom: "1px solid var(--line)", verticalAlign: "middle" };
 const arrMini = (off: boolean): CSSProperties => ({
@@ -308,7 +312,7 @@ function DesignCanvas({ code, slots, runs, nodeStable, canEdit }: { code: string
     if (!canEdit) return;
     setArrBusy(true); setArrMsg(null);
     // Arrangement 2차: 배열 순서가 곧 구획 순서(Move) · 빠진 이름은 삭제(Delete) · 새 이름은 추가(Add)
-    const body = { code: slots.A ?? "", sections: next.map((s) => ({ name: s.name, ...(s.len != null ? { len: s.len } : {}), ...(s.dir ? { dir: s.dir } : {}) })) };
+    const body = { code: slots.A ?? "", sections: next.map((s) => ({ name: s.name, ...(s.len != null ? { len: s.len } : {}), ...(s.dir ? { dir: s.dir } : {}), components: s.components ?? [] })) };
     const r = await fetch("/api/setup/arrangement", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
     const j = await r.json().catch(() => ({}));
     setArrBusy(false);
@@ -341,7 +345,7 @@ function DesignCanvas({ code, slots, runs, nodeStable, canEdit }: { code: string
           <p style={{ ...muted, margin: "0 0 6px" }}>구획 순서(↑↓) · 길이(mm) · 방향(p36 L0~R270) · 추가/삭제. 길이를 비우면 도면이 치수표의 L 로 균등 분할합니다. 저장은 다음 BOM Run 부터 반영됩니다.</p>
           <table data-testid="arr-table" style={{ borderCollapse: "collapse", fontSize: 11, color: "var(--ink)" }}>
             <thead><tr style={{ color: "var(--ink-muted)" }}>
-              <th style={arrTh}>순서</th><th style={arrTh}>구획</th><th style={arrTh}>길이(mm)</th><th style={arrTh}>방향</th><th style={arrTh}></th>
+              <th style={arrTh}>순서</th><th style={arrTh}>구획</th><th style={arrTh}>길이(mm)</th><th style={arrTh}>방향</th><th style={arrTh}>Component 배치(앞·중·뒤 / 상·중·하)</th><th style={arrTh}></th>
             </tr></thead>
             <tbody>
               {secs.map((s, i) => (
@@ -366,6 +370,37 @@ function DesignCanvas({ code, slots, runs, nodeStable, canEdit }: { code: string
                       <option value="">— 없음</option>
                       {DIRS.map((d) => <option key={d} value={d}>{d}</option>)}
                     </select>
+                  </td>
+                  <td style={arrTd}>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 4, maxWidth: 260 }} data-testid={`arr-comp-${s.name}`}>
+                      {(s.children ?? []).map((ch) => {
+                        const cur = (s.components ?? []).find((c) => c.code === ch);
+                        const set = (field: "at" | "level", v: string) => setSecs((xs) => xs.map((x, j) => {
+                          if (j !== i) return x;
+                          const rest = (x.components ?? []).filter((c) => c.code !== ch);
+                          if (!v && field === "at") return { ...x, components: rest };                    // 앞/중/뒤를 비우면 배치 해제
+                          const base = cur ?? { code: ch, at: "center", level: "mid" };
+                          return { ...x, components: [...rest, { ...base, [field]: v || base[field] }] };
+                        }));
+                        return (
+                          <span key={ch} style={{ display: "inline-flex", gap: 2, alignItems: "center", fontSize: 10 }}>
+                            <span style={{ fontFamily: "var(--font-mono)" }}>{ch}</span>
+                            <select data-testid={`arr-at-${s.name}-${ch}`} value={cur?.at ?? ""} disabled={!canEdit}
+                              onChange={(e) => set("at", e.target.value)} style={{ fontSize: 10, padding: "0 2px", border: "1px solid var(--line)", borderRadius: 3, background: "var(--surface-0)", color: "var(--ink)" }}>
+                              <option value="">—</option>
+                              {ATS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                            </select>
+                            {cur && (
+                              <select data-testid={`arr-lv-${s.name}-${ch}`} value={cur.level} disabled={!canEdit}
+                                onChange={(e) => set("level", e.target.value)} style={{ fontSize: 10, padding: "0 2px", border: "1px solid var(--line)", borderRadius: 3, background: "var(--surface-0)", color: "var(--ink)" }}>
+                                {LVS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                              </select>
+                            )}
+                          </span>
+                        );
+                      })}
+                      {(s.children ?? []).length === 0 && <span style={muted}>부품 없음</span>}
+                    </div>
                   </td>
                   <td style={arrTd}>
                     <button type="button" data-testid={`arr-del-${s.name}`} disabled={s.locked} title={s.locked ? "BOM 관계가 걸린 구획입니다" : "구획 삭제"}

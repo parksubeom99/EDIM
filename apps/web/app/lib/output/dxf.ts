@@ -61,7 +61,7 @@ export interface DxfInput {
   dimItem: string;
   sections: string[];
   /** Arrangement: 구획별 길이(mm) + 방향(p36 L0~R270). 없으면 sections.length × L 로 균등 분할. */
-  secDims?: { name: string; len: number; dir?: string }[];
+  secDims?: { name: string; len: number; dir?: string; components?: { code: string; at: string; level: string }[] }[];
   items?: DrawingItem[];
 }
 
@@ -73,6 +73,8 @@ export interface DxfMeta {
   sections: string[];
   /** 구획별 방향(없으면 null) — 평면도에만 적는다 */
   dirs?: (string | null)[];
+  /** 구획 안 부품 배치(p36) — 평면도에 상자로 그린다 */
+  components?: { section: string; code: string; at: string; level: string }[];
   widthMm: number;
   heightMm: number;
   lengthMm: number;
@@ -84,7 +86,7 @@ export interface DxfMeta {
 /** 평면 배치도 — 외형·섹션 분할·치수선. 치수는 전부 등록 표에서 온다. */
 export function buildPlanDxf(input: DxfInput): { dxf: string; meta: DxfMeta } {
   const { W, L } = input.dims;
-  const secs: { name: string; len: number; dir?: string }[] = (input.secDims && input.secDims.length > 0)
+  const secs: { name: string; len: number; dir?: string; components?: { code: string; at: string; level: string }[] }[] = (input.secDims && input.secDims.length > 0)
     ? input.secDims
     : (input.sections.length > 0 ? input.sections : ["Unit"]).map((name) => ({ name, len: L }));
   const offs: number[] = []; let acc = 0;
@@ -100,6 +102,16 @@ export function buildPlanDxf(input: DxfInput): { dxf: string; meta: DxfMeta } {
     ents += text(offs[i]! + 120, W / 2, 60, s.name.toUpperCase()); n++;
     // Arrangement 2차: 그 구획에 등록된 방향(p36 Fan Direction)을 구획 안에 적는다. 미등록이면 아무것도 안 적는다.
     if (s.dir) { ents += text(offs[i]! + 120, W / 2 - 160, 50, `DIR ${s.dir}`); n++; }
+    // Component 배치(p36) — 구획을 3×3 칸으로 보고 그 칸 가운데에 부품 상자를 그린다.
+    // Top View 라 앞·중·뒤 = 길이 방향, 상·중·하 = 폭 방향이다(높이는 정면도가 본다).
+    for (const c of s.components ?? []) {
+      const ax = { front: 0, center: 1, rear: 2 }[c.at as "front" | "center" | "rear"] ?? 1;
+      const ly = { top: 2, mid: 1, bottom: 0 }[c.level as "top" | "mid" | "bottom"] ?? 1;
+      const cw = s.len / 3, ch = W / 3;
+      const x0 = offs[i]! + ax * cw + cw * 0.15, y0 = ly * ch + ch * 0.2;
+      ents += rect(x0, y0, cw * 0.7, ch * 0.6, "COMPONENT"); n += 4;
+      ents += text(x0 + 40, y0 + ch * 0.25, 45, c.code.toUpperCase()); n++;
+    }
   });
   ents += line(0, -300, length, -300, "DIM"); ents += text(length / 2 - 200, -420, 70, `L=${length}`); n += 2;
   ents += line(-300, 0, -300, W, "DIM"); ents += text(-900, W / 2, 70, `W=${W}`); n += 2;
@@ -107,7 +119,8 @@ export function buildPlanDxf(input: DxfInput): { dxf: string; meta: DxfMeta } {
 
   return {
     dxf: wrap(ents),
-    meta: { type: "plan", sections, dirs: secs.map((s) => s.dir ?? null), widthMm: W, heightMm: input.dims.H, lengthMm: length, dimItem: input.dimItem, entities: n },
+    meta: { type: "plan", sections, dirs: secs.map((s) => s.dir ?? null),
+      components: secs.flatMap((s) => (s.components ?? []).map((c) => ({ section: s.name, ...c }))), widthMm: W, heightMm: input.dims.H, lengthMm: length, dimItem: input.dimItem, entities: n },
   };
 }
 
@@ -118,7 +131,7 @@ export function buildPlanDxf(input: DxfInput): { dxf: string; meta: DxfMeta } {
  */
 export function buildAssemblyDxf(input: DxfInput): { dxf: string; meta: DxfMeta } {
   const { W, H, L } = input.dims;
-  const secs: { name: string; len: number; dir?: string }[] = (input.secDims && input.secDims.length > 0)
+  const secs: { name: string; len: number; dir?: string; components?: { code: string; at: string; level: string }[] }[] = (input.secDims && input.secDims.length > 0)
     ? input.secDims
     : (input.sections.length > 0 ? input.sections : ["Unit"]).map((name) => ({ name, len: L }));
   const offs: number[] = []; let acc = 0;
@@ -174,7 +187,7 @@ export function buildAssemblyDxf(input: DxfInput): { dxf: string; meta: DxfMeta 
  */
 export function buildFrontDxf(input: DxfInput): { dxf: string; meta: DxfMeta } {
   const { W, H, L } = input.dims;
-  const secs: { name: string; len: number; dir?: string }[] = (input.secDims && input.secDims.length > 0)
+  const secs: { name: string; len: number; dir?: string; components?: { code: string; at: string; level: string }[] }[] = (input.secDims && input.secDims.length > 0)
     ? input.secDims
     : (input.sections.length > 0 ? input.sections : ["Unit"]).map((name) => ({ name, len: L }));
   const offs: number[] = []; let acc = 0;

@@ -83,6 +83,26 @@ export type Direction = (typeof DIRECTIONS)[number];
 export const isDirection = (v: unknown): v is Direction =>
   typeof v === "string" && (DIRECTIONS as readonly string[]).includes(v);
 
+/**
+ * Component 배치 규칙 (코퍼스 "Component Position Rule" · 청사진 p36).
+ * 구획 안에서 부품이 어디에 놓이는지를 3×3 칸으로 적는다 — 앞·중·뒤 × 상·중·하.
+ * mm 좌표가 아니라 **칸**인 이유: 지금 도면은 선과 글자 수준이고, 회사 실 CAD 규칙(기준점·기준면)이
+ * 아직 안 들어왔다. 칸은 실 규칙이 들어와도 살아남는 최소 단위다.
+ */
+export const AT = ["front", "center", "rear"] as const;
+export const LEVEL = ["top", "mid", "bottom"] as const;
+export type At = (typeof AT)[number];
+export type Level = (typeof LEVEL)[number];
+export const isAt = (v: unknown): v is At => typeof v === "string" && (AT as readonly string[]).includes(v);
+export const isLevel = (v: unknown): v is Level => typeof v === "string" && (LEVEL as readonly string[]).includes(v);
+
+export interface ComponentPos {
+  /** 배치 대상 부품 코드 — 그 구획의 BOM 자식이어야 한다(등록은 API 가 막는다) */
+  code: string;
+  at: At;
+  level: Level;
+}
+
 export interface SectionDef {
   name: string;
   when?: Cond;
@@ -90,6 +110,8 @@ export interface SectionDef {
   len?: number;
   /** Arrangement 2차: 그 구획 Component 의 방향(p36). 없으면 미지정. */
   dir?: Direction;
+  /** Arrangement 2차: 구획 안 부품 배치(p36 Component). 없으면 배치 규칙 없음 — 도면은 그리지 않는다. */
+  components?: ComponentPos[];
 }
 
 /** Arrangement: 한 구획의 이름 + 길이(mm) + 방향. len 이 없으면 fallbackL 을 쓴다. */
@@ -97,6 +119,7 @@ export interface SectionDim {
   name: string;
   len: number;
   dir?: Direction;
+  components?: ComponentPos[];
 }
 
 /** p33 — a registered code (product / part / purchased item). */
@@ -219,6 +242,7 @@ export function sectionDimsFor(
       name: s.name,
       len: typeof s.len === "number" && s.len > 0 ? s.len : fallbackL,
       ...(isDirection(s.dir) ? { dir: s.dir } : {}),
+      ...(s.components && s.components.length > 0 ? { components: s.components } : {}),
     }));
 }
 

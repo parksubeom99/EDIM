@@ -437,6 +437,32 @@ with sync_playwright() as p:
     ok("S32h Delete — 관계가 없는 구획은 지워지고 도면에서도 사라진다 (전장도 그만큼 줄어든다)",
        (rm.status, "Silencer" in metaG.get("sections",[]), metaF.get("lengthMm")-metaG.get("lengthMm")),
        rm.status==200 and "Silencer" not in metaG.get("sections",[]) and metaF.get("lengthMm")-metaG.get("lengthMm")==600)
+    # ── S38 Component 배치 규칙 (p36 · 코퍼스 "Component Position Rule") ──
+    g2=ctx.request.get(ARR+"?code=EU&slots="+json.dumps({"A":"EU","B":"55","C":"2123","D":"630","E":"SS","F":"1-21-13-15"})).json()
+    fan=[x for x in g2["sections"] if x["name"]=="Fan"][0]
+    ok("S38a 구획마다 **그 구획에 달린 BOM 자식**을 배치 후보로 준다 (화면이 부품 목록을 지어내지 않는다)",
+       (fan.get("children"), fan.get("components")), bool(fan.get("children")))
+    rows2b=[{"name":x["name"], **({"len":x["len"]} if x.get("len") is not None else {}), **({"dir":x["dir"]} if x.get("dir") else {}), "components":x.get("components",[])} for x in g2["sections"]]
+    target=fan["children"][0]
+    for r_ in rows2b:
+        if r_["name"]=="Fan": r_["components"]=[{"code":target,"at":"rear","level":"bottom"}]
+    pc=put(rows2b)
+    rC=run55("S38"); metaC=ctx.request.get(BASE+f"/api/dxf?runId={rC['runId']}&type=plan&meta=1").json()
+    dxfC=ctx.request.get(BASE+f"/api/dxf?runId={rC['runId']}&type=plan").text()
+    ok("S38b 배치를 저장하면 평면도에 그 부품 상자가 그려진다 (구획 3×3 칸 · COMPONENT 레이어)",
+       (pc.status, metaC.get("components"), "COMPONENT" in dxfC),
+       pc.status==200 and metaC.get("components")==[{"section":"Fan","code":target,"at":"rear","level":"bottom"}] and "COMPONENT" in dxfC)
+    gc=dxf_stats(dxfC)
+    ok("S38c 상자는 구획 안에 있다 (도형 실측 — 전장·폭을 넘지 않는다)",
+       (gc["maxx"], metaC.get("lengthMm"), gc["layers"]), gc["maxx"]<=metaC.get("lengthMm") and "COMPONENT" in gc["layers"])
+    bad2=put([{**r_, "components":[{"code":"KCP 1","at":"rear","level":"bottom"}]} if r_["name"]=="Fan" else r_ for r_ in rows2b])
+    ok("S38d 그 구획의 부품이 아니면 배치를 거부한다 (409 — 없는 부품을 도면에 그리지 않는다)", bad2.status, bad2.status==409)
+    bad3=put([{**r_, "components":[{"code":target,"at":"nose","level":"bottom"}]} if r_["name"]=="Fan" else r_ for r_ in rows2b])
+    ok("S38e 배치 값이 목록 밖이면 400", bad3.status, bad3.status==400)
+    old_meta=ctx.request.get(BASE+f"/api/dxf?runId={rD['runId']}&type=plan&meta=1").json()
+    ok("S38f 앞 스냅샷 도면에는 배치가 없다 — 배치도 스냅샷에 박힌 값만 쓴다(0011 원칙)",
+       old_meta.get("components"), not old_meta.get("components"))
+
     # 원상 복구 — 뒤 단계(S16~)가 옛 순서를 전제로 하지 않게
     put(rows)
 

@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { withTenant, upsertProductCode } from "@edim/db";
-import { sectionDimsFor, isDirection, type ProductCode, type SectionDef, type SlotValues } from "@edim/bom-code";
+import { sectionDimsFor, isDirection, isAt, isLevel, type ProductCode, type SectionDef, type ComponentPos, type SlotValues } from "@edim/bom-code";
 
 import { loadCatalog } from "@/app/lib/catalog";
 import { guard, str, dbError } from "../_guard";
@@ -46,10 +46,17 @@ export async function GET(req: NextRequest) {
   // 활성 구획(현재 슬롯 기준). L=1 을 주면 len 미등록 구획의 fallback 이 1 이 되어 "미등록"을 null 로 구분한다.
   const active = new Set(sectionDimsFor(product, slots, 1).map((s) => s.name));
   const used = usedSections(catalog, product.code);
+  // 그 구획에 실제로 달린 BOM 자식 — 배치할 수 있는 부품 목록이다(화면이 목록을 지어내지 않게)
+  const childrenBySection = new Map<string, string[]>();
+  for (const r of catalog.relationships.filter((r) => r.parent === product.code))
+    childrenBySection.set(r.section, [...(childrenBySection.get(r.section) ?? []), r.child]);
+
   const sections = (product.sections ?? []).map((s) => ({
     name: s.name,
     len: typeof s.len === "number" ? s.len : null,
     dir: isDirection(s.dir) ? s.dir : null,
+    components: s.components ?? [],
+    children: childrenBySection.get(s.name) ?? [],
     when: Boolean(s.when),
     active: active.has(s.name),
     locked: used.has(s.name),
@@ -74,7 +81,7 @@ export async function POST(req: NextRequest) {
 
   if (Array.isArray(b.sections)) {
     // ── 2차: 배열 전체 교체(순서·추가·삭제·길이·방향) ──
-    const rows = b.sections as { name?: unknown; len?: unknown; dir?: unknown }[];
+    const rows = b.sections as { name?: unknown; len?: unknown; dir?: unknown; components?: unknown }[];
     if (rows.length === 0) return NextResponse.json({ error: "구획이 하나도 없을 수는 없습니다" }, { status: 400 });
     const seen = new Set<string>();
     nextSections = [];
@@ -87,12 +94,31 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "길이는 양수여야 합니다" }, { status: 400 });
       if (r.dir != null && !isDirection(r.dir))
         return NextResponse.json({ error: `방향 값이 아닙니다: ${String(r.dir)}` }, { status: 400 });
+      // Component 배치(p36): 그 구획의 BOM 자식만 놓을 수 있다 — 없는 부품을 도면에 그리지 않는다.
+      let comps: ComponentPos[] | undefined;
+      if (r.components !== undefined) {
+        if (!Array.isArray(r.components)) return NextResponse.json({ error: "components 는 배열이어야 합니다" }, { status: 400 });
+        const allowed = new Set(catalog.relationships.filter((x) => x.parent === product.code && x.section === name).map((x) => x.child));
+        const acc: ComponentPos[] = [];
+        for (const c of r.components as { code?: unknown; at?: unknown; level?: unknown }[]) {
+          const code = str(c.code, 40);
+          if (!code) return NextResponse.json({ error: "부품 코드가 비었습니다" }, { status: 400 });
+          if (!allowed.has(code))
+            return NextResponse.json({ error: `${name} 구획의 부품이 아닙니다: ${code} — Set-Up ▸ Code Relationship 에서 먼저 연결하십시오` }, { status: 409 });
+          if (!isAt(c.at) || !isLevel(c.level))
+            return NextResponse.json({ error: "배치 값이 아닙니다 (앞·중·뒤 × 상·중·하)" }, { status: 400 });
+          if (acc.some((x) => x.code === code)) return NextResponse.json({ error: `부품 배치 중복: ${code}` }, { status: 400 });
+          acc.push({ code, at: c.at, level: c.level });
+        }
+        comps = acc;
+      }
       const old = prevByName.get(name);
       nextSections.push({
         name,
         ...(old?.when ? { when: old.when } : {}),            // 조건은 이름으로 물려받는다(화면에서 만들지 않는다)
         ...(typeof r.len === "number" ? { len: r.len } : {}),
         ...(isDirection(r.dir) ? { dir: r.dir } : {}),
+        ...(comps !== undefined ? (comps.length > 0 ? { components: comps } : {}) : (old?.components ? { components: old.components } : {})),
       });
     }
     // 삭제되는 구획에 BOM 관계가 걸려 있으면 거부한다 — 그 줄들이 갈 곳을 잃는다.
