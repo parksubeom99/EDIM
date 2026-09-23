@@ -301,7 +301,8 @@ function DesignCanvas({ code, slots, runs, nodeStable, canEdit }: { code: string
     } catch { /* 등록 전엔 빈 배열 */ }
   }, [slots]);
   useEffect(() => { loadArr(); }, [loadArr]);
-  const sections = secs.length > 0 ? secs.map((s) => s.name) : ["—"];
+  const visible = secs.filter((s) => s.active !== false);  // 조건부로 꺼진 구획은 개념도에 그리지 않는다(도면과 같게)
+  const sections = visible.length > 0 ? visible.map((s) => s.name) : ["—"];
   const sw = w / sections.length;
   async function saveArr(next: ArrSection[]) {
     if (!canEdit) return;
@@ -390,10 +391,10 @@ function DesignCanvas({ code, slots, runs, nodeStable, canEdit }: { code: string
       )}
       <svg viewBox={`0 0 ${w + 40} 220`} width="100%" style={{ maxWidth: 760, display: "block" }}>
         <rect x="20" y="40" width={w} height="120" rx="6" fill="var(--surface-1)" stroke="var(--ink)" strokeWidth="1.5" />
-        {secs.length > 0 ? (() => {
-          const total = secs.reduce((a, s) => a + (s.len ?? 900), 0) || 1;
+        {visible.length > 0 ? (() => {
+          const total = visible.reduce((a, s) => a + (s.len ?? 900), 0) || 1;
           let acc = 0;
-          return secs.map((s) => {
+          return visible.map((s) => {
             const x = 20 + (acc / total) * w; const sww = ((s.len ?? 900) / total) * w; acc += s.len ?? 900;
             return (
               <g key={s.name}>

@@ -132,6 +132,6 @@ BOM 사양 문자열(패널·댐퍼·코일·드레인팬)이 `{cap.face}` 대�
 - API `/api/setup/arrangement` POST 가 **배열 전체 교체**를 받는다(배열 순서 = 구획 순서 · 빠진 이름 = 삭제 · 새 이름 = 추가). 조건(`when`)은 이름으로 물려받아 화면이 조건을 만들지 않는다. 구 형식 `{lengths}` 도 계속 받는다.
 - **삭제 잠금**: 그 구획에 BOM 관계(`code_relationship.section`)가 걸려 있으면 409 로 거부한다 — 줄이 갈 곳을 잃지 않게. GET 이 `locked` 로 미리 알려 화면 버튼도 잠근다.
 - 도면: 평면도가 구획 안에 `DIR <방향>` 을 적고, meta 에 `dirs` 를 싣는다. 방향 미등록이면 아무것도 적지 않는다.
-- e2e S32a~S32h(목록·Move→도면/BOM 순서·방향 표기·앞 스냅샷엔 방향 없음·삭제 거부 409·Add 전장 +600·Delete 복귀). 실측: typecheck 11 · 단위 189 · DB 검증 9종 PASS · **124/124**.
+- e2e S32a~S32h(목록·Move→도면/BOM 순서·방향 표기·앞 스냅샷엔 방향 없음·삭제 거부 409·Add 전장 +600·Delete 복귀) + S31h(개념도는 지금 도는 구획만 그린다 — 편집 표에는 조건부까지 전부). 실측: typecheck 11 · 단위 189 · DB 검증 9종 PASS · **125/125**.
 - **남은 2차(Tier B · 회장님 승인 필요)**: 2D 3각법(Front/Right) 도면은 `drawing_type` CHECK 가 `('plan','assembly')` 로 잠겨 있어 마이그레이션 0012 가 필요하다. 3D View · Design Tool Binding 은 그다음.
 - 정정: 09-22 인계 노트의 "단위 205" 는 근거 없는 수치였다 — 실측은 vitest 189(+auth 12 PASS). README 의 "DB 검증 7종" 도 실제 9종으로 고쳤다.

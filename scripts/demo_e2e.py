@@ -207,6 +207,12 @@ with sync_playwright() as p:
     pg.fill("[data-testid=arr-len-Coil]", "1500"); pg.click("[data-testid=arr-save]", force=True)
     pg.wait_for_selector("[data-testid=design-canvas] >> text=1500", timeout=15000)
     ok("S31g 화면: Arrangement 편집 → Coil 길이 1500 저장 → 캔버스 구획에 1500 이 뜬다", bool(pg.query_selector("[data-testid=design-canvas] >> text=1500")), True)
+    # S31h 개념도는 **지금 슬롯에서 도는 구획만** 그린다(편집 표에는 조건부 구획까지 전부 뜬다) — 도면과 같은 구획 집합
+    _rows=pg.eval_on_selector_all("[data-testid=arr-table] tbody tr","e=>e.length")
+    _cv=pg.eval_on_selector("[data-testid=design-canvas] svg","e=>e.textContent")  # 편집 표가 같은 카드 안에 있으므로 개념도(SVG)만 읽는다
+    _drawn=[nm for nm in ("Mixing","Filter","Rotor","Coil","Humid.","HeatPump","Fan") if nm in _cv]
+    ok("S31h 편집 표에는 조건부 구획까지 전부(7), 개념도에는 지금 슬롯에서 도는 구획만 — 꺼진 조건부 구획은 그리지 않는다",
+       (_rows, _drawn), _rows==7 and len(_drawn)<_rows and "HeatPump" not in _drawn and "Mixing" in _drawn and "Fan" in _drawn)
     pg.screenshot(path=f"{OUT}/16_design_tab.png")
     # 되돌린다 — API 로 EU 제품 코드의 모든 구획 len 을 지운다(빈 화면 입력이 불안정). 뒤 시나리오가 균등 도면을 기대한다.
     _c=ctx.request.get(BASE+"/api/setup/catalog").json(); _eu=[p_ for p_ in _c.get("productCodes",[]) if p_.get("code")=="EU"][0]
