@@ -507,6 +507,32 @@ with sync_playwright() as p:
         if t.get("role")=="buy": t["rows"][0]["cells"]["A"]="LS ELECTRIC"
     ctx.request.post(BASE+"/api/setup/product-codes",headers=J0,data=json.dumps(inv2))
 
+    # ── S36 Schedule management (p12·18·50) — 작업대를 떠나지 않고 일정을 잡는다 ──
+    pg.goto(BASE+"/workbench?node=a0000000-0000-4000-8000-000000000004",wait_until="domcontentloaded")
+    pg.wait_for_selector("[data-testid=task-title]",timeout=30000); nuke(pg)
+    before=pg.eval_on_selector_all("[data-testid=task-row]","e=>e.length")
+    # 하이드레이션 전에는 DOM 에 값만 들어가고 React 상태가 비어 버튼이 잠겨 있다 — 버튼이 풀릴 때까지 기다렸다 누른다
+    for _ in range(20):
+        pg.fill("[data-testid=task-title]","코일 사양 확인")
+        pg.fill("[data-testid=task-due]","2026-09-01")   # 지난 날짜 — '지남' 표기 확인용
+        if pg.eval_on_selector("[data-testid=task-add]","e=>!e.disabled"): break
+        time.sleep(0.3)
+    pg.click("[data-testid=task-add]")
+    pg.wait_for_function("(n)=>document.querySelectorAll('[data-testid=task-row]').length>n", arg=before, timeout=30000)
+    todo=pg.inner_text("[data-testid=task-group-todo]")
+    ok("S36a 작업대에서 할 일을 기한과 함께 등록한다 (To-do list 에 뜨고 기한이 지났으면 '지남')",
+       (before, todo.replace("\n"," | ")[:70]), "코일 사양 확인" in todo and "지남" in todo)
+    tid=pg.eval_on_selector("[data-testid=task-group-todo] [data-testid=task-row] button","e=>e.dataset.testid.replace('task-toggle-','')")
+    pg.click(f"[data-testid=task-toggle-{tid}]")
+    pg.wait_for_function("()=>{const d=document.querySelector('[data-testid=task-group-done]'); return d && d.innerText.includes('코일 사양 확인');}", timeout=30000)
+    donet=pg.inner_text("[data-testid=task-group-done]"); todo2=pg.inner_text("[data-testid=task-group-todo]")
+    ok("S36b '완료'를 누르면 To-do 에서 Done items 로 옮겨간다 (되돌리기도 있다)",
+       (donet.split("\n")[0], "코일 사양 확인" in todo2), "코일 사양 확인" in donet and "코일 사양 확인" not in todo2)
+    ok("S36c Approval Request List 가 같은 상자에 뜬다 (요청·결정은 아래 Approval 에서 — 보는 곳과 하는 곳을 나눈다)",
+       bool(pg.query_selector("[data-testid=approval-request-list]")) or "요청 없음" in pg.inner_text("[data-testid=task-group-done]"),
+       True)
+    pg.screenshot(path=f"{OUT}/53_schedule.png",full_page=True)
+
     # ── S35 승인 대장 (p55 EDIM Approval Management) — 문서와 도면을 한 표로 ──
     reg=ctx.request.get(BASE+"/api/register").json()
     kinds=set(r["kind"] for r in reg.get("rows",[]))

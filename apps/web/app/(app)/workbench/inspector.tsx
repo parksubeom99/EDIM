@@ -56,6 +56,29 @@ export function Inspector({
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
+  const [taskTitle, setTaskTitle] = useState("");
+  const [taskDue, setTaskDue] = useState("");
+
+  /** p12·18·50 Schedule management — 할 일 추가(기한 선택). 표는 project_task 로 이미 있던 것이다. */
+  async function addTask() {
+    if (!project || !taskTitle.trim()) return;
+    setBusy(true);
+    const r = await fetch(`/api/projects/${project.id}/tasks`, {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ title: taskTitle.trim(), ...(taskDue ? { dueAt: `${taskDue}T00:00:00Z` } : {}) }),
+    });
+    setBusy(false);
+    if (r.ok) { setTaskTitle(""); setTaskDue(""); router.refresh(); }
+  }
+
+  async function toggleTask(id: string, state: "todo" | "done") {
+    setBusy(true);
+    const r = await fetch(`/api/project-tasks/${id}`, {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ state }),
+    });
+    setBusy(false);
+    if (r.ok) router.refresh();
+  }
   const [msg, setMsg] = useState<string | null>(null);
 
   async function request(tier: ApprovalTier) {
@@ -144,15 +167,56 @@ export function Inspector({
         )}
       </Section>
 
-      <Section name="Schedule">
-        {project.tasks.length === 0 ? (
-          <span style={{ fontSize: "var(--fs-12)", color: "var(--ink-muted)" }}>일정 없음</span>
+      {/* p12·p18·p50 Schedule management — To-do list · Done items · Schedule(기한) · Approval Request List.
+          작업대를 떠나지 않고 일정을 잡는다. 데이터는 project_task(이미 있던 표)라 스키마 변경은 없다. */}
+      <Section name="Schedule management">
+        {canEdit && (
+          <div style={{ display: "flex", gap: 4, marginBottom: 6 }}>
+            <input data-testid="task-title" value={taskTitle} onChange={(e) => setTaskTitle(e.target.value)} placeholder="할 일"
+              style={{ flex: 1, minWidth: 0, fontSize: "var(--fs-12)", padding: "3px 6px", border: "1px solid var(--line)", borderRadius: "var(--radius-sm)", background: "var(--surface-0)", color: "var(--ink)" }} />
+            <input data-testid="task-due" type="date" value={taskDue} onChange={(e) => setTaskDue(e.target.value)}
+              style={{ fontSize: "var(--fs-12)", padding: "3px 4px", border: "1px solid var(--line)", borderRadius: "var(--radius-sm)", background: "var(--surface-0)", color: "var(--ink)" }} />
+            <button type="button" data-testid="task-add" disabled={busy || !taskTitle.trim()} onClick={() => void addTask()} style={{ ...btn(), opacity: taskTitle.trim() ? 1 : 0.5 }}>추가</button>
+          </div>
+        )}
+        {(["todo", "done"] as const).map((state) => {
+          const list = project.tasks.filter((t) => t.state === state);
+          return (
+            <div key={state} data-testid={`task-group-${state}`} style={{ marginBottom: 6 }}>
+              <div style={{ ...k, fontSize: "var(--fs-12)" }}>{state === "todo" ? "To-do list" : "Done items"} {list.length}</div>
+              {list.length === 0 ? (
+                <span style={{ fontSize: "var(--fs-12)", color: "var(--ink-muted)" }}>{state === "todo" ? "할 일 없음" : "완료 없음"}</span>
+              ) : (
+                <ul style={{ margin: 0, paddingLeft: 0, listStyle: "none", fontSize: "var(--fs-12)" }}>
+                  {list.map((t) => {
+                    const over = state === "todo" && t.dueAt && t.dueAt.slice(0, 10) < new Date().toISOString().slice(0, 10);
+                    return (
+                      <li key={t.id} data-testid="task-row" data-state={t.state} style={{ display: "flex", gap: 6, alignItems: "baseline" }}>
+                        {canEdit && (
+                          <button type="button" data-testid={`task-toggle-${t.id}`} disabled={busy}
+                            onClick={() => void toggleTask(t.id, state === "todo" ? "done" : "todo")}
+                            style={{ ...btn(), padding: "0 5px", fontSize: 11 }}>{state === "todo" ? "완료" : "되돌리기"}</button>
+                        )}
+                        <span style={{ textDecoration: state === "done" ? "line-through" : "none" }}>{t.title}</span>
+                        {t.dueAt && <span style={{ ...k, color: over ? "var(--danger, #b4232a)" : "var(--ink-muted)" }}>· {t.dueAt.slice(0, 10)}{over ? " 지남" : ""}</span>}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          );
+        })}
+        {/* Approval Request List — 청사진의 같은 상자에 있는 목록. 요청/결정은 아래 Approval 섹션에서 한다. */}
+        <div style={{ ...k, fontSize: "var(--fs-12)", marginTop: 4 }}>Approval Request List {project.approvals.length}</div>
+        {project.approvals.length === 0 ? (
+          <span style={{ fontSize: "var(--fs-12)", color: "var(--ink-muted)" }}>요청 없음</span>
         ) : (
-          <ul style={{ margin: 0, paddingLeft: 16, fontSize: "var(--fs-12)" }}>
-            {project.tasks.map((t) => (
-              <li key={t.id} style={{ textDecoration: t.state === "done" ? "line-through" : "none" }}>
-                {t.title}
-                {t.dueAt && <span style={k}> · {t.dueAt.slice(0, 10)}</span>}
+          <ul data-testid="approval-request-list" style={{ margin: 0, paddingLeft: 0, listStyle: "none", fontSize: "var(--fs-12)" }}>
+            {project.approvals.slice(0, 6).map((a) => (
+              <li key={a.id}>
+                <span style={{ fontFamily: "var(--font-mono)", color: "var(--accent)" }}>{a.state}</span>
+                {a.bomRunId && <span style={k}> · BOM {a.bomRunId.slice(0, 8)}</span>}
               </li>
             ))}
           </ul>
