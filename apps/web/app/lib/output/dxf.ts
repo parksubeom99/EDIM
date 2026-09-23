@@ -65,8 +65,11 @@ export interface DxfInput {
   items?: DrawingItem[];
 }
 
+/** 3각법 뷰 — plan=Top(L×W) · front=Front(L×H) · right=Right(W×H) · assembly=조립도 */
+export type DrawingView = "plan" | "assembly" | "front" | "right";
+
 export interface DxfMeta {
-  type: "plan" | "assembly";
+  type: DrawingView;
   sections: string[];
   /** 구획별 방향(없으면 null) — 평면도에만 적는다 */
   dirs?: (string | null)[];
@@ -163,3 +166,74 @@ export function buildAssemblyDxf(input: DxfInput): { dxf: string; meta: DxfMeta 
     meta: { type: "assembly", sections, widthMm: W, heightMm: H, lengthMm: length, dimItem: input.dimItem, entities: n, items: items.length },
   };
 }
+
+/**
+ * 정면도(Front View · 3각법) — 평면도와 **같은 스냅샷 치수·같은 구획**을 쓴다.
+ * 가로 = 전장(구획 길이의 합, 평면도와 같은 값) · 세로 = 높이 H.
+ * 코퍼스 "2D와 3D의 관계": 같은 Parameter Set 을 공유하므로 뷰마다 치수를 따로 계산하지 않는다.
+ */
+export function buildFrontDxf(input: DxfInput): { dxf: string; meta: DxfMeta } {
+  const { W, H, L } = input.dims;
+  const secs: { name: string; len: number; dir?: string }[] = (input.secDims && input.secDims.length > 0)
+    ? input.secDims
+    : (input.sections.length > 0 ? input.sections : ["Unit"]).map((name) => ({ name, len: L }));
+  const offs: number[] = []; let acc = 0;
+  for (const s of secs) { offs.push(acc); acc += s.len; }
+  const length = acc;
+  const sections = secs.map((s) => s.name);
+  let ents = ""; let n = 0;
+
+  ents += rect(0, 0, length, H, "OUTLINE"); n += 4;
+  secs.forEach((s, i) => {
+    if (i > 0) { ents += line(offs[i]!, 0, offs[i]!, H, "SECTION"); n++; }
+    ents += text(offs[i]! + 120, H / 2, 60, s.name.toUpperCase()); n++;
+    if (s.dir) { ents += text(offs[i]! + 120, H / 2 - 160, 50, `DIR ${s.dir}`); n++; }
+  });
+  // 기준선(코퍼스 "기준선/중심선 표시") — 바닥에서 H/2
+  ents += line(0, H / 2, length, H / 2, "DIM"); n++;
+  ents += line(0, -300, length, -300, "DIM"); ents += text(length / 2 - 200, -420, 70, `L=${length}`); n += 2;
+  ents += line(-300, 0, -300, H, "DIM"); ents += text(-900, H / 2, 70, `H=${H}`); n += 2;
+  ents += text(0, H + 300, 90, `EDIM ${input.code} - FRONT - DIM ${input.dimItem} (W${W} H${H})`); n++;
+
+  return {
+    dxf: wrap(ents),
+    meta: { type: "front", sections, dirs: secs.map((s) => s.dir ?? null), widthMm: W, heightMm: H, lengthMm: length, dimItem: input.dimItem, entities: n },
+  };
+}
+
+/**
+ * 우측면도(Right View · 3각법) — 가로 = 폭 W · 세로 = 높이 H.
+ * 측면에서는 구획이 겹쳐 보이므로 구획선을 긋지 않고, 구획 수만 표제란에 남긴다.
+ */
+export function buildRightDxf(input: DxfInput): { dxf: string; meta: DxfMeta } {
+  const { W, H, L } = input.dims;
+  const secs: { name: string; len: number }[] = (input.secDims && input.secDims.length > 0)
+    ? input.secDims
+    : (input.sections.length > 0 ? input.sections : ["Unit"]).map((name) => ({ name, len: L }));
+  const length = secs.reduce((a, s) => a + s.len, 0);
+  const sections = secs.map((s) => s.name);
+  let ents = ""; let n = 0;
+
+  ents += rect(0, 0, W, H, "OUTLINE"); n += 4;
+  ents += line(W / 2, 0, W / 2, H, "DIM"); n++;              // 중심선
+  ents += line(0, -300, W, -300, "DIM"); ents += text(W / 2 - 200, -420, 70, `W=${W}`); n += 2;
+  ents += line(-300, 0, -300, H, "DIM"); ents += text(-900, H / 2, 70, `H=${H}`); n += 2;
+  ents += text(0, H + 300, 90, `EDIM ${input.code} - RIGHT - DIM ${input.dimItem} (L${length} · ${sections.length} sections)`); n++;
+
+  return {
+    dxf: wrap(ents),
+    meta: { type: "right", sections, widthMm: W, heightMm: H, lengthMm: length, dimItem: input.dimItem, entities: n },
+  };
+}
+
+/** 뷰 이름 → 생성기 (3각법 + 조립도) */
+export function buildView(view: DrawingView, input: DxfInput): { dxf: string; meta: DxfMeta } {
+  if (view === "assembly") return buildAssemblyDxf(input);
+  if (view === "front") return buildFrontDxf(input);
+  if (view === "right") return buildRightDxf(input);
+  return buildPlanDxf(input);
+}
+
+export const DRAWING_VIEWS: DrawingView[] = ["plan", "front", "right", "assembly"];
+export const isDrawingView = (v: unknown): v is DrawingView =>
+  typeof v === "string" && (DRAWING_VIEWS as string[]).includes(v);

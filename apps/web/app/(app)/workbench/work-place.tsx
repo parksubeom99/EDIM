@@ -424,6 +424,20 @@ function DesignCanvas({ code, slots, runs, nodeStable, canEdit }: { code: string
           평면도 DXF
         </a>
         <a
+          data-testid="dxf-front"
+          href={runId ? `/api/dxf?runId=${runId}&type=front` : "#"}
+          style={{ fontSize: "var(--fs-12)", color: "var(--ink)", background: "var(--surface-2)", border: "1px solid var(--line)", borderRadius: "var(--radius-sm)", padding: "5px 10px", textDecoration: "none", opacity: runId ? 1 : 0.5, pointerEvents: runId ? "auto" : "none" }}
+        >
+          정면도 DXF
+        </a>
+        <a
+          data-testid="dxf-right"
+          href={runId ? `/api/dxf?runId=${runId}&type=right` : "#"}
+          style={{ fontSize: "var(--fs-12)", color: "var(--ink)", background: "var(--surface-2)", border: "1px solid var(--line)", borderRadius: "var(--radius-sm)", padding: "5px 10px", textDecoration: "none", opacity: runId ? 1 : 0.5, pointerEvents: runId ? "auto" : "none" }}
+        >
+          우측면도 DXF
+        </a>
+        <a
           data-testid="dxf-assembly"
           href={runId ? `/api/dxf?runId=${runId}&type=assembly` : "#"}
           style={{ fontSize: "var(--fs-12)", color: "var(--ink)", background: "var(--surface-2)", border: "1px solid var(--line)", borderRadius: "var(--radius-sm)", padding: "5px 10px", textDecoration: "none", opacity: runId ? 1 : 0.5, pointerEvents: runId ? "auto" : "none" }}
@@ -586,7 +600,7 @@ function DrawingRegister({ runId, nodeStable, canEdit }: { runId: string | null;
   }, [nodeStable]);
   useEffect(() => { void load(); }, [load]);
 
-  async function make(type: "plan" | "assembly") {
+  async function make(type: "plan" | "front" | "right" | "assembly") {
     if (!runId || busy) return;
     setBusy(true); setErr(null);
     const r = await fetch("/api/drawings", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ runId, type }) });
@@ -609,6 +623,15 @@ function DrawingRegister({ runId, nodeStable, canEdit }: { runId: string | null;
         <button type="button" data-testid="drawing-make-plan" disabled={!runId || !canEdit || busy} onClick={() => void make("plan")}
           style={{ fontSize: "var(--fs-12)", padding: "5px 10px", background: "var(--surface-2)", color: "var(--ink)", border: "1px solid var(--line)", borderRadius: "var(--radius-sm)", opacity: runId && canEdit ? 1 : 0.5 }}>
           평면도 등록
+        </button>
+        {/* 3각법(0012 · 코퍼스 "2D 3각법 View") — 같은 스냅샷 치수에서 정면·우측면을 뜬다 */}
+        <button type="button" data-testid="drawing-make-front" disabled={!runId || !canEdit || busy} onClick={() => void make("front")}
+          style={{ fontSize: "var(--fs-12)", padding: "5px 10px", background: "var(--surface-2)", color: "var(--ink)", border: "1px solid var(--line)", borderRadius: "var(--radius-sm)", opacity: runId && canEdit ? 1 : 0.5 }}>
+          정면도 등록
+        </button>
+        <button type="button" data-testid="drawing-make-right" disabled={!runId || !canEdit || busy} onClick={() => void make("right")}
+          style={{ fontSize: "var(--fs-12)", padding: "5px 10px", background: "var(--surface-2)", color: "var(--ink)", border: "1px solid var(--line)", borderRadius: "var(--radius-sm)", opacity: runId && canEdit ? 1 : 0.5 }}>
+          우측면도 등록
         </button>
         <button type="button" data-testid="drawing-make-assembly" disabled={!runId || !canEdit || busy} onClick={() => void make("assembly")}
           style={{ fontSize: "var(--fs-12)", padding: "5px 10px", background: "var(--surface-2)", color: "var(--ink)", border: "1px solid var(--line)", borderRadius: "var(--radius-sm)", opacity: runId && canEdit ? 1 : 0.5 }}>

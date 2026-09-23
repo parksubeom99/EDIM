@@ -135,3 +135,11 @@ BOM 사양 문자열(패널·댐퍼·코일·드레인팬)이 `{cap.face}` 대�
 - e2e S32a~S32h(목록·Move→도면/BOM 순서·방향 표기·앞 스냅샷엔 방향 없음·삭제 거부 409·Add 전장 +600·Delete 복귀) + S31h(개념도는 지금 도는 구획만 그린다 — 편집 표에는 조건부까지 전부). 실측: typecheck 11 · 단위 189 · DB 검증 9종 PASS · **125/125**.
 - **남은 2차(Tier B · 회장님 승인 필요)**: 2D 3각법(Front/Right) 도면은 `drawing_type` CHECK 가 `('plan','assembly')` 로 잠겨 있어 마이그레이션 0012 가 필요하다. 3D View · Design Tool Binding 은 그다음.
 - 정정: 09-22 인계 노트의 "단위 205" 는 근거 없는 수치였다 — 실측은 vitest 189(+auth 12 PASS). README 의 "DB 검증 7종" 도 실제 9종으로 고쳤다.
+
+#### 0012 · 2D 3각법 (2026-09-23 · 회장님 Tier B 승인)
+`drawing_type` CHECK 를 `('plan','assembly')` → `('plan','assembly','front','right')` 로 넓혔다(제약 완화 · 옛 행 무영향). 뜻: **plan=Top(L×W) · front=Front(L×H) · right=Right(W×H) · assembly=조립도**.
+- 세 뷰가 **같은 BOM 스냅샷 하나**에서 나온다 — 뷰마다 치수를 다시 계산하지 않는다(코퍼스 "2D와 3D의 관계: 같은 Parameter Set 공유"). 정면도는 평면도와 같은 구획·같은 전장을 쓰고, 방향(p36)도 함께 적는다. 우측면도는 구획이 겹쳐 보이므로 구획선을 긋지 않고 구획 수만 표제란에 남긴다.
+- 화면: Design 탭에 `정면도 DXF`·`우측면도 DXF` 내려받기와 `정면도 등록`·`우측면도 등록`(번호 `-FRT`·`-RHT`, 개정·상태·발행 잠금은 기존과 동일).
+- 모르는 뷰 이름은 **조용히 평면도로 떨어뜨리지 않고** 400 으로 막는다(API) · DB 도 CHECK 로 막는다(`iso_3d` 삽입 거부 — drawing:test 21).
+- e2e S33a~f(세 뷰 동시 생성 · 뷰 간 치수 일치 · ezdxf 외형 실측 · 미지원 뷰 400 · 등록 번호). 실측: typecheck 11 · 단위 189 · DB 검증 9종 PASS · drawing:test 21 · **131/131**.
+- 남은 것: 3D View(ISO·Exploded) · Design Tool Binding · Component 배치 규칙 — 코퍼스 MVP 순서대로 다음 단계.

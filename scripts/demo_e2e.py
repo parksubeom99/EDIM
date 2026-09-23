@@ -437,6 +437,37 @@ with sync_playwright() as p:
     # 원상 복구 — 뒤 단계(S16~)가 옛 순서를 전제로 하지 않게
     put(rows)
 
+    # ── S33 2D 3각법 (0012 · 코퍼스 "2D 3각법 View" · 청사진 p36 DWG View) ──
+    # 핵심: Front/Top(plan)/Right 가 **같은 스냅샷 하나**에서 나오고, 뷰 간 치수가 어긋나지 않는다(코퍼스 "View 간 치수 동기화").
+    rV=run55("S33"); RID=rV["runId"]
+    mp=ctx.request.get(BASE+f"/api/dxf?runId={RID}&type=plan&meta=1").json()
+    mf=ctx.request.get(BASE+f"/api/dxf?runId={RID}&type=front&meta=1").json()
+    mr=ctx.request.get(BASE+f"/api/dxf?runId={RID}&type=right&meta=1").json()
+    ok("S33a 같은 스냅샷에서 평면(Top)·정면(Front)·우측면(Right) 세 뷰가 나온다",
+       (mp.get("type"), mf.get("type"), mr.get("type")), (mp.get("type"),mf.get("type"),mr.get("type"))==("plan","front","right"))
+    ok("S33b 뷰 간 치수가 같다 — 전장은 평면=정면, 폭은 평면=우측면, 높이는 정면=우측면 (같은 Parameter Set)",
+       (mp.get("lengthMm"), mf.get("lengthMm"), mp.get("widthMm"), mr.get("widthMm"), mf.get("heightMm"), mr.get("heightMm")),
+       mp.get("lengthMm")==mf.get("lengthMm") and mp.get("widthMm")==mr.get("widthMm") and mf.get("heightMm")==mr.get("heightMm"))
+    def outline(txt):
+        # 외형은 **선(LINE)** 으로만 잰다 — 표제란 글자가 도형 밖에 있어 텍스트를 섞으면 치수가 아니다
+        doc=ezdxf.read(io.StringIO(txt)); ls=[e for e in doc.modelspace() if e.dxftype()=="LINE" and e.dxf.layer=="OUTLINE"]
+        xs=[v for e in ls for v in (e.dxf.start.x, e.dxf.end.x)]; ys=[v for e in ls for v in (e.dxf.start.y, e.dxf.end.y)]
+        return {"maxx":round(max(xs)),"maxy":round(max(ys)),"n":len(ls)}
+    fdx=ctx.request.get(BASE+f"/api/dxf?runId={RID}&type=front").text()
+    rdx=ctx.request.get(BASE+f"/api/dxf?runId={RID}&type=right").text()
+    gf=outline(fdx); gr=outline(rdx)
+    ok("S33c 정면도 도형 실측(ezdxf 로 파싱) — 가로 = 전장, 세로 = 높이 H",
+       (gf["maxx"], gf["maxy"], mf.get("heightMm")), gf["maxx"]==mf.get("lengthMm") and gf["maxy"]==mf.get("heightMm"))
+    ok("S33d 우측면도 도형 실측 — 가로 = 폭 W, 세로 = 높이 H (구획선은 긋지 않는다 · 겹쳐 보이므로)",
+       (gr["maxx"], gr["maxy"]), gr["maxx"]==mr.get("widthMm") and gr["maxy"]==mr.get("heightMm"))
+    bad=ctx.request.get(BASE+f"/api/dxf?runId={RID}&type=iso_3d")
+    ok("S33e 아직 없는 뷰(iso_3d · 3D 미착수)는 400 으로 거부한다 — 조용히 평면도로 떨어지지 않는다", bad.status, bad.status==400)
+    regF=ctx.request.post(BASE+"/api/drawings",headers=J0,data=json.dumps({"runId":RID,"type":"front"})).json()
+    regR=ctx.request.post(BASE+"/api/drawings",headers=J0,data=json.dumps({"runId":RID,"type":"right"})).json()
+    ok("S33f 정면도·우측면도도 번호·개정을 받아 등록된다 (-FRT · -RHT · Rev A)",
+       (regF.get("drawingNo"), regF.get("rev"), regR.get("drawingNo")),
+       str(regF.get("drawingNo","")).endswith("-FRT") and str(regR.get("drawingNo","")).endswith("-RHT") and regF.get("rev")=="A")
+
     # ── P3-a 플랫폼 관리자 계층 · DB①/DB② 소유 분리 (p54 User Management · p59 최종 승인 · p64 Admin.) ──
     # S16 회사 관리자가 Company Info.에서 Special 의뢰를 올린다 = 회사→플랫폼 유일 통로
     pg.goto(BASE+"/m/company",wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=user-management]",timeout=30000); time.sleep(1.5); nuke(pg)

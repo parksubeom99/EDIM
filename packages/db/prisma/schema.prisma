@@ -408,7 +408,7 @@ model Drawing {
   hierarchyStable String?  @map("hierarchy_stable") @db.Uuid
   bomRunId        String   @map("bom_run_id") @db.Uuid
   drawingNo       String   @map("drawing_no")
-  drawingType     String   @map("drawing_type") // 'plan' | 'assembly'
+  drawingType     String   @map("drawing_type") // 3각법(0012): 'plan'=Top | 'front' | 'right' | 'assembly'
   scale           String   @default("1:50")
   size            String   @default("A3")
   currentRev      String   @default("A") @map("current_rev")
