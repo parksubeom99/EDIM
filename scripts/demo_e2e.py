@@ -11,6 +11,9 @@ def nuke(pg): pg.evaluate("document.querySelectorAll('nextjs-portal').forEach(e=
 def ok(k,v,cond): R[k]=(bool(cond),v); print(("PASS" if cond else "FAIL"),k,"→",v)
 with sync_playwright() as p:
     b=p.chromium.launch(); ctx=b.new_context(viewport={"width":1440,"height":900}); pg=ctx.new_page()
+    # 캡처 복원(E8): 로그인 화면은 세션이 생기기 전에 찍는다
+    pg.goto(BASE+"/login",wait_until="domcontentloaded"); pg.wait_for_selector("input",timeout=30000)
+    pg.fill("input","owner@acme.test"); nuke(pg); pg.screenshot(path=f"{OUT}/00_login.png",full_page=True)
     r=ctx.request.post(BASE+"/api/auth/login",data={"email":"owner@acme.test"}); ok("S0 login",r.status,r.status==200)
     pg.goto(BASE+"/workbench",wait_until="domcontentloaded"); pg.wait_for_selector("text=Code Builder",timeout=30000); time.sleep(2)
     # S1 프로젝트 노드 선택
@@ -506,6 +509,39 @@ with sync_playwright() as p:
     for k,t in inv2["tables"].items():
         if t.get("role")=="buy": t["rows"][0]["cells"]["A"]="LS ELECTRIC"
     ctx.request.post(BASE+"/api/setup/product-codes",headers=J0,data=json.dumps(inv2))
+
+    # ── 캡처 복원(E8) — 05 프로젝트 목록 · 06 CPQ 모듈 · 48·49 도면 그림 ──
+    _tds=[d for d in ctx.request.get(BASE+"/api/documents").json().get("rows",[]) if d.get("docType")=="techdata"]
+    ok("S37a Tech Data 문서가 남아 있다(인쇄본 캡처의 근거)", len(_tds), len(_tds)>0)
+    pg.goto(BASE+f"/api/documents/{_tds[0]['id']}/print",wait_until="domcontentloaded")
+    pg.wait_for_function("()=>document.body.innerText.includes('TECH DATA')",timeout=30000)  # 인쇄본이 그려진 뒤에 캡처(고정 sleep 아님)
+    pg.screenshot(path=f"{OUT}/47_techdata_print.png",full_page=True)
+    pg.goto(BASE+"/m/project",wait_until="domcontentloaded"); pg.wait_for_selector("text=PS-61313",timeout=30000); nuke(pg)
+    pg.screenshot(path=f"{OUT}/05_project_mgmt.png",full_page=True)
+    pg.goto(BASE+"/m/cpq",wait_until="domcontentloaded"); pg.wait_for_selector("text=CPQ",timeout=30000); nuke(pg)
+    pg.screenshot(path=f"{OUT}/06_module_cpq_stub.png",full_page=True)
+    # 도면은 **내려받은 DXF 를 ezdxf 로 다시 그린 그림**이다(화면 캡처가 아니다 — 파일이 진짜라는 증거)
+    def dxf_png(txt, path, title):
+        import matplotlib; matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        doc=ezdxf.read(io.StringIO(txt)); msp=doc.modelspace()
+        fig,ax=plt.subplots(figsize=(12,6.5))
+        for e in msp:
+            if e.dxftype()=="LINE":
+                ax.plot([e.dxf.start.x,e.dxf.end.x],[e.dxf.start.y,e.dxf.end.y],lw=0.9,color="#1c2b2b")
+            elif e.dxftype()=="CIRCLE":
+                ax.add_patch(plt.Circle((e.dxf.center.x,e.dxf.center.y),e.dxf.radius,fill=False,lw=0.8,color="#1c2b2b"))
+            elif e.dxftype()=="TEXT":
+                ax.text(e.dxf.insert.x,e.dxf.insert.y,e.dxf.text,fontsize=5.5,color="#1c2b2b")
+        ax.set_aspect("equal"); ax.axis("off"); ax.set_title(title,fontsize=8)
+        fig.savefig(path,dpi=150,bbox_inches="tight"); plt.close(fig)
+    _plan=ctx.request.get(BASE+f"/api/dxf?runId={RUN1}&type=plan").text()
+    _asm=ctx.request.get(BASE+f"/api/dxf?runId={RUN1}&type=assembly").text()
+    dxf_png(_plan, f"{OUT}/48_dxf_plan.png", "EDIM - PLAN (ezdxf re-render of the downloaded DXF)")
+    dxf_png(_asm,  f"{OUT}/49_dxf_assembly.png", "EDIM - ASSEMBLY (ezdxf re-render of the downloaded DXF)")
+    ok("S37 캡처 28장이 스크립트에서 전부 나온다 (00·05·06·47·48·49 복원 — 발행본 손질 없이)",
+       sorted(f for f in os.listdir(OUT) if f.endswith(".png"))[:3] + [len([f for f in os.listdir(OUT) if f.endswith(".png")])],
+       len([f for f in os.listdir(OUT) if f.endswith(".png")])>=28)
 
     # ── S36 Schedule management (p12·18·50) — 작업대를 떠나지 않고 일정을 잡는다 ──
     pg.goto(BASE+"/workbench?node=a0000000-0000-4000-8000-000000000004",wait_until="domcontentloaded")
