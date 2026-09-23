@@ -18,15 +18,20 @@ interface SnapLine {
   childCode?: unknown; remarks?: unknown;
 }
 
-function parseDims(v: unknown): { dims: Dims; item: string; secDims: { name: string; len: number }[] } | null {
+function parseDims(v: unknown): { dims: Dims; item: string; secDims: { name: string; len: number; dir?: string }[] } | null {
   if (!v || typeof v !== "object") return null;
   const o = v as Record<string, unknown>;
   const n = (k: string) => (typeof o[k] === "number" && Number.isFinite(o[k]) ? (o[k] as number) : null);
   const W = n("W"), H = n("H"), L = n("L");
   if (W === null || H === null || L === null || typeof o.item !== "string") return null;
   const secDims = Array.isArray(o.sections)
-    ? (o.sections as unknown[]).flatMap((s) => (s && typeof s === "object" && typeof (s as Record<string, unknown>).name === "string" && typeof (s as Record<string, unknown>).len === "number"
-        ? [{ name: (s as { name: string }).name, len: (s as { len: number }).len }] : []))
+    ? (o.sections as unknown[]).flatMap((s) => {
+        if (!(s && typeof s === "object")) return [];
+        const r = s as Record<string, unknown>;
+        if (typeof r.name !== "string" || typeof r.len !== "number") return [];
+        // Arrangement 2차: 방향도 스냅샷에 박힌 값만 쓴다(현재 등록 표를 다시 읽지 않는다 — 0011 과 같은 원칙)
+        return [{ name: r.name, len: r.len, ...(typeof r.dir === "string" ? { dir: r.dir } : {}) }];
+      })
     : [];
   return { dims: { W, H, L }, item: o.item, secDims };
 }

@@ -18,7 +18,7 @@ from PIL import Image
 
 CORPUS, SHOTS, OUTDIR = sys.argv[1], sys.argv[2], sys.argv[3]
 MAIN = sys.argv[4] if len(sys.argv) > 4 else "p6"
-DATE = "2026-09-21"
+DATE = "2026-09-23"
 HERE = os.path.dirname(os.path.abspath(__file__))
 DECK = os.path.join(HERE, "..", "deck")
 
@@ -32,7 +32,7 @@ ST = {"L": "실동", "P": "부분", "N": "미착수", "C": "개념·표지"}
 def pg(st, tag, title, have=(), gap=(), ev="", shot=None, nx=""):
     return dict(st=st, tag=tag, title=title, have=list(have), gap=list(gap), ev=ev, shot=shot, nx=nx)
 
-# ── 판정 데이터 (청사진 70쪽 전수 정독 2026-09-21 · repo main 실측 · 화면은 스크린샷을 눈으로 확인) ──
+# ── 판정 데이터 (청사진 70쪽 전수 정독 2026-09-21 · 2026-09-23 재실측 갱신 · repo main 실측 · 화면은 스크린샷을 눈으로 확인) ──
 PAGES = {
  1: pg("C", "표지", "CTO Business Platform — EDIM", ["CPQ + PLM + ERP + D.T 통합이라는 정체성은 repo README 첫 문장과 발표 덱의 출발점이다"]),
  2: pg("C", "간지", "System concept"),
@@ -69,9 +69,10 @@ PAGES = {
         ["/m/project 화면은 **목록 한 줄**이다 — 영업 단계 전이, Client 담당자 정보, 접수 자료 등록(File), Edit Table 없음"],
         "project:test · e2e S1", "05_project_mgmt", "P6 통합에서 승인 파이프라인과 함께 보강"),
  13: pg("P", "C-1 · ERP / CPQ / Selection Template", "Selection Template",
-        ["Product Code 표시 · BOM / EDIM Run / Quotation·PCR / Drawing 버튼과 목록 ✓", "Arrangement 개념도(구성 구획) ✓"],
-        ["Arrangement · Move · Delete · Add Item · DWG View 는 **버튼 자리만 있고 동작이 없다**", "Sub Item list · Schedule management 없음"],
-        "e2e S21a · S21b", "16_design_tab", "Arrangement 는 p35~36 과 한 묶음 — 회장님 우선순위 결정 필요"),
+        ["Product Code 표시 · BOM / EDIM Run / Quotation·PCR / Drawing 버튼과 목록 ✓", "Arrangement 개념도 = 등록된 구획(하드코딩 아님) — 활성 구획이 폭 비례로 그려진다",
+         "**Arrangement 버튼이 돈다(2026-09-22 1차)**: 구획 길이를 고쳐 저장 → 다음 BOM 의 도면 전장이 그만큼 바뀐다(Coil 900→1500 = +600)"],
+        ["Move · Delete · Add Item · DWG View 는 **버튼 자리만 있고 동작이 없다**", "방향(L0~R270) · Component 배치 · Sub Item list · Schedule management 없음"],
+        "e2e S21a · S21b · S31a~S31g", "16_design_tab", "Arrangement 2차(방향·Component·2D 3각법·3D) 는 회장님 결정 대기"),
  14: pg("L", "공기조화기 사양", "사양표 — 우리 제품의 말로",
         ["BOM 의 사양 열이 p14 문구 그대로 나온다(Base Frame · Casing · Fan · Coil · Damper)"],
         ["'다단계 Option 추적' 은 슬롯 조건(when) 한 단계 수준"], "e2e S6a", "15_bom_cost"),
@@ -103,9 +104,9 @@ PAGES = {
         [], ["DB①(platform 스키마)은 **구조만 있고 비어 있다**", "메타데이터 추출(하) · 2D 도면 객체 이해(중) · 3D 형상(상) 어느 단계도 없다"],
         "e2e S16f(DB① 비어 있음을 단언)", None, "P3-b — 회장님 DXF 추출 연구 결과가 입력. D4 하이브리드로 결정됨"),
  24: pg("L", "EDIM AI Tool · 도면 DB", "Projects · Drawings · Revisions",
-        ["Revisions: 개정 번호(A,B,…)·사유·개정자, **append-only**(앱 역할에 UPDATE/DELETE 권한 없음)", "Drawings: 번호·유형·현재 개정·상태(작성중/검토/승인/발행), 발행은 DB 트리거가 잠근다"],
+        ["Revisions: 개정 번호(A,B,…)·사유·개정자, **append-only**(앱 역할에 UPDATE/DELETE 권한 없음)", "개정 = **슬롯 A~F 전체 코드**(2026-09-22 회장님 결정) — F 가 붙은 실행도 자기 근거 개정으로 추적된다", "Drawings: 번호·유형·현재 개정·상태(작성중/검토/승인/발행), 발행은 DB 트리거가 잠근다"],
         ["Parts · BOM · Material 테이블은 코드 카탈로그 + BOM 스냅샷 구조로 대체(GAP1 결정)", "scale · size 열 없음"],
-        "revision:test · drawing:test 14 · e2e S2b~S2d · S19", "11b_revisions"),
+        "revision:test · drawing:test 18 · e2e S2b~S2d · S19 · S28e", "11b_revisions"),
  25: pg("P", "S-2 · EDIM Toolbox UI", "사용자 UI Form — Command button · Combo box · Templet",
         ["Command button set-up ✓ — 보이기·순서 변경이 MainForm Action Bar 에 **즉시 반영**, 기본값 복원"],
         ["Combo box set-up · 여러 동작을 정의한 Templet · Canvas Drag 없음(화면에도 그렇게 적혀 있다)", "UI 개발 AI(설명을 주면 UI 자동 설계) 없음"],
@@ -135,14 +136,21 @@ PAGES = {
  34: pg("L", "S-1-4 · Product Code Relationship", "Child Group — 코드 관계가 곧 BOM",
         ["Child Group · Q'ty · 조건 · 코드 상속(p34) ✓ · Part List Running Test ✓", "BOM 은 슬롯 규칙 함수가 아니라 **등록된 관계를 돌린 결과**다"],
         ["다단 BOM(하위의 하위) 없음"], "e2e S8 · S9b~S9d · 회귀 1,200 조합 · backbone:test 13", "22_setup_relationship"),
- 35: pg("N", "S-1-5 · Arrangement Code", "Arrangement 코드 등록", [], ["없음"], "", None, "p13 · p36 · p46 과 한 묶음"),
- 36: pg("N", "S-1-6 · Arrangement Set-Up", "Key / Detail Dimension · Component · Design Verification",
-        [], ["Key Dimension 만 표로 존재(→ p38). Detail Dimension · Component 배치 · 방향(L0~R270) · Design Verification(Macro) 없음"], "", None, "p35 와 한 묶음"),
+ 35: pg("P", "S-1-5 · Arrangement Code", "Arrangement 코드 등록",
+        ["구획(section)이 제품 코드에 **순서·조건·길이**로 등록돼 있고(카탈로그 데이터), 화면에서 길이를 고쳐 저장한다 — `/api/setup/arrangement`",
+         "등록한 길이는 BOM 스냅샷에 함께 박혀, 앞 스냅샷의 도면은 옛 길이 그대로 남는다(S31e)"],
+        ["전용 Arrangement Code 등록 화면(Group · Item List · 승인 상태 · DWG 첨부) 없음 — 지금은 제품 코드의 구획 필드다",
+         "Arrangement 코드 자체의 코드 체계·승인 절차 없음"],
+        "e2e S31a~S31f · packages/bom-code/catalog/ahu-demo.json(sections)", "16_design_tab", "p13 · p36 · p46 과 한 묶음 — 2차 범위는 회장님 결정 대기"),
+ 36: pg("P", "S-1-6 · Arrangement Set-Up", "Key / Detail Dimension · Component · Design Verification",
+        ["구획 길이(Arrangement 치수 한 축)를 화면에서 등록·저장하고 도면이 그 길이로 그려진다(S31c~S31f)", "Key Dimension(W·H·L) 은 표로 존재(→ p38)"],
+        ["Detail Dimension · Component 배치 · 방향(L0~R270) · Design Verification(Macro) 없음", "구획별 치수는 길이(L) 한 축뿐 — 폭·높이는 제품 전체 값 하나를 쓴다"],
+        "e2e S31c~S31f", None, "p35 와 한 묶음 — Arrangement 2차"),
  37: pg("C", "간지", "EDIM Drawing Management — DWG Set-Up"),
  38: pg("P", "PLM / Design Drawing / Set-Up / Macro", "치수 전파 — 표를 고치면 도면이 바뀐다",
-        ["Key Dimension 표(W·H·L) → DXF. 한 칸 2472→2600 이면 **폭만** 따라 바뀐다(ezdxf 로 파싱해 확인)", "한 번의 저장으로 BOM 수량·원가·구매 수량·도면 폭이 **함께** 바뀌고 앞 스냅샷은 그대로(S30)", "평면도·조립도 2종 · 번호·개정·상태·발행 잠금 · 표가 바뀐 뒤 옛 스냅샷으로는 도면을 못 그린다(409)"],
-        ["도면은 아직 **선과 글자** 수준 — 제작도가 아니다", "단면 치수가 cap.face(BOM 사양)·dim.W(도면) 두 칸에 중복 — 한 칸 수정이 둘 다에 닿지 않는다(회장님 결정 대기)", "Detail Dimension · 부품도 · KAD-□ 슬롯 문법 없음"],
-        "e2e S18a~S18f · S19a~S19e · S30a~g · drawing:test 16", "43_drawings", "DXF 연구 결과와 CAD 담당의 Drawing Set-Up 입력이 필요"),
+        ["Key Dimension 표(W·H·L) → DXF. 한 칸 2472→2600 이면 **폭만** 따라 바뀐다(ezdxf 로 파싱해 확인)", "한 번의 저장으로 BOM 수량·원가·구매 수량·도면 폭이 **함께** 바뀌고 앞 스냅샷은 그대로(S30)", "평면도·조립도 2종 · 번호·개정·상태·발행 잠금", "**치수가 BOM 스냅샷에 박힌다(0011)** — 도면은 스냅샷 치수만 읽고, 09-21 의 임시 가드(409)는 걷어냈다(옛 스냅샷은 422)", "**한 칸이 둘 다에 닿는다**: 사양 문자열이 cap.face 대신 dim.W/H 를 읽어, W 한 칸을 고치면 BOM 사양·도면·원가가 함께 바뀐다(S30b2 — 09-21 의 중복 해소)"],
+        ["도면은 아직 **선과 글자** 수준 — 제작도가 아니다", "Detail Dimension · 부품도 · KAD-□ 슬롯 문법 없음", "구획별 치수는 길이 한 축(p36)"],
+        "e2e S18a~S18f · S19a~S19e · S30a~g · S31 · drawing:test 18", "43_drawings", "DXF 연구 결과와 CAD 담당의 Drawing Set-Up 입력이 필요"),
  39: pg("P", "Set-Up / PLM / Work Process / Design", "도면 Templet 호출 설정 6단계",
         ["1) Product Item 호출 ✓ · 도면 치수 ✓ · 사용 승인 절차(상태 4단계) ✓"], ["하부 도면 호출 · 도면 구성 설정 · 설계 우선순위 · 조립 방식/설계 검증 Macro 없음"],
         "e2e S7 · S18a", "48_dxf_plan"),
@@ -180,8 +188,10 @@ PAGES = {
         ["Prompt · Macro · Flowchart · Description · Coding 이 같은 매크로를 본다"], ["Data Management(Directory · Type of source: Table/Chart/Formula drawing) 없음", "함수 마법사 · 그래프 마법사 없음"],
         "e2e S13b · S13c · S13e", "30_toolbox_program"),
  58: pg("N", "E-2 · Toolbar Module", "Main Work place Toolbar",
-        [], ["Arrangement · Move · Delete · Add · DWG · View · Free CAD · 설계 심볼 · 승인 — 버튼 줄은 청사진 순서대로 있지만 **눌러도 동작하는 것이 없다**", "그림 제작 Module 없음 (Action Bar 편집은 p25 의 것이라 여기서 세지 않았다)"],
-        "", "16_design_tab", "Arrangement 묶음(p13·35·36·46)과 함께 — 회장님 우선순위 결정"),
+        [], ["**이 툴바의 9개 버튼은 여전히 onClick 이 없다**(toolbar.tsx CANVAS_CMDS) — 눌러도 동작 0",
+             "Arrangement 만 **Design 탭 안의 편집 패널**로 따로 돈다(p13) — 툴바 버튼에 물린 것이 아니라 여기서는 미착수로 셌다",
+             "그림 제작 Module 없음 (Action Bar 편집은 p25 의 것이라 여기서 세지 않았다)"],
+        "grep toolbar.tsx CANVAS_CMDS(핸들러 0건) · 동작하는 쪽은 e2e S31g", "16_design_tab", "Arrangement 묶음(p13·35·36·46)과 함께 — 회장님 우선순위 결정"),
  59: pg("L", "E-3 · Key Work Place", "Hierarchy 와 Run 심볼",
         ["Work Hierarchy 트리에서 노드를 고르면 작업 대상이 호출된다", "EDIM Run · BOM Run · EBOM Run · Cost · Approval Request ✓"], ["Hierarchy(Edit) · Data Up-Load · DWG 폴더 없음"],
         "hierarchy:test · e2e S1 · S3", "10_project_bound"),
@@ -189,8 +199,8 @@ PAGES = {
         ["승인된 식만 실행 · 실행에 LLM 없음 · 결과 455.4 재현", "매크로는 **서버가** 실행한다(클라이언트가 값을 보내지 않는다)"], ["Design Tool 범례 중 Key Dimension 만 실제"],
         "e2e S5 · S13e · S20d", "14_edim_run"),
  61: pg("L", "E-4 · Sub Work Place / Code", "코드 조립 — A ▼ B ▼ C ▼ D ▼ E ▼ F ▼",
-        ["슬롯 조립 → 규칙 검증 → VALID → 개정 저장(Rev A→B)", "등록 안 된 코드는 서버가 422 로 거부"], ["Arrangement Code · Child Component Import/Export(Excel 연동) 없음"],
-        "rccs 테스트 · e2e S2 · S2b · S2c · S8b", "11_code_builder"),
+        ["슬롯 조립 → 규칙 검증 → VALID → 개정 저장(Rev A→B)", "등록 안 된 코드는 서버가 422 로 거부", "개정에 **슬롯 F 까지 포함**(회장님 결정 2026-09-22) — F 만 다른 미저장 조합은 근거 개정이 빈 값으로 남는다(S22f)"], ["Arrangement Code · Child Component Import/Export(Excel 연동) 없음"],
+        "rccs 테스트 · e2e S2 · S2b · S2c · S8b · S22f · S28e", "11_code_builder"),
  62: pg("L", "E-4 · Sub Work Place / BOM", "BOM Run → EBOM Run → Cost → Document · Drawing · Export",
         ["BOM 11행 · 섹션별 EBOM · 원가 · 문서 · 도면 · Export 가 전부 돈다", "EBOM·Cost 는 다시 계산하지 않고 **스냅샷을 읽는다**"], ["단가는 샘플", "'Work Process 의 설계·생산·자재 Data 추출' 은 배율 가정(18%·12%)"],
         "e2e S6a · S6b · S20a~S20c", "15_bom_cost"),
@@ -273,7 +283,7 @@ def s_rule():
     return f'''<section class="slide"><div class="stage"><header><span class="no">01</span><h2>읽는 법 — 판정 기준과 실측</h2></header>
 <div class="honest">
 <div class="h"><b>판정 네 가지</b><p><u>실동</u> 그 장의 핵심 동작이 화면에서 끝까지 돌고, e2e 나 DB 검증이 그것을 못 박고 있다.<br><u>부분</u> 일부만 돈다 — 도는 것과 없는 것을 둘 다 적는다.<br><u>미착수</u> 구현 대상인데 도는 것이 없다. <b>버튼 자리만 있는 것은 미착수로 셌다.</b><br><u>개념·표지</u> 구현 대상이 아닌 장. 반영된 곳이 있으면 적었다.</p></div>
-<div class="h hb"><b>실측 (main {MAIN} · 엘 샌드박스)</b><p>typecheck 11 · 단위 테스트 189 · 발표 시나리오 e2e <b>106/106</b><br>DB 검증: rls · revision · project · hierarchy · macro · backbone 13 · platform 25 · drawing 16 · document 37 · auth<br>회귀: 슬롯 1,200 조합에서 BOM 불변<br>각 장의 근거 칸에 적힌 S번호는 <code>scripts/demo_e2e.py</code> 의 단계 이름이다.</p></div>
+<div class="h hb"><b>실측 (main {MAIN} · 엘 샌드박스)</b><p>typecheck 11 · 단위 테스트 189(vitest) + auth 12 PASS · 발표 시나리오 e2e <b>116/116</b><br>DB 검증 9종 전부 PASS: rls · revision 8 · project · hierarchy · macro 10 · backbone 13 · platform 25 · drawing 18 · document 37<br>회귀: 슬롯 1,200 조합에서 BOM 불변<br>각 장의 근거 칸에 적힌 S번호는 <code>scripts/demo_e2e.py</code> 의 단계 이름이다.</p></div>
 <div class="h"><b>오른쪽 화면은 전부 실제 캡처</b><p>목업이 아니다. <code>demo_e2e.py</code> 가 매번 새로 찍는 화면이고, 이번부터 <code>docs/screens/</code> 에 함께 올렸다. 도면은 내려받은 DXF 를 ezdxf 로 다시 그린 것이다.</p></div>
 <div class="h hc"><b>여전히 검증되지 않은 것</b><p><b>회장님 Windows PC 실행 0회</b> — 위 수치는 전부 엘 샌드박스(Linux) 기준.<br>표·단가는 샘플 · Prompt→Macro 실모델 호출 0회 · 도면은 선과 글자 수준.</p></div>
 </div></div></section>'''
@@ -309,15 +319,42 @@ def s_page(p):
 <footer class="pf">{nx}</footer></div></section>'''
 
 def s_remaining():
-    return f'''<section class="slide"><div class="stage"><header><span class="no">끝</span><h2>남은 것 — 누가 풀어야 움직이나</h2></header>
-<div class="honest">
-<div class="h hc"><b>회장님 몫</b><p>① <b>Windows PC 에서 1회 실행</b> — 모든 수치가 그때 처음 회장님 것이 된다 (<code>docs/DEMO.md</code> §1, pull 후 <code>pnpm db:generate && pnpm db:migrate</code>)<br>② API 키로 Prompt→Macro 1회 · ③ 회사 실 표(단가 · Table1/NS)<br>④ 결정: 코드 개정에 슬롯 F 를 넣을지 · Arrangement(p13·35·36·46) 우선순위<br>⑤ DXF 추출 연구 결과(→ P3-b) · 88md 백업 · CI 워크플로 파일 1개 추가(토큰 권한 밖)</p></div>
-<div class="h"><b>사장님 몫</b><p><b>D1</b> — Special Tool Box 첫 시연 사례(→ P3-c)<br>회사 기술 문서 · 기술 계산식(→ Tech Data 깊이, p15)</p></div>
-<div class="h hb"><b>엘이 이어서 할 수 있는 것</b><p><b>P6 통합은 끝났다</b>(승인 ↔ BOM · 발행/발주 문 · 추적 — 연결 장부 '없음' 3 → 2).<br>남은 엘 몫: 기존에 깨져 있던 검증 2종(hierarchy · macro) 수리 · 변경 전파를 한 시나리오로 묶는 단언 · P5 발표 준비(회장님 결정 후)</p></div>
-<div class="h"><b>범위 밖으로 둔 것</b><p>p43·p44 생산·MES · p69 파트너·모바일·QR · 3D DWG · 클라우드 배포.<br>회장님 확정: EDIM 완료 후 확장 단계(ERP → Digital Twin → AR·XR).</p></div>
+    return '''<section class="slide"><div class="stage"><header><span class="no">끝1</span><h2>남은 작업 — 엘이 지시만 받으면 하는 것</h2></header>
+<div class="own"><table class="ot"><thead><tr><th>#</th><th>작업</th><th>왜 엘이 할 수 있나</th><th>선행 조건</th><th>나오는 것</th></tr></thead><tbody>
+<tr><td>E1</td><td>Arrangement 2차 — 방향(L0~R270) · Component 배치 · 2D 3각법 · 3D View</td><td>코퍼스에 MVP 범위가 있고(EDIM_ARRANGEMENT_…md), 1차 구획 길이가 이미 돈다</td><td>회장님이 범위·순서만 결정</td><td>p13·35·36·46·58 을 부분→실동으로, e2e S32~</td></tr>
+<tr><td>E2</td><td>툴바 9버튼(Move·Delete·Add·DWG·View·Free CAD) 실동</td><td>동작 대상(구획·스냅샷)이 이미 서버에 있다</td><td>E1 과 같은 결정</td><td>p58 미착수 해소</td></tr>
+<tr><td>E3</td><td>p32 자재·구매 품목 코드 등록 화면 + Supplier 속성</td><td>구매 요청(p51)이 이미 돌고, 빈 칸이 Supplier 열 하나다</td><td>없음 — 지시만</td><td>p32 미착수 해소 · p51 Supplier 채움</td></tr>
+<tr><td>E4</td><td>Schedule management(To-do · Done · 승인 요청 목록) · Data Up-Load</td><td>승인·프로젝트 테이블이 이미 있다</td><td>없음 — 지시만</td><td>p12·p18·p50 부분 보강</td></tr>
+<tr><td>E5</td><td>승인 대장 화면(DOC No · Version · Released 모아보기)</td><td>문서·도면 상태가 DB 에 다 있다</td><td>없음 — 지시만</td><td>p55 부분 보강</td></tr>
+<tr><td>E6</td><td>인계 노트 오기 정정(단위 205→189) · README "DB 검증 7종"→9종</td><td>repo 문서 수정</td><td>없음 — 지시만</td><td>문서 커밋 1건</td></tr>
+<tr><td>E7</td><td>발표 덱·진행현황 보고서를 이번 main(cb0dfd9) 반영본으로 재생성</td><td>생성기가 repo 에 있다</td><td>이 대조표 판정을 회장님이 조정한 뒤</td><td>덱 v0.5 · 진행현황 09-23판</td></tr>
+<tr><td>E8</td><td>e2e 캡처 6장(00·05·06·47·48·49) 스크립트 복원</td><td>나머지 26장은 매번 자동으로 찍힌다</td><td>없음 — 지시만</td><td>증빙 자동화 28/28</td></tr>
+</tbody></table>
+<p class="onote">엘이 <b>혼자 못 여는 것</b>: P3-b 학습 1수준(회장님 DXF 연구 결과가 입력) · P3-c Special 슬롯(사장님 D1) · 실 단가·실 표 바인딩(회사 자료). 재료가 오면 그다음은 엘 몫이다.</p>
+</div></div></section>
+
+<section class="slide"><div class="stage"><header><span class="no">끝2</span><h2>남은 작업 — 회장님·사장님만 풀 수 있는 것</h2></header>
+<div class="own"><table class="ot"><thead><tr><th>#</th><th>작업</th><th>왜 엘이 못 하나</th><th>소요</th><th>주시면 되는 것</th></tr></thead><tbody>
+<tr><td>M1</td><td><b>Windows PC 에서 1회 실행</b> — <code>git pull</code> → <code>pnpm db:generate &amp;&amp; pnpm db:migrate</code> → <code>pnpm db:reset:demo</code> → <code>pnpm dev</code></td><td>엘 샌드박스는 다른 기계다. 회장님 PC 접근 경로가 없다</td><td>10분</td><td>화면 1장 또는 "됐다" 한 줄</td></tr>
+<tr><td>M2</td><td>CI 워크플로 배선 — <code>docs/ci/ci.yml</code> 을 <code>.github/workflows/ci.yml</code> 로 추가</td><td>토큰에 Workflows 권한이 없다(403 실측)</td><td>2분</td><td>GitHub 웹에서 파일 추가</td></tr>
+<tr><td>M3</td><td>API 키로 Prompt→Macro 1회</td><td>샌드박스에 키가 없다 — 실모델 호출 0회</td><td>5분</td><td>키 1개 또는 회장님 PC 에서 1회 실행</td></tr>
+<tr><td>M4</td><td>회사 실 표 — 단가 · Table1/NS · 기술 계산식</td><td>회사 자료다. 지금 수치는 전부 샘플</td><td>—</td><td>엑셀·표 파일</td></tr>
+<tr><td>M5</td><td>DXF 추출 연구 결과(→ P3-b 학습 1수준 입력)</td><td>회장님이 직접 연구 중인 자료</td><td>—</td><td>결과 파일·정리</td></tr>
+<tr><td>M6</td><td>결정 3건 — Arrangement 2차 범위 · <b>이 70장 판정 조정</b> · D5 발표 시점</td><td>결정은 회장님 권한</td><td>—</td><td>한 줄 결정</td></tr>
+<tr><td>M7</td><td><b>사장님</b> D1 — Special Tool Box 첫 시연 사례(→ P3-c)</td><td>사장님 영역(기술 문서 담당)</td><td>—</td><td>사례 1건</td></tr>
+</tbody></table>
+<p class="onote">범위 밖(회장님 확정): p43·p44 생산·MES · p69 파트너·모바일·QR · 3D DWG · 클라우드 배포 — EDIM 완료 후 확장 단계(ERP → Digital Twin → AR·XR).</p>
 </div></div></section>'''
 
 EXTRA_CSS = '''
+.own{flex:1;display:flex;flex-direction:column;justify-content:center;gap:1.2cqw}
+.ot{width:100%;border-collapse:collapse;font-size:1.12cqw;line-height:1.45}
+.ot th{text-align:left;font-size:1.05cqw;color:var(--mut);font-weight:700;border-bottom:.14cqw solid var(--line);padding:.55cqw .7cqw}
+.ot td{padding:.55cqw .7cqw;border-bottom:.1cqw solid var(--line);vertical-align:top;color:var(--ink)}
+.ot td:first-child{font-family:'JetBrains Mono',monospace;color:var(--teal);font-weight:700;width:3.4cqw}
+.ot td b{color:var(--hl)}.ot code{font-family:'JetBrains Mono',monospace;font-size:.98cqw;color:var(--teal)}
+.onote{font-size:1.12cqw;color:var(--mut);line-height:1.5;border-left:.22cqw solid var(--amber);padding-left:1cqw}
+.onote b{color:var(--hl)}
 .badge{margin-left:auto;font-size:1.25cqw;font-weight:800;padding:.3cqw 1.1cqw;border-radius:2cqw;letter-spacing:.04em;white-space:nowrap}
 .badge.L,.c.L,.b.L i,.bt i.L{background:var(--teal);color:#04241e}.badge.P{background:transparent;color:var(--amber);border:.16cqw solid var(--amber)}
 .badge.N{background:transparent;color:var(--coral);border:.16cqw solid var(--coral)}.badge.C{background:transparent;color:var(--mut);border:.12cqw solid var(--line)}
@@ -375,7 +412,7 @@ def page_map_md():
 
 if __name__ == "__main__":
     os.makedirs(OUTDIR, exist_ok=True)
-    for theme, name in (("dark", "EDIM_청사진70장_대조_20260921.html"), ("light", "_print.html")):
+    for theme, name in (("dark", "EDIM_청사진70장_대조_20260923.html"), ("light", "_print.html")):
         open(os.path.join(OUTDIR, name), "w", encoding="utf-8").write(build(theme))
     open(os.path.join(OUTDIR, "page-map.md"), "w", encoding="utf-8").write(page_map_md())
     c = counts(); print("pages 70 ·", " · ".join(f"{ST[k]} {c[k]}" for k in "LPNC"), "· slides", 70 + 5)

@@ -269,6 +269,18 @@ function nextRevLabel(count: number): string {
   return s;
 }
 
+/* ───────────── Arrangement (p13·35·36·46·58) ───────────── */
+/** 청사진 p36 Fan Direction — 좌/우 × 0·90·180·270 */
+const DIRS = ["L0", "L90", "L180", "L270", "R0", "R90", "R180", "R270"] as const;
+interface ArrSection { name: string; len: number | null; dir: string | null; when: boolean; active: boolean; locked: boolean }
+const arrTh: CSSProperties = { textAlign: "left", fontWeight: 600, padding: "2px 8px 4px 0", borderBottom: "1px solid var(--line)" };
+const arrTd: CSSProperties = { padding: "3px 8px 3px 0", borderBottom: "1px solid var(--line)", verticalAlign: "middle" };
+const arrMini = (off: boolean): CSSProperties => ({
+  fontFamily: "var(--font-mono)", fontSize: 11, color: off ? "var(--line)" : "var(--ink-muted)",
+  background: "var(--surface-2)", border: "1px solid var(--line)", borderRadius: 4,
+  padding: "1px 6px", marginRight: 4, cursor: off ? "default" : "pointer",
+});
+
 /* ───────────── Design canvas (SVG, driven by slots) ───────────── */
 function DesignCanvas({ code, slots, runs, nodeStable, canEdit }: { code: string; slots: SlotValues; runs: RunResult[]; nodeStable: string | null; canEdit: boolean }) {
   // P4-a: 도면은 **BOM 스냅샷**에서 나온다. 스냅샷이 없으면 뜰 수 없다.
@@ -276,7 +288,8 @@ function DesignCanvas({ code, slots, runs, nodeStable, canEdit }: { code: string
   const cap = Number(slots.B ?? 0) || 10;
   const w = 320 + Math.min(cap, 60) * 4;
   // Arrangement: 구획은 **등록된 것**을 쓴다(하드코딩 아님). 현재 슬롯에서 활성인 구획 + 등록 길이.
-  const [secs, setSecs] = useState<{ name: string; len: number | null }[]>([]);
+  const [secs, setSecs] = useState<ArrSection[]>([]);
+  const [addName, setAddName] = useState("");
   const [arrOpen, setArrOpen] = useState(false);
   const [arrBusy, setArrBusy] = useState(false);
   const [arrMsg, setArrMsg] = useState<string | null>(null);
@@ -290,14 +303,27 @@ function DesignCanvas({ code, slots, runs, nodeStable, canEdit }: { code: string
   useEffect(() => { loadArr(); }, [loadArr]);
   const sections = secs.length > 0 ? secs.map((s) => s.name) : ["—"];
   const sw = w / sections.length;
-  async function saveArr(next: { name: string; len: number | null }[]) {
+  async function saveArr(next: ArrSection[]) {
     if (!canEdit) return;
     setArrBusy(true); setArrMsg(null);
-    const r = await fetch("/api/setup/arrangement", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ code: slots.A ?? "", lengths: Object.fromEntries(next.filter((s) => s.len != null).map((s) => [s.name, s.len])) }) });
+    // Arrangement 2차: 배열 순서가 곧 구획 순서(Move) · 빠진 이름은 삭제(Delete) · 새 이름은 추가(Add)
+    const body = { code: slots.A ?? "", sections: next.map((s) => ({ name: s.name, ...(s.len != null ? { len: s.len } : {}), ...(s.dir ? { dir: s.dir } : {}) })) };
+    const r = await fetch("/api/setup/arrangement", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
     const j = await r.json().catch(() => ({}));
     setArrBusy(false);
-    if (r.ok) { setSecs(next); setArrMsg("저장 · 다음 BOM Run 부터 도면 전장에 반영됩니다"); } else setArrMsg(`거부: ${j.error ?? r.status}`);
+    if (r.ok) { setSecs(next); setArrMsg("저장 · 다음 BOM Run 부터 순서·전장·방향에 반영됩니다"); } else setArrMsg(`거부: ${j.error ?? r.status}`);
   }
+  const move = (i: number, d: -1 | 1) => setSecs((xs) => {
+    const j = i + d; if (j < 0 || j >= xs.length) return xs;
+    const out = [...xs]; const t = out[i]!; out[i] = out[j]!; out[j] = t; return out;
+  });
+  const del = (i: number) => setSecs((xs) => xs.filter((_, j) => j !== i));
+  const add = () => {
+    const name = addName.trim();
+    if (!name || secs.some((s) => s.name === name)) { setArrMsg(name ? `이미 있는 구획: ${name}` : "구획 이름을 적으십시오"); return; }
+    setSecs((xs) => [...xs, { name, len: null, dir: null, active: true, locked: false, when: false }]);
+    setAddName(""); setArrMsg(null);
+  };
   return (
     <div data-testid="design-canvas" style={card}>
       <div style={h}>
@@ -311,16 +337,47 @@ function DesignCanvas({ code, slots, runs, nodeStable, canEdit }: { code: string
       </div>
       {arrOpen && canEdit && (
         <div data-testid="arrangement-panel" style={{ ...card, margin: "0 0 10px", padding: 10, background: "var(--surface-1)" }}>
-          <p style={{ ...muted, margin: "0 0 6px" }}>구획 길이(mm) — 비우면 도면이 치수표의 L 로 균등 분할합니다. 저장은 다음 BOM Run 부터 반영됩니다.</p>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            {secs.map((s, i) => (
-              <label key={s.name} style={{ display: "flex", flexDirection: "column", fontSize: 11, color: "var(--ink-muted)" }}>
-                {s.name}
-                <input type="number" min={0} data-testid={`arr-len-${s.name}`} value={s.len ?? ""} placeholder="L"
-                  onChange={(e) => setSecs((xs) => xs.map((x, j) => (j === i ? { ...x, len: e.target.value === "" ? null : Number(e.target.value) } : x)))}
-                  style={{ width: 76, fontFamily: "var(--font-mono)", fontSize: 12, padding: "3px 5px", border: "1px solid var(--line)", borderRadius: 4, background: "var(--surface-0)", color: "var(--ink)" }} />
-              </label>
-            ))}
+          <p style={{ ...muted, margin: "0 0 6px" }}>구획 순서(↑↓) · 길이(mm) · 방향(p36 L0~R270) · 추가/삭제. 길이를 비우면 도면이 치수표의 L 로 균등 분할합니다. 저장은 다음 BOM Run 부터 반영됩니다.</p>
+          <table data-testid="arr-table" style={{ borderCollapse: "collapse", fontSize: 11, color: "var(--ink)" }}>
+            <thead><tr style={{ color: "var(--ink-muted)" }}>
+              <th style={arrTh}>순서</th><th style={arrTh}>구획</th><th style={arrTh}>길이(mm)</th><th style={arrTh}>방향</th><th style={arrTh}></th>
+            </tr></thead>
+            <tbody>
+              {secs.map((s, i) => (
+                <tr key={s.name} data-testid={`arr-row-${s.name}`}>
+                  <td style={arrTd}>
+                    <button type="button" data-testid={`arr-up-${s.name}`} disabled={i === 0} onClick={() => move(i, -1)} style={arrMini(i === 0)}>↑</button>
+                    <button type="button" data-testid={`arr-down-${s.name}`} disabled={i === secs.length - 1} onClick={() => move(i, 1)} style={arrMini(i === secs.length - 1)}>↓</button>
+                  </td>
+                  <td style={{ ...arrTd, fontFamily: "var(--font-mono)" }}>
+                    {s.name}
+                    {s.when && <span style={{ ...muted, marginLeft: 6 }}>조건부{s.active ? "" : " · 지금 슬롯에서 꺼짐"}</span>}
+                  </td>
+                  <td style={arrTd}>
+                    <input type="number" min={0} data-testid={`arr-len-${s.name}`} value={s.len ?? ""} placeholder="L"
+                      onChange={(e) => setSecs((xs) => xs.map((x, j) => (j === i ? { ...x, len: e.target.value === "" ? null : Number(e.target.value) } : x)))}
+                      style={{ width: 76, fontFamily: "var(--font-mono)", fontSize: 12, padding: "3px 5px", border: "1px solid var(--line)", borderRadius: 4, background: "var(--surface-0)", color: "var(--ink)" }} />
+                  </td>
+                  <td style={arrTd}>
+                    <select data-testid={`arr-dir-${s.name}`} value={s.dir ?? ""}
+                      onChange={(e) => setSecs((xs) => xs.map((x, j) => (j === i ? { ...x, dir: e.target.value === "" ? null : e.target.value } : x)))}
+                      style={{ fontFamily: "var(--font-mono)", fontSize: 12, padding: "3px 5px", border: "1px solid var(--line)", borderRadius: 4, background: "var(--surface-0)", color: "var(--ink)" }}>
+                      <option value="">— 없음</option>
+                      {DIRS.map((d) => <option key={d} value={d}>{d}</option>)}
+                    </select>
+                  </td>
+                  <td style={arrTd}>
+                    <button type="button" data-testid={`arr-del-${s.name}`} disabled={s.locked} title={s.locked ? "BOM 관계가 걸린 구획입니다" : "구획 삭제"}
+                      onClick={() => del(i)} style={arrMini(s.locked)}>Delete</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8 }}>
+            <input data-testid="arr-add-name" value={addName} onChange={(e) => setAddName(e.target.value)} placeholder="새 구획 이름"
+              style={{ width: 130, fontSize: 12, padding: "3px 6px", border: "1px solid var(--line)", borderRadius: 4, background: "var(--surface-0)", color: "var(--ink)" }} />
+            <button type="button" data-testid="arr-add" onClick={add} style={arrMini(false)}>Add</button>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8 }}>
             <button type="button" data-testid="arr-save" disabled={arrBusy} onClick={() => saveArr(secs)}

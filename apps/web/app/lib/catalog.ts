@@ -1,7 +1,7 @@
 import type { Role } from "@edim/core-ontology";
 import { withTenant, loadCatalogRows, type CatalogRows } from "@edim/db";
 import { slotDefsFromSubCodes, type SlotDef } from "./rccs";
-import { macroTablesOf } from "@edim/bom-code";
+import { macroTablesOf, isDirection } from "@edim/bom-code";
 import type { Catalog, Cond, CostBind, QtyBind, SectionDef, SlotKey, TechTable, Cell } from "@edim/bom-code";
 
 /**
@@ -96,7 +96,10 @@ export function parseSections(v: unknown): SectionDef[] | undefined | "invalid" 
     // Arrangement: 구획 길이(len, mm). 있으면 보존, 없으면 도면이 dim.L 로 폴백한다.
     if (s.len !== undefined && s.len !== null && !(typeof s.len === "number" && Number.isFinite(s.len) && s.len > 0)) return "invalid";
     const len = typeof s.len === "number" ? s.len : undefined;
-    out.push({ name: s.name, ...(c ? { when: c } : {}), ...(len !== undefined ? { len } : {}) });
+    // Arrangement 2차: 방향(p36 L0~R270). 값이 목록 밖이면 그 코드 전체를 무효로 본다(조용한 무시 금지).
+    if (s.dir !== undefined && s.dir !== null && !isDirection(s.dir)) return "invalid";
+    const dir = isDirection(s.dir) ? s.dir : undefined;
+    out.push({ name: s.name, ...(c ? { when: c } : {}), ...(len !== undefined ? { len } : {}), ...(dir ? { dir } : {}) });
   }
   return out;
 }

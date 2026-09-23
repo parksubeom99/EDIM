@@ -69,17 +69,29 @@ export interface TechTable {
 
 export type Cond = { slot: SlotKey; eq: string } | { macro: true };
 
+/**
+ * Arrangement 방향 (청사진 p36 Fan Direction · 코퍼스 EDIM_ARRANGEMENT_…MODEL.md "Component Position Rule").
+ * 좌/우 계열 × 0·90·180·270°. 미등록이면 방향 지정 없음(도면에 표기하지 않는다).
+ */
+export const DIRECTIONS = ["L0", "L90", "L180", "L270", "R0", "R90", "R180", "R270"] as const;
+export type Direction = (typeof DIRECTIONS)[number];
+export const isDirection = (v: unknown): v is Direction =>
+  typeof v === "string" && (DIRECTIONS as readonly string[]).includes(v);
+
 export interface SectionDef {
   name: string;
   when?: Cond;
   /** Arrangement: 구획 길이(mm). 없으면 도면이 dim 표의 L 로 폴백한다. */
   len?: number;
+  /** Arrangement 2차: 그 구획 Component 의 방향(p36). 없으면 미지정. */
+  dir?: Direction;
 }
 
-/** Arrangement: 한 구획의 이름 + 길이(mm). len 이 없으면 fallbackL 을 쓴다. */
+/** Arrangement: 한 구획의 이름 + 길이(mm) + 방향. len 이 없으면 fallbackL 을 쓴다. */
 export interface SectionDim {
   name: string;
   len: number;
+  dir?: Direction;
 }
 
 /** p33 — a registered code (product / part / purchased item). */
@@ -174,7 +186,11 @@ export function sectionDimsFor(
 ): SectionDim[] {
   return (product.sections ?? [])
     .filter((s) => holds(s.when, slots, macroValue))
-    .map((s) => ({ name: s.name, len: typeof s.len === "number" && s.len > 0 ? s.len : fallbackL }));
+    .map((s) => ({
+      name: s.name,
+      len: typeof s.len === "number" && s.len > 0 ? s.len : fallbackL,
+      ...(isDirection(s.dir) ? { dir: s.dir } : {}),
+    }));
 }
 
 class RefError extends Error {}

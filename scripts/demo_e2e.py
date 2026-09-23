@@ -381,6 +381,56 @@ with sync_playwright() as p:
     rC=run55(); gC=dxf_of(rC["runId"])
     ok("S31f 되돌리면(길이 제거) 전장이 원래대로 균등", (L0, gC["maxx"]), gC["maxx"]==L0)
 
+    # ── S32 Arrangement 2차 — 순서(Move) · 방향(p36 L0~R270) · 추가/삭제(Add/Delete) ──
+    # 편집은 화면 API 하나(/api/setup/arrangement)로만 한다: 배열 순서 = 구획 순서, 빠진 이름 = 삭제, 새 이름 = 추가.
+    ARR=BASE+"/api/setup/arrangement"
+    g0=ctx.request.get(ARR+"?code=EU&slots="+json.dumps({"A":"EU","B":"55","C":"2123","D":"630","E":"SS","F":"1-21-13-15"})).json()
+    names0=[x["name"] for x in g0.get("sections",[])]
+    ok("S32a 등록된 구획 목록을 화면이 받아온다 (조건부 구획 포함 · 관계 걸린 구획은 locked)",
+       (names0[:3], sum(1 for x in g0["sections"] if x.get("locked"))), len(names0)>=4 and any(x.get("locked") for x in g0["sections"]))
+    def put(rows):
+        return ctx.request.post(ARR, headers=J0, data=json.dumps({"code":"EU","sections":rows}))
+    # (1) Move — Filter 를 맨 앞으로 보낸다
+    rows=[{"name":x["name"], **({"len":x["len"]} if x.get("len") is not None else {}), **({"dir":x["dir"]} if x.get("dir") else {})} for x in g0["sections"]]
+    fi=[i for i,x in enumerate(rows) if x["name"]=="Filter"][0]
+    moved=[rows[fi]]+[r for i,r in enumerate(rows) if i!=fi]
+    mv=put(moved)
+    rD=run55("S32MV"); gD=dxf_of(rD["runId"])
+    secD=ctx.request.get(BASE+f"/api/dxf?runId={rD['runId']}&type=plan&meta=1").json().get("sections",[])
+    ok("S32b Move — 구획 순서를 바꾸면 도면의 구획 순서가 그대로 따라온다 (Filter 가 맨 앞)",
+       (mv.status, secD[:2]), mv.status==200 and secD and secD[0]=="Filter")
+    secs_in_bom=[l.get("section") for l in (rD.get("lines") or [])]
+    # 구획 순서가 BOM 줄 정렬의 기준이다(미등록 구획 Casing 은 늘 앞) — Filter 가 등록 구획 중 첫째로 온다
+    listed=[x for x in secs_in_bom if x in secD]
+    ok("S32c 같은 순서가 BOM 줄 정렬에도 반영된다 (구획이 BOM·도면 공통 기준 — p13)",
+       (secs_in_bom[:4], secD[:2]), bool(listed) and listed[0]=="Filter")
+    # (2) 방향 — Fan 구획에 R90
+    rows2=[dict(r) for r in moved]
+    for r in rows2:
+        if r["name"]=="Fan": r["dir"]="R90"
+    dr=put(rows2)
+    rE=run55("S32DIR"); dxfE=ctx.request.get(BASE+f"/api/dxf?runId={rE['runId']}&type=plan").text()
+    metaE=ctx.request.get(BASE+f"/api/dxf?runId={rE['runId']}&type=plan&meta=1").json()
+    ok("S32d 방향(p36 Fan Direction) — Fan 구획에 R90 을 등록하면 도면에 'DIR R90' 이 찍힌다",
+       (dr.status, "DIR R90" in dxfE, metaE.get("dirs")), dr.status==200 and "DIR R90" in dxfE)
+    dxfD=ctx.request.get(BASE+f"/api/dxf?runId={rD['runId']}&type=plan").text()
+    ok("S32e 앞 스냅샷의 도면에는 방향이 없다 — 방향도 스냅샷에 박힌 값만 쓴다(0011 원칙)", ("DIR R90" in dxfD), "DIR R90" not in dxfD)
+    # (3) Delete — BOM 관계가 걸린 구획은 거부, 빈 구획은 지워진다
+    lock=[r for r in rows2 if r["name"]=="Coil"]
+    rej=put([r for r in rows2 if r["name"]!="Coil"])
+    ok("S32f Delete 거부 — BOM 관계가 걸린 구획(Coil)은 지울 수 없다 (409, 줄이 갈 곳을 잃지 않게)", rej.status, rej.status==409)
+    add=put(rows2+[{"name":"Silencer","len":600}])
+    rF=run55("S32ADD"); metaF=ctx.request.get(BASE+f"/api/dxf?runId={rF['runId']}&type=plan&meta=1").json()
+    ok("S32g Add — 새 구획(Silencer 600)을 추가하면 도면 맨 뒤에 그 길이로 붙는다",
+       (add.status, metaF.get("sections",[])[-1:], metaF.get("lengthMm")), add.status==200 and metaF.get("sections",[])[-1]=="Silencer")
+    rm=put(rows2)
+    rG=run55("S32RM"); metaG=ctx.request.get(BASE+f"/api/dxf?runId={rG['runId']}&type=plan&meta=1").json()
+    ok("S32h Delete — 관계가 없는 구획은 지워지고 도면에서도 사라진다 (전장도 그만큼 줄어든다)",
+       (rm.status, "Silencer" in metaG.get("sections",[]), metaF.get("lengthMm")-metaG.get("lengthMm")),
+       rm.status==200 and "Silencer" not in metaG.get("sections",[]) and metaF.get("lengthMm")-metaG.get("lengthMm")==600)
+    # 원상 복구 — 뒤 단계(S16~)가 옛 순서를 전제로 하지 않게
+    put(rows)
+
     # ── P3-a 플랫폼 관리자 계층 · DB①/DB② 소유 분리 (p54 User Management · p59 최종 승인 · p64 Admin.) ──
     # S16 회사 관리자가 Company Info.에서 Special 의뢰를 올린다 = 회사→플랫폼 유일 통로
     pg.goto(BASE+"/m/company",wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=user-management]",timeout=30000); time.sleep(1.5); nuke(pg)

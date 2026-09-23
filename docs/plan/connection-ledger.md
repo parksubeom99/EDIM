@@ -126,3 +126,12 @@ BOM 사양 문자열(패널·댐퍼·코일·드레인팬)이 `{cap.face}` 대�
 - API `/api/setup/arrangement` GET(활성 구획+등록 길이) / POST(len 병합 upsert). 화면: Design 탭 Toolbar `Arrangement` 버튼 → 구획 길이 편집 → 저장 → 캔버스가 등록 구획을 폭 비례로 그림.
 - e2e S31a~g(엔진 전장 = 구획 길이 합 · 앞 스냅샷 보존 · 되돌리면 균등 · 화면 편집 실동). drawing:test 18 · bom-code 18 · 116/116.
 - **2차(코퍼스 MVP · 회장님 결정 대기)**: 방향(L0~R270) · Component 배치 규칙 · 2D 3각법(Front/Top/Right) · 3D View · Design Tool Binding. Move/Delete/Add/DWG/View/Free CAD 버튼은 아직 자리만 있다.
+
+#### Arrangement 2차 — 순서·방향·추가/삭제 (2026-09-23 · 청사진 p13·36·46·58 · 코퍼스 "Component Position Rule")
+1차(길이) 위에 **구획 순서(Move) · 방향(p36 Fan Direction L0~R270) · 추가(Add) · 삭제(Delete)** 를 얹었다. 스키마 변경은 여전히 없다 — 전부 제품 코드 `sections` 배열이고, BOM Run 때 스냅샷 `dims.sections` 로 박힌다(0011 원칙: 도면은 스냅샷 값만 읽는다).
+- API `/api/setup/arrangement` POST 가 **배열 전체 교체**를 받는다(배열 순서 = 구획 순서 · 빠진 이름 = 삭제 · 새 이름 = 추가). 조건(`when`)은 이름으로 물려받아 화면이 조건을 만들지 않는다. 구 형식 `{lengths}` 도 계속 받는다.
+- **삭제 잠금**: 그 구획에 BOM 관계(`code_relationship.section`)가 걸려 있으면 409 로 거부한다 — 줄이 갈 곳을 잃지 않게. GET 이 `locked` 로 미리 알려 화면 버튼도 잠근다.
+- 도면: 평면도가 구획 안에 `DIR <방향>` 을 적고, meta 에 `dirs` 를 싣는다. 방향 미등록이면 아무것도 적지 않는다.
+- e2e S32a~S32h(목록·Move→도면/BOM 순서·방향 표기·앞 스냅샷엔 방향 없음·삭제 거부 409·Add 전장 +600·Delete 복귀). 실측: typecheck 11 · 단위 189 · DB 검증 9종 PASS · **124/124**.
+- **남은 2차(Tier B · 회장님 승인 필요)**: 2D 3각법(Front/Right) 도면은 `drawing_type` CHECK 가 `('plan','assembly')` 로 잠겨 있어 마이그레이션 0012 가 필요하다. 3D View · Design Tool Binding 은 그다음.
+- 정정: 09-22 인계 노트의 "단위 205" 는 근거 없는 수치였다 — 실측은 vitest 189(+auth 12 PASS). README 의 "DB 검증 7종" 도 실제 9종으로 고쳤다.
