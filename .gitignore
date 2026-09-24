@@ -19,3 +19,4 @@ packages/db/prisma/*.db
 .DS_Store
 .turbo/
 *.tsbuildinfo
+.storage/

@@ -56,7 +56,8 @@ model AppUser {
   auditActions       AuditLog[]
   macrosCreated      MacroRegistry[]     @relation("MacroCreator")
   macrosApproved     MacroRegistry[]     @relation("MacroApprover")
-  createdProjects    Project[]
+  createdProjects    Project[] @relation("ProjectCreator")
+  ownedProjects      Project[] @relation("ProjectOwner")
   uploadedFiles      ProjectAttachment[]
   approvalsRequested ProjectApproval[]   @relation("ApprovalRequester")
   approvalsToDecide  ProjectApproval[]   @relation("ApprovalApprover")
@@ -169,9 +170,14 @@ model Project {
   status          String // 'active' | 'closed'
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   createdBy       String   @map("created_by") @db.Uuid
+  /// 0014 · p12 담당자 · Remarks · Description
+  ownerId         String?  @map("owner_id") @db.Uuid
+  remarks         String?
+  description     String?
 
   tenant      Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  creator     AppUser             @relation(fields: [createdBy], references: [id])
+  creator     AppUser             @relation("ProjectCreator", fields: [createdBy], references: [id])
+  owner       AppUser?            @relation("ProjectOwner", fields: [ownerId], references: [id])
   attachments ProjectAttachment[]
   tasks       ProjectTask[]
   approvals   ProjectApproval[]
@@ -189,7 +195,9 @@ model ProjectAttachment {
   docType     String   @map("doc_type")
   name        String
   description String?
-  fileRef     String   @map("file_ref") // storage path/key; binary upload out of scope
+  fileRef     String   @map("file_ref") // 'local:<tenant>/<uuid>' = 0014 실제 파일 · 그 외 = 메타데이터만
+  fileMime    String?  @map("file_mime")
+  fileSize    Int?     @map("file_size")
   uploadedAt  DateTime @default(now()) @map("uploaded_at") @db.Timestamptz(6)
   uploadedBy  String   @map("uploaded_by") @db.Uuid
 

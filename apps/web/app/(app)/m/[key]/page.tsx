@@ -1,16 +1,16 @@
 import Link from "next/link";
 import { getServerSession } from "@/app/lib/session";
 import { getModule, canAccessModule } from "@/app/lib/modules";
-import { listProjectsForSession } from "@/app/lib/project";
 import { CompanyAdmin } from "../company-admin";
 import { Purchasing } from "../purchasing";
 import { Register } from "../register";
+import { ProjectManagement } from "../project-management";
 import { canEditProject } from "@/app/lib/project-perms";
 
 /**
  * Module routing stub (STEP 5). Guarded server-side: an unpermitted role sees a
- * forbidden notice, never module content. The 'project' module lists the
- * tenant's projects, each linking into the Main Work Panel detail (?node=).
+ * forbidden notice, never module content. The 'project' module is the p12·p50
+ * Project Management screen (등록 · 헤더 편집 · 영업 단계 · 접수 자료 File).
  *
  * P3-a: 'company' 모듈이 회사 관리자 영역이 된다 — User Management(2층→3층)와
  * 플랫폼 요청 통로(2층→1층). 역할 변경·의뢰 제출은 서버에서 owner 만 통과한다.
@@ -24,11 +24,9 @@ export default async function ModulePage({
   const session = await getServerSession();
   const mod = getModule(key);
   const allowed = !!session && !!mod && canAccessModule(session.role, key);
-  const projects =
-    allowed && key === "project" ? await listProjectsForSession() : null;
 
   return (
-    <main style={{ maxWidth: key === "purchasing" || key === "register" ? 960 : 640, margin: "10vh auto", padding: 24 }}>
+    <main style={{ maxWidth: key === "project" ? 1120 : key === "purchasing" || key === "register" ? 960 : 640, margin: "10vh auto", padding: 24 }}>
       <Link
         href="/"
         style={{ color: "var(--accent)", fontSize: "var(--fs-13)" }}
@@ -53,35 +51,7 @@ export default async function ModulePage({
           ) : key === "purchasing" ? (
             <Purchasing canEdit={canEditProject(session!.role)} />
           ) : key === "project" ? (
-            <ul style={{ listStyle: "none", padding: 0 }}>
-              {(projects ?? []).map((p) => (
-                <li
-                  key={p.id}
-                  style={{
-                    padding: "6px 0",
-                    borderBottom: "1px solid var(--line)",
-                  }}
-                >
-                  <Link
-                    href={`/?node=${p.hierarchyStable}`}
-                    style={{ color: "var(--ink)", textDecoration: "none" }}
-                  >
-                    <span
-                      style={{
-                        fontFamily: "var(--font-mono)",
-                        color: "var(--accent)",
-                      }}
-                    >
-                      {p.projectNo}
-                    </span>{" "}
-                    {p.name}
-                  </Link>
-                </li>
-              ))}
-              {(projects ?? []).length === 0 && (
-                <li style={{ color: "var(--ink-muted)" }}>no projects</li>
-              )}
-            </ul>
+            <ProjectManagement canEdit={canEditProject(session!.role)} />
           ) : (
             <p style={{ color: "var(--ink-muted)" }}>
               여기에 {mod!.label} 워크플로우가 들어옵니다. (L3 — 범위 밖)

@@ -604,7 +604,7 @@ with sync_playwright() as p:
     pg.goto(BASE+f"/api/documents/{_tds[0]['id']}/print",wait_until="domcontentloaded")
     pg.wait_for_function("()=>document.body.innerText.includes('TECH DATA')",timeout=30000)  # 인쇄본이 그려진 뒤에 캡처(고정 sleep 아님)
     pg.screenshot(path=f"{OUT}/47_techdata_print.png",full_page=True)
-    pg.goto(BASE+"/m/project",wait_until="domcontentloaded"); pg.wait_for_selector("text=PS-61313",timeout=30000); nuke(pg)
+    pg.goto(BASE+"/m/project",wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=pm-detail][data-project='PS-61313-5']",timeout=30000); nuke(pg)
     pg.screenshot(path=f"{OUT}/05_project_mgmt.png",full_page=True)
     pg.goto(BASE+"/m/cpq",wait_until="domcontentloaded"); pg.wait_for_selector("text=CPQ",timeout=30000); nuke(pg)
     pg.screenshot(path=f"{OUT}/06_module_cpq_stub.png",full_page=True)
@@ -801,15 +801,73 @@ with sync_playwright() as p:
     r=ctx.request.patch(BASE+"/api/company/members",headers=J,data=json.dumps({"userId":"10000000-0000-4000-8000-00000000000a","role":"viewer"}))
     ok("S17b 마지막 owner 강등은 거부된다 (409)", r.status, r.status==409)
     pg.screenshot(path=f"{OUT}/42_user_management.png",full_page=True)
+    # ── S42 p12·p50 Project Management — 등록 · 헤더(담당자·Remarks·Description) · 영업 단계 · 접수 자료(File) ──
+    # 맨 뒤에 둔다: 새 프로젝트가 Work Hierarchy 에 노드로 생기므로 앞 단계의 트리를 흔들지 않게(reset:demo 가 지운다).
+    PNO="PS-E2E-"+str(int(time.time()))[-6:]
+    pg.goto(BASE+"/m/project",wait_until="domcontentloaded")
+    pg.wait_for_selector("[data-testid=project-mgmt][data-ready='1']",timeout=60000); nuke(pg)
+    hdr=pg.inner_text("[data-testid=pm-detail]")
+    ok("S42a 프로젝트 관리 화면이 p12 헤더를 갖는다 (Project No·Type·Client·Client 담당자·담당자·영업 단계·Item·Remarks·등록일·Description)",
+       hdr.split("\n")[0:2], all(k in hdr for k in ("PS-61313-5","Project Type","Client 담당자 정보","담당자","영업 단계","Remarks","등록일","Description")))
+    for _ in range(20):
+        pg.fill("[data-testid=pm-new-no]",PNO); pg.fill("[data-testid=pm-new-name]","E2E 신규 AHU"); pg.fill("[data-testid=pm-new-client]","KSY")
+        if pg.eval_on_selector("[data-testid=pm-create]","e=>!e.disabled"): break
+        time.sleep(0.3)   # 하이드레이션 대기 재시도(값을 다시 넣고 버튼이 풀리는지 본다)
+    pg.click("[data-testid=pm-create]")
+    pg.wait_for_selector(f"[data-testid=pm-row-{PNO}][data-selected='1']",timeout=30000)
+    newp=[x for x in ctx.request.get(BASE+"/api/projects").json()["rows"] if x["projectNo"]==PNO][0]
+    pg.goto(BASE+f"/workbench?node={newp['hierarchyStable']}",wait_until="domcontentloaded")
+    pg.wait_for_selector(f"[data-testid=inspector-bound][data-project='{newp['id']}']",timeout=60000)
+    ok("S42b 등록 — 새 프로젝트가 목록에 생기고 Work Hierarchy 노드로도 생겨 작업대에서 바로 열린다", (PNO, newp["salesStage"]), newp["salesStage"]=="기술제안")
+    dup=ctx.request.post(BASE+"/api/projects",headers=J0,data=json.dumps({"projectNo":PNO,"name":"중복"}))
+    ok("S42c 같은 Project No 는 다시 등록할 수 없다 (409)", dup.status, dup.status==409)
+    pg.goto(BASE+"/m/project",wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=project-mgmt][data-ready='1']",timeout=60000); nuke(pg)
+    pg.click(f"[data-testid=pm-row-{PNO}]"); pg.wait_for_selector(f"[data-testid=pm-detail][data-project='{PNO}']",timeout=30000)
+    pg.select_option("[data-testid=pm-owner]","20000000-0000-4000-8000-00000000000a")
+    pg.fill("[data-testid=pm-contact]","김담당 010-0000-0000"); pg.fill("[data-testid=pm-remarks]","1차 사양 회의 완료")
+    pg.fill("[data-testid=pm-description]","Pain Point: 클린룸 차압 유지"); pg.select_option("[data-testid=pm-stage]","협의")
+    pg.click("[data-testid=pm-save]")
+    pg.wait_for_function("()=>(document.querySelector('[data-testid=pm-msg]')?.innerText||'').includes('협의')",timeout=30000)
+    got=[x for x in ctx.request.get(BASE+"/api/projects").json()["rows"] if x["projectNo"]==PNO][0]
+    ok("S42d 헤더 저장 — 담당자·Client 담당자·Remarks·Description 과 영업 단계(기술제안→협의)가 함께 저장된다",
+       (got["ownerId"][-4:] if got["ownerId"] else None, got["remarks"], got["salesStage"]),
+       got["ownerId"]=="20000000-0000-4000-8000-00000000000a" and got["clientContact"].startswith("김담당") and got["remarks"]=="1차 사양 회의 완료" and got["description"].startswith("Pain Point") and got["salesStage"]=="협의")
+    bad=ctx.request.patch(BASE+f"/api/projects/{got['id']}",headers=J0,data=json.dumps({"ownerId":"10000000-0000-4000-8000-00000000000b"}))
+    ok("S42e 담당자는 이 회사 구성원만 — 다른 회사 사람을 넣으면 400", bad.status, bad.status==400)
+    BODY="고객 요구사항: 풍량 55,000 CMH · 차압 유지\n".encode("utf-8")
+    pg.set_input_files("[data-testid=pm-up-file]",{"name":"requirements.txt","mimeType":"text/plain","buffer":BODY})
+    pg.fill("[data-testid=pm-up-desc]","1차 접수 자료")
+    pg.wait_for_function("()=>{const b=document.querySelector('[data-testid=pm-upload]'); return b && !b.disabled;}",timeout=30000)
+    pg.click("[data-testid=pm-upload]")
+    pg.wait_for_selector("[data-testid=pm-att-row][data-has-file='1']",timeout=30000)
+    att=ctx.request.get(BASE+f"/api/project-attachments?projectId={got['id']}").json()["rows"][0]
+    back=ctx.request.get(BASE+f"/api/project-attachments/{att['id']}/file")
+    ok("S42f 접수 자료 등록(File) — 실제 파일이 올라가고, 받으면 같은 바이트가 돌아온다", (att["name"], att["fileSize"], back.status),
+       back.status==200 and back.body()==BODY and att["fileSize"]==len(BODY) and att["department"]=="영업")
+    big=ctx.request.post(BASE+"/api/project-attachments",multipart={"projectId":got["id"],"department":"영업","docType":"File",
+        "file":{"name":"big.bin","mimeType":"application/octet-stream","buffer":b"0"*(10*1024*1024+1)}})
+    ok("S42g 10MB 를 넘는 파일은 받지 않는다 (413)", big.status, big.status==413)
+    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data={"email":"viewer@acme.test"})
+    vp=vw.request.patch(BASE+f"/api/projects/{got['id']}",headers=J0,data=json.dumps({"remarks":"viewer 수정"}))
+    vu=vw.request.post(BASE+"/api/project-attachments",multipart={"projectId":got["id"],"department":"영업","docType":"File","file":{"name":"x.txt","mimeType":"text/plain","buffer":b"x"}})
+    vw.close()
+    ok("S42h viewer 는 헤더 수정·자료 등록이 막힌다 (403 · 403)", (vp.status, vu.status), vp.status==403 and vu.status==403)
+    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data={"email":"owner@globex.test"})
+    gx=gb.request.get(BASE+f"/api/project-attachments/{att['id']}/file"); gp=gb.request.patch(BASE+f"/api/projects/{got['id']}",headers=J0,data=json.dumps({"remarks":"x"}))
+    gb.close()
+    ok("S42i 다른 회사는 이 파일도 프로젝트도 못 본다 (RLS — 404 · 404)", (gx.status, gp.status), gx.status==404 and gp.status==404)
+    pg.goto(BASE+"/m/project",wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=project-mgmt][data-ready='1']",timeout=60000)
+    pg.click(f"[data-testid=pm-row-{PNO}]"); pg.wait_for_selector("[data-testid=pm-att-row][data-has-file='1']",timeout=30000); nuke(pg)
+    pg.screenshot(path=f"{OUT}/55_project_mgmt.png",full_page=True)
     # S37 은 맨 끝에서 센다 — 중간(옛 자리)에서는 뒤에 찍히는 5장(40·41·42·52·53)이 아직 없어,
     # 빈 폴더에서는 25장이라 실패하고 이전 실행 잔재가 있을 때만 통과했다(2026-09-24 실측).
     _want=["00_login","05_project_mgmt","06_module_cpq_stub","10_project_bound","11_code_builder","11b_revisions","12_macro_tab",
            "13_macro_approved","14_edim_run","15_bom_cost","16_design_tab","20_setup_subcode","21_setup_product_table",
            "22_setup_relationship","23_codebuilder_from_subcode","30_toolbox_program","31_toolbox_ui_tool","40_company_admin",
            "41_platform_console","42_user_management","43_drawings","44_document_tab","45_purchasing","46_quotation_print",
-           "47_techdata_print","48_dxf_plan","49_dxf_assembly","51_accepted","52_register","53_schedule","54_toolbar"]
+           "47_techdata_print","48_dxf_plan","49_dxf_assembly","51_accepted","52_register","53_schedule","54_toolbar","55_project_mgmt"]
     _miss=[w for w in _want if not os.path.exists(f"{OUT}/{w}.png") or os.path.getmtime(f"{OUT}/{w}.png")<T0]
-    ok("S37 캡처 31장이 이번 실행에서 전부 나온다 (잔재 파일은 세지 않음)", _miss or len(_want), not _miss)
+    ok("S37 캡처 32장이 이번 실행에서 전부 나온다 (잔재 파일은 세지 않음)", _miss or len(_want), not _miss)
     b.close()
 n=sum(1 for v in R.values() if v[0]); print(f"\n[demo_e2e] {n}/{len(R)} steps passed"); json.dump(R,open(f"{OUT}/demo_e2e_result.json","w"),ensure_ascii=False,indent=1)
 sys.exit(0 if n==len(R) else 1)

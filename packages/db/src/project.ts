@@ -87,9 +87,14 @@ export function listProjects(tx: TenantClient) {
 
 export interface UpdateProjectPatch {
   name?: string;
+  type?: ProjectType;
   clientName?: string | null;
   clientContact?: string | null;
   itemType?: string | null;
+  /** 0014 · p12 담당자 · Remarks · Description */
+  ownerId?: string | null;
+  remarks?: string | null;
+  description?: string | null;
 }
 
 export async function updateProject(
@@ -108,15 +113,23 @@ export async function updateProject(
     id,
     {
       name: before.name,
+      type: before.type,
       clientName: before.clientName,
       clientContact: before.clientContact,
       itemType: before.itemType,
+      ownerId: before.ownerId,
+      remarks: before.remarks,
+      description: before.description,
     },
     {
       name: after.name,
+      type: after.type,
       clientName: after.clientName,
       clientContact: after.clientContact,
       itemType: after.itemType,
+      ownerId: after.ownerId,
+      remarks: after.remarks,
+      description: after.description,
     },
   );
 }
@@ -223,6 +236,8 @@ export interface AddAttachmentInput {
   name: string;
   description?: string | null;
   fileRef: string;
+  fileMime?: string | null;
+  fileSize?: number | null;
   uploadedBy: string;
 }
 
@@ -240,6 +255,8 @@ export async function addAttachment(
       name: input.name,
       description: input.description ?? null,
       fileRef: input.fileRef,
+      fileMime: input.fileMime ?? null,
+      fileSize: input.fileSize ?? null,
       uploadedBy: input.uploadedBy,
     },
   });
