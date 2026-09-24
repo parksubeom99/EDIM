@@ -28,9 +28,9 @@ const btn = (primary = false): CSSProperties => ({
   cursor: "pointer",
 });
 
-function Section({ name, children }: { name: string; children: ReactNode }) {
+function Section({ name, children, testid }: { name: string; children: ReactNode; testid?: string }) {
   return (
-    <div style={sec}>
+    <div style={sec} data-testid={testid}>
       <div style={title}>{name}</div>
       {children}
     </div>
@@ -223,7 +223,7 @@ export function Inspector({
         )}
       </Section>
 
-      <Section name="Approval">
+      <Section name="Approval" testid="inspector-approval">
         <div style={{ fontSize: "var(--fs-13)", marginBottom: 6 }}>
           현재 단계{" "}
           <span data-testid="pipeline-stage" style={{ fontFamily: "var(--font-mono)", color: "var(--accent)" }}>

@@ -1,9 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { CodeChip } from "@edim/ui";
 import type { SlotDef, SlotValues, AssembleResult } from "@/app/lib/rccs";
-import type { WorkTab } from "./toolbar";
+import type { WorkTab, CanvasCmd } from "./toolbar";
 import type { WorkbenchProject } from "./mainform-shell";
 import type { RunResult } from "./action-bar";
 import { MacroPanel } from "./macro-panel";
@@ -36,6 +36,7 @@ export function WorkPlace({
   canDecide,
   rev,
   onRev,
+  canvas,
 }: {
   tab: WorkTab;
   project: WorkbenchProject | null;
@@ -49,6 +50,7 @@ export function WorkPlace({
   canDecide: boolean;
   rev: RevInfo | null;
   onRev: (r: RevInfo | null) => void;
+  canvas?: CanvasLink;
 }) {
   return (
     <div style={{ display: "grid", gridTemplateRows: "1fr auto", minHeight: 0, height: "100%" }}>
@@ -64,7 +66,7 @@ export function WorkPlace({
           </div>
         )}
         {tab === "code" && <CodeBuilder slotDefs={slotDefs} slots={slots} onSlots={onSlots} assembled={assembled} nodeStable={nodeStable} canEdit={canEdit} rev={rev} onRev={onRev} />}
-        {tab === "design" && <DesignCanvas code={assembled.code} slots={slots} runs={runs} nodeStable={nodeStable} canEdit={canEdit} />}
+        {tab === "design" && <DesignCanvas code={assembled.code} slots={slots} runs={runs} nodeStable={nodeStable} canEdit={canEdit} link={canvas} />}
         {tab === "bom" && <BomPanel code={assembled.code} runs={runs} />}
         {tab === "macro" && <MacroPanel project={project} nodeStable={nodeStable} canEdit={canEdit} canDecide={canDecide} runs={runs} />}
         {tab === "document" && <DocumentPanel project={project} code={assembled.code} runs={runs} nodeStable={nodeStable} canEdit={canEdit} />}
@@ -285,8 +287,28 @@ const arrMini = (off: boolean): CSSProperties => ({
   padding: "1px 6px", marginRight: 4, cursor: off ? "default" : "pointer",
 });
 
+/** p58 툴바 ↔ Design 개념도. 선택·이동 상태는 셸이 들고(툴바가 버튼을 잠그려고 본다), 편집은 여기 초안에서만 한다. */
+export interface CanvasLink {
+  cmd: { cmd: CanvasCmd; seq: number } | null;
+  done: () => void;
+  sel: string | null;
+  onSel: (s: string | null) => void;
+  moving: boolean;
+  onMoving: (m: boolean) => void;
+}
+
+/** Copy 이름: 같은 이름이 없을 때까지 -2, -3 … (API 상한 24자). */
+function copyName(base: string, taken: Set<string>): string {
+  for (let n = 2; n < 100; n++) {
+    const suf = `-${n}`;
+    const name = base.slice(0, 24 - suf.length) + suf;
+    if (!taken.has(name)) return name;
+  }
+  return base.slice(0, 20) + "-cp";
+}
+
 /* ───────────── Design canvas (SVG, driven by slots) ───────────── */
-function DesignCanvas({ code, slots, runs, nodeStable, canEdit }: { code: string; slots: SlotValues; runs: RunResult[]; nodeStable: string | null; canEdit: boolean }) {
+function DesignCanvas({ code, slots, runs, nodeStable, canEdit, link }: { code: string; slots: SlotValues; runs: RunResult[]; nodeStable: string | null; canEdit: boolean; link?: CanvasLink }) {
   // P4-a: 도면은 **BOM 스냅샷**에서 나온다. 스냅샷이 없으면 뜰 수 없다.
   const runId = runs.find((r) => r.kind === "bom" && r.runId)?.runId ?? null;
   const cap = Number(slots.B ?? 0) || 10;
@@ -297,12 +319,15 @@ function DesignCanvas({ code, slots, runs, nodeStable, canEdit }: { code: string
   const [arrOpen, setArrOpen] = useState(false);
   const [arrBusy, setArrBusy] = useState(false);
   const [arrMsg, setArrMsg] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState(false);
+  const addRef = useRef<HTMLInputElement | null>(null);
   const loadArr = useCallback(async () => {
     try {
       const r = await fetch("/api/setup/arrangement?code=" + encodeURIComponent(slots.A ?? "") + "&slots=" + encodeURIComponent(JSON.stringify(slots)));
       const j = await r.json();
       if (r.ok) setSecs(j.sections ?? []);
     } catch { /* 등록 전엔 빈 배열 */ }
+    setLoaded(true);
   }, [slots]);
   useEffect(() => { loadArr(); }, [loadArr]);
   const visible = secs.filter((s) => s.active !== false);  // 조건부로 꺼진 구획은 개념도에 그리지 않는다(도면과 같게)
@@ -323,6 +348,56 @@ function DesignCanvas({ code, slots, runs, nodeStable, canEdit }: { code: string
     const out = [...xs]; const t = out[i]!; out[i] = out[j]!; out[j] = t; return out;
   });
   const del = (i: number) => setSecs((xs) => xs.filter((_, j) => j !== i));
+  // ── p58 툴바 명령: 초안(secs)만 바꾸고 패널을 연다. 반영은 기존 '저장' 한 곳에서만. ──
+  const sel = link?.sel ?? null;
+  const selRow = secs.find((s) => s.name === sel) ?? null;
+  useEffect(() => {
+    if (sel && loaded && !secs.some((s) => s.name === sel)) link?.onSel(null);  // 코드가 바뀌어 사라진 구획
+  }, [secs, sel, loaded, link]);
+  useEffect(() => () => link?.onMoving(false), []);  // eslint-disable-line react-hooks/exhaustive-deps
+  const cmd = link?.cmd ?? null;
+  useEffect(() => {
+    if (!cmd || !loaded || !link) return;
+    link.done();
+    if (!canEdit) return;
+    setArrOpen(true);
+    const c = cmd.cmd;
+    if (c === "add") { setArrMsg("새 구획 이름을 적고 Add → 저장"); window.setTimeout(() => addRef.current?.focus(), 0); return; }
+    if (c === "arrangement") return;
+    const row = secs.find((s) => s.name === link.sel);
+    if (!row) { setArrMsg("먼저 개념도에서 구획을 고르십시오"); return; }
+    if (c === "delete") {
+      if (row.locked) { setArrMsg(`${row.name} 은 BOM 관계가 걸린 구획이라 지울 수 없습니다`); return; }
+      setSecs((xs) => xs.filter((x) => x.name !== row.name));
+      link.onSel(null); link.onMoving(false);
+      setArrMsg(`초안에서 ${row.name} 삭제 — 저장해야 반영됩니다`);
+    } else if (c === "copy") {
+      const name = copyName(row.name, new Set(secs.map((x) => x.name)));
+      // 길이·방향만 복사한다. 부품 배치는 그 구획의 BOM 자식만 가능하므로 새 구획에는 비워 둔다. 조건(when)은 등록 데이터라 따라가지 않는다.
+      setSecs((xs) => { const i = xs.findIndex((x) => x.name === row.name); const out = [...xs]; out.splice(i + 1, 0, { name, len: row.len, dir: row.dir, active: true, locked: false, when: false, components: [] }); return out; });
+      link.onSel(name);
+      setArrMsg(`초안에 ${name} 복사 — 저장해야 반영됩니다`);
+    } else if (c === "move") {
+      const next = !link.moving;
+      link.onMoving(next);
+      setArrMsg(next ? `${row.name} 을 옮길 자리의 구획을 개념도에서 누르십시오 (Move 를 다시 누르면 취소)` : "이동 취소");
+    }
+  }, [cmd, loaded]);  // eslint-disable-line react-hooks/exhaustive-deps
+  const pick = (name: string) => {
+    if (!link) return;
+    if (link.moving && sel && name !== sel) {
+      setSecs((xs) => {
+        const from = xs.findIndex((x) => x.name === sel); const to = xs.findIndex((x) => x.name === name);
+        if (from < 0 || to < 0) return xs;
+        const out = [...xs]; const [it] = out.splice(from, 1); out.splice(to, 0, it!); return out;
+      });
+      link.onMoving(false);
+      setArrOpen(true);
+      setArrMsg(`초안에서 ${sel} 을 ${name} 자리로 이동 — 저장해야 반영됩니다`);
+      return;
+    }
+    link.onSel(name === sel ? null : name);
+  };
   const add = () => {
     const name = addName.trim();
     if (!name || secs.some((s) => s.name === name)) { setArrMsg(name ? `이미 있는 구획: ${name}` : "구획 이름을 적으십시오"); return; }
@@ -333,6 +408,11 @@ function DesignCanvas({ code, slots, runs, nodeStable, canEdit }: { code: string
     <div data-testid="design-canvas" style={card}>
       <div style={h}>
         Design · Arrangement <span style={muted}>({code || "—"})</span>
+        {sel && (
+          <span data-testid="canvas-selected" data-moving={link?.moving ? "1" : "0"} style={{ ...muted, marginLeft: 8, color: "var(--accent)" }}>
+            선택 {sel}{link?.moving ? " · 옮길 자리를 누르십시오" : ""}{selRow?.locked ? " · BOM 관계 있음" : ""}
+          </span>
+        )}
         {canEdit && (
           <button type="button" data-testid="arrangement-edit" onClick={() => setArrOpen((v) => !v)}
             style={{ marginLeft: "auto", fontFamily: "var(--font-mono)", fontSize: 11, color: arrOpen ? "var(--accent-contrast)" : "var(--ink-muted)", background: arrOpen ? "var(--accent)" : "var(--surface-2)", border: "1px solid var(--line)", borderRadius: 4, padding: "2px 8px", cursor: "pointer" }}>
@@ -411,7 +491,7 @@ function DesignCanvas({ code, slots, runs, nodeStable, canEdit }: { code: string
             </tbody>
           </table>
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8 }}>
-            <input data-testid="arr-add-name" value={addName} onChange={(e) => setAddName(e.target.value)} placeholder="새 구획 이름"
+            <input ref={addRef} data-testid="arr-add-name" value={addName} onChange={(e) => setAddName(e.target.value)} placeholder="새 구획 이름"
               style={{ width: 130, fontSize: 12, padding: "3px 6px", border: "1px solid var(--line)", borderRadius: 4, background: "var(--surface-0)", color: "var(--ink)" }} />
             <button type="button" data-testid="arr-add" onClick={add} style={arrMini(false)}>Add</button>
           </div>
@@ -432,8 +512,10 @@ function DesignCanvas({ code, slots, runs, nodeStable, canEdit }: { code: string
           return visible.map((s) => {
             const x = 20 + (acc / total) * w; const sww = ((s.len ?? 900) / total) * w; acc += s.len ?? 900;
             return (
-              <g key={s.name}>
-                <rect x={x} y="40" width={sww} height="120" fill="none" stroke="var(--line)" />
+              <g key={s.name} data-testid={`canvas-sec-${s.name}`} data-selected={s.name === sel ? "1" : undefined}
+                onClick={() => pick(s.name)} style={{ cursor: link ? "pointer" : "default" }}>
+                <rect x={x} y="40" width={sww} height="120" fill={s.name === sel ? "color-mix(in srgb, var(--accent) 14%, transparent)" : "transparent"}
+                  stroke={s.name === sel ? "var(--accent)" : "var(--line)"} strokeWidth={s.name === sel ? 2 : 1} />
                 <text x={x + sww / 2} y="100" textAnchor="middle" fontSize="12" fill="var(--ink)" fontFamily="var(--font-body)">{s.name}</text>
                 <text x={x + sww / 2} y="118" textAnchor="middle" fontSize="10" fill="var(--ink-muted)" fontFamily="var(--font-mono)">{s.len ?? "L"}</text>
               </g>

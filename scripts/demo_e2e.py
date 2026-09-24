@@ -6,6 +6,7 @@ from playwright.sync_api import sync_playwright
 BASE=sys.argv[1] if len(sys.argv)>1 else "http://localhost:3000"
 OUT=sys.argv[2] if len(sys.argv)>2 else "shots"
 import os; os.makedirs(OUT,exist_ok=True)
+T0=time.time()-1
 R={}
 def nuke(pg): pg.evaluate("document.querySelectorAll('nextjs-portal').forEach(e=>e.remove())")
 def ok(k,v,cond): R[k]=(bool(cond),v); print(("PASS" if cond else "FAIL"),k,"→",v)
@@ -19,7 +20,7 @@ with sync_playwright() as p:
     # S1 프로젝트 노드 선택
     pg.click("text=PS-61313"); time.sleep(1.5); insp=pg.inner_text("body"); ok("S1 project node bound (Inspector shows Micron FAB AHU)", "Micron FAB AHU" in insp, "Micron FAB AHU" in insp); pg.screenshot(path=f"{OUT}/10_project_bound.png")
     # S2 코드 조립 D=630 E=SS
-    sel=pg.query_selector_all("select")
+    sel=pg.query_selector_all("[data-testid=code-builder] select")
     sel[3].select_option(value="630"); sel[4].select_option(value="SS"); sel[5].select_option(value="1-21-13-15"); time.sleep(0.8)  # F 포함 (2026-09-22 회장님 결정: 개정 = A~F 전체 코드)
     code=pg.inner_text("text=조립 결과").strip() if pg.query_selector("text=조립 결과") else ""
     body=pg.inner_text("body"); m=re.search(r"EU-55-2123-630SS-1-21-13-15",body); ok("S2 code assembled (A~F · F 순번 포함)",m.group(0) if m else body[:80],m); pg.screenshot(path=f"{OUT}/11_code_builder.png")
@@ -27,13 +28,13 @@ with sync_playwright() as p:
     nuke(pg); pg.fill("[data-testid=rev-reason]","initial selection"); pg.click("[data-testid=rev-save]", force=True); time.sleep(2)
     pg.reload(wait_until="domcontentloaded"); pg.wait_for_selector("text=Code Builder", timeout=30000); time.sleep(2)
     body=pg.inner_text("body"); ok("S2b Rev A persisted across reload (slots + Inspector 'Rev A')", "EU-55-2123-630SS" in body and "Rev A" in body, "EU-55-2123-630SS" in body and "Rev A" in body)
-    nuke(pg); sel=pg.query_selector_all("select"); sel[4].select_option(value="AL"); time.sleep(0.8)
+    nuke(pg); sel=pg.query_selector_all("[data-testid=code-builder] select"); sel[4].select_option(value="AL"); time.sleep(0.8)
     pg.fill("[data-testid=rev-reason]","material change to AL"); pg.click("[data-testid=rev-save]", force=True); time.sleep(2)
     body=pg.inner_text("body"); ok("S2c Rev B appended, history shows A and B", "Rev B" in body and "Rev A" in body and "EU-55-2123-630AL" in body, "Rev B" in body and "Rev A" in body)
     pg.screenshot(path=f"{OUT}/11b_revisions.png")
     # S2d rehearsal-residue detector: a presentation-ready DB holds exactly Rev A,B here. More = run `pnpm db:reset:demo`
     rv=ctx.request.get(BASE+"/api/rccs/revisions?node=a0000000-0000-4000-8000-000000000004").json().get("revisions",[]); ok("S2d clean start: exactly 2 revisions (else run: pnpm db:reset:demo)", len(rv), len(rv)==2)
-    nuke(pg); sel=pg.query_selector_all("select"); sel[4].select_option(value="SS"); time.sleep(0.8)  # back to SS for the rest of the script
+    nuke(pg); sel=pg.query_selector_all("[data-testid=code-builder] select"); sel[4].select_option(value="SS"); time.sleep(0.8)  # back to SS for the rest of the script
     # S3 EDIM Run without macro
     pg.click("button:has-text('EDIM Run')"); time.sleep(2); body=pg.inner_text("body"); ok("S3 EDIM Run responds (no-macro guard on fresh DB, or value if demo-seeded)", "no-macro" in body or "455.4" in body or "ran" in body, True); 
     # S4 Macro tab: verify → draft → approve
@@ -626,9 +627,73 @@ with sync_playwright() as p:
     _asm=ctx.request.get(BASE+f"/api/dxf?runId={RUN1}&type=assembly").text()
     dxf_png(_plan, f"{OUT}/48_dxf_plan.png", "EDIM - PLAN (ezdxf re-render of the downloaded DXF)")
     dxf_png(_asm,  f"{OUT}/49_dxf_assembly.png", "EDIM - ASSEMBLY (ezdxf re-render of the downloaded DXF)")
-    ok("S37 캡처 28장이 스크립트에서 전부 나온다 (00·05·06·47·48·49 복원 — 발행본 손질 없이)",
-       sorted(f for f in os.listdir(OUT) if f.endswith(".png"))[:3] + [len([f for f in os.listdir(OUT) if f.endswith(".png")])],
-       len([f for f in os.listdir(OUT) if f.endswith(".png")])>=28)
+
+    # ── S41 p58 Main Work place Toolbar — 버튼이 명령을 보낸다 (편집은 Design 초안·같은 저장, 승인은 Inspector, 도면은 스냅샷) ──
+    NODE4=BASE+"/workbench?node=a0000000-0000-4000-8000-000000000004"
+    def arr_rows():
+        return pg.eval_on_selector_all("[data-testid=arr-table] tbody tr","es=>es.map(e=>e.dataset.testid.replace('arr-row-',''))")
+    def wait_canvas():
+        pg.wait_for_selector("[data-testid=canvas-cmds]",timeout=30000); nuke(pg)
+        pg.wait_for_function("()=>{const b=document.querySelector('[data-cmd=add]'); return b && !b.disabled;}",timeout=30000)  # 하이드레이션 대기
+    pg.goto(NODE4,wait_until="domcontentloaded"); wait_canvas()
+    cmds=pg.eval_on_selector_all("[data-testid=canvas-cmds] [data-cmd]","es=>es.map(e=>e.dataset.cmd)")
+    none=pg.eval_on_selector_all("[data-testid=canvas-cmds] [data-cmd-none]","es=>es.map(e=>[e.dataset.cmdNone,e.disabled,e.title.length>10])")
+    ok("S41a 툴바가 p58 구성이다 — Arrangement·Move·Delete·Add·Copy·DWG View·승인은 명령, Free CAD·설계 심볼은 잠긴 자리(이유 표기)",
+       (cmds,none), cmds==["arrangement","move","delete","add","copy","dwg-view","approval"] and len(none)==2 and all(d and t for _,d,t in none))
+    dis=pg.eval_on_selector_all("[data-cmd=move],[data-cmd=delete],[data-cmd=copy]","es=>es.map(e=>e.disabled)")
+    ok("S41b 구획을 고르기 전에는 Move·Delete·Copy 가 잠긴다 (대상 없는 명령을 막는다)", dis, dis==[True,True,True])
+    pg.click("[data-cmd=arrangement]"); pg.wait_for_selector("[data-testid=arr-table] tbody tr",timeout=30000)
+    ok("S41c Arrangement ▼ 는 Design 탭의 기존 Arrangement 편집을 연다 (두 번째 편집 화면 없음)",
+       bool(pg.query_selector("[data-testid=design-canvas] [data-testid=arrangement-panel]")), bool(pg.query_selector("[data-testid=design-canvas] [data-testid=arrangement-panel]")))
+    base_rows=arr_rows()
+    pg.click("[data-testid=canvas-sec-Fan]")
+    pg.wait_for_function("()=>{const b=document.querySelector('[data-cmd=copy]'); return b && !b.disabled;}",timeout=30000)
+    ok("S41d 개념도에서 구획을 누르면 선택되고 Move·Delete·Copy 가 풀린다", pg.inner_text("[data-testid=canvas-selected]"),
+       pg.get_attribute("[data-testid=canvas-sec-Fan]","data-selected")=="1")
+    pg.click("[data-cmd=copy]"); pg.wait_for_selector("[data-testid=arr-row-Fan-2]",timeout=30000)
+    r1=arr_rows()
+    ok("S41e Copy — 고른 구획 바로 뒤에 Fan-2 가 초안으로 생기고 선택이 새 구획으로 옮겨 간다", r1,
+       r1.index("Fan-2")==r1.index("Fan")+1 and "Fan-2" in pg.inner_text("[data-testid=canvas-selected]"))
+    pg.click("[data-cmd=delete]"); pg.wait_for_selector("[data-testid=arr-row-Fan-2]",state="detached",timeout=30000)
+    ok("S41f Delete — 관계 없는 구획(Fan-2)은 초안에서 지워진다", arr_rows(), arr_rows()==base_rows)
+    pg.click("[data-testid=canvas-sec-Coil]"); pg.wait_for_function("()=>document.querySelector('[data-testid=canvas-sec-Coil]')?.dataset.selected==='1'",timeout=30000)
+    pg.click("[data-cmd=delete]")
+    pg.wait_for_function("()=>(document.querySelector('[data-testid=arrangement-panel]')?.innerText||'').includes('지울 수 없습니다')",timeout=30000)
+    ok("S41g Delete 거부 — BOM 관계가 걸린 구획(Coil)은 툴바로도 못 지운다 (API 409 와 같은 규칙)", "Coil" in arr_rows(), "Coil" in arr_rows())
+    first=base_rows[0]
+    pg.click("[data-testid=canvas-sec-Fan]"); pg.wait_for_function("()=>document.querySelector('[data-testid=canvas-sec-Fan]')?.dataset.selected==='1'",timeout=30000)
+    pg.click("[data-cmd=move]"); pg.wait_for_function("()=>document.querySelector('[data-testid=canvas-selected]')?.dataset.moving==='1'",timeout=30000)
+    pg.click(f"[data-testid=canvas-sec-{first}]")
+    pg.wait_for_function("(f)=>{const r=[...document.querySelectorAll('[data-testid=arr-table] tbody tr')].map(e=>e.dataset.testid); return r[0]==='arr-row-Fan';}", arg=first, timeout=30000)
+    ok(f"S41h Move — Fan 을 고르고 Move → {first} 자리를 누르면 초안 순서가 바뀐다(저장 전)", arr_rows()[:3], arr_rows()[0]=="Fan")
+    # 같은 저장 한 곳: 새로 열고(초안 버림) Copy → 저장 → API 에 반영 → API 로 원복(09-21 규칙)
+    SL={"A":"EU","B":"55","C":"2123","D":"630","E":"SS","F":"1-21-13-15"}
+    g_before=ctx.request.get(ARR+"?code=EU&slots="+json.dumps(SL)).json()["sections"]
+    pg.goto(NODE4,wait_until="domcontentloaded"); wait_canvas()
+    pg.click("[data-cmd=arrangement]"); pg.wait_for_selector("[data-testid=arr-table] tbody tr",timeout=30000)
+    pg.click("[data-testid=canvas-sec-Fan]"); pg.wait_for_function("()=>{const b=document.querySelector('[data-cmd=copy]'); return b && !b.disabled;}",timeout=30000)
+    pg.click("[data-cmd=copy]"); pg.wait_for_selector("[data-testid=arr-row-Fan-2]",timeout=30000)
+    pg.click("[data-testid=arr-save]")
+    pg.wait_for_function("()=>(document.querySelector('[data-testid=arrangement-panel]')?.innerText||'').includes('다음 BOM Run')",timeout=30000)
+    g_after=[x["name"] for x in ctx.request.get(ARR+"?code=EU&slots="+json.dumps(SL)).json()["sections"]]
+    fan=[x for x in g_before if x["name"]=="Fan"][0]
+    ok("S41i 툴바 편집은 기존 '저장' 한 곳으로 반영된다 — Fan-2 가 등록되고 Fan 의 길이·방향을 물려받는다(부품 배치는 비움)", g_after,
+       "Fan-2" in g_after and g_after.index("Fan-2")==g_after.index("Fan")+1)
+    rs=put([{"name":x["name"], **({"len":x["len"]} if x.get("len") is not None else {}), **({"dir":x["dir"]} if x.get("dir") else {}), "components":x.get("components",[])} for x in g_before])
+    g_back=[x["name"] for x in ctx.request.get(ARR+"?code=EU&slots="+json.dumps(SL)).json()["sections"]]
+    ok("S41j 원복(API) — 뒤 단계가 오염되지 않게 등록 구획을 되돌린다", (rs.status, g_back==[x["name"] for x in g_before]), rs.status==200 and g_back==[x["name"] for x in g_before])
+    pg.goto(NODE4,wait_until="domcontentloaded"); wait_canvas()
+    dwg_off=pg.eval_on_selector("[data-cmd=dwg-view]","e=>e.disabled")
+    pg.click("[data-run=bom]")
+    pg.wait_for_function("()=>{const s=document.querySelector('[data-cmd=dwg-view]'); return s && !s.disabled;}",timeout=60000)
+    with pg.expect_download(timeout=30000) as dl:
+        pg.select_option("[data-cmd=dwg-view]","front")
+    fn=dl.value.suggested_filename
+    ok("S41k DWG View ▼ — BOM 스냅샷이 없으면 잠기고, 있으면 고른 뷰(정면도)의 DXF 를 받는다", (dwg_off, fn), dwg_off and fn.endswith("-front.dxf"))
+    pg.click("[data-cmd=approval]")
+    pg.wait_for_function("()=>document.querySelector('[data-testid=inspector-approval]')?.dataset.focused==='1'",timeout=30000)
+    ok("S41l 승인 — Inspector 의 Approval 로 데려가 강조한다 (요청·결정은 거기서만 — 보는 곳/하는 곳 분리)", True, True)
+    pg.screenshot(path=f"{OUT}/54_toolbar.png")
 
     # ── S36 Schedule management (p12·18·50) — 작업대를 떠나지 않고 일정을 잡는다 ──
     pg.goto(BASE+"/workbench?node=a0000000-0000-4000-8000-000000000004",wait_until="domcontentloaded")
@@ -732,6 +797,15 @@ with sync_playwright() as p:
     r=ctx.request.patch(BASE+"/api/company/members",headers=J,data=json.dumps({"userId":"10000000-0000-4000-8000-00000000000a","role":"viewer"}))
     ok("S17b 마지막 owner 강등은 거부된다 (409)", r.status, r.status==409)
     pg.screenshot(path=f"{OUT}/42_user_management.png",full_page=True)
+    # S37 은 맨 끝에서 센다 — 중간(옛 자리)에서는 뒤에 찍히는 5장(40·41·42·52·53)이 아직 없어,
+    # 빈 폴더에서는 25장이라 실패하고 이전 실행 잔재가 있을 때만 통과했다(2026-09-24 실측).
+    _want=["00_login","05_project_mgmt","06_module_cpq_stub","10_project_bound","11_code_builder","11b_revisions","12_macro_tab",
+           "13_macro_approved","14_edim_run","15_bom_cost","16_design_tab","20_setup_subcode","21_setup_product_table",
+           "22_setup_relationship","23_codebuilder_from_subcode","30_toolbox_program","31_toolbox_ui_tool","40_company_admin",
+           "41_platform_console","42_user_management","43_drawings","44_document_tab","45_purchasing","46_quotation_print",
+           "47_techdata_print","48_dxf_plan","49_dxf_assembly","51_accepted","52_register","53_schedule","54_toolbar"]
+    _miss=[w for w in _want if not os.path.exists(f"{OUT}/{w}.png") or os.path.getmtime(f"{OUT}/{w}.png")<T0]
+    ok("S37 캡처 31장이 이번 실행에서 전부 나온다 (잔재 파일은 세지 않음)", _miss or len(_want), not _miss)
     b.close()
 n=sum(1 for v in R.values() if v[0]); print(f"\n[demo_e2e] {n}/{len(R)} steps passed"); json.dump(R,open(f"{OUT}/demo_e2e_result.json","w"),ensure_ascii=False,indent=1)
 sys.exit(0 if n==len(R) else 1)

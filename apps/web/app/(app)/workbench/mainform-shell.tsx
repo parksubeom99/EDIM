@@ -9,7 +9,7 @@ import { assembleCode, RCCS_SLOTS, type SlotDef, type SlotValues } from "@/app/l
 import type { PipelineState } from "@/app/lib/approval-state";
 import { HierarchyTree } from "../hierarchy-tree";
 import { SignOutButton } from "../sign-out-button";
-import { Toolbar, type WorkTab } from "./toolbar";
+import { Toolbar, type WorkTab, type CanvasCmd } from "./toolbar";
 import { WorkPlace } from "./work-place";
 import { Inspector } from "./inspector";
 import { ActionBar, type RunResult } from "./action-bar";
@@ -91,6 +91,24 @@ export function MainFormShell({
   const [commands, setCommandsState] = useState<CommandDef[]>(DEFAULT_COMMANDS);
   const [busyKind, setBusyKind] = useState<string | null>(null);
   const runRef = useRef<((kind: string) => void) | null>(null);
+  /* p58 — Main Work place Toolbar 명령. 버튼은 명령만 보내고(seq 로 한 번씩), 받는 쪽이 처리한 뒤 비운다. */
+  const [canvasCmd, setCanvasCmd] = useState<{ cmd: CanvasCmd; seq: number } | null>(null);
+  const [canvasSel, setCanvasSel] = useState<string | null>(null);
+  const [canvasMoving, setCanvasMoving] = useState(false);
+  const sendCmd = (cmd: CanvasCmd) => {
+    if (cmd === "approval") {
+      const el = document.querySelector<HTMLElement>("[data-testid=inspector-approval]");
+      if (!el) return;
+      el.scrollIntoView({ block: "center", behavior: "smooth" });
+      el.setAttribute("data-focused", "1");
+      el.style.outline = "2px solid var(--accent)";
+      el.style.outlineOffset = "4px";
+      window.setTimeout(() => { el.removeAttribute("data-focused"); el.style.outline = ""; }, 1500);
+      return;
+    }
+    setTab("design");
+    setCanvasCmd((c) => ({ cmd, seq: (c?.seq ?? 0) + 1 }));
+  };
   useEffect(() => {
     try {
       const raw = window.localStorage.getItem("edim.toolbox.commands.v1");
@@ -123,6 +141,12 @@ export function MainFormShell({
         stage={project?.pipeline.stage ?? "Design"}
         tab={tab}
         onTab={setTab}
+        onCmd={sendCmd}
+        canEdit={canEdit}
+        runId={runs.find((r) => r.kind === "bom" && r.runId)?.runId ?? null}
+        selected={canvasSel}
+        moving={canvasMoving}
+        hasProject={!!project}
         right={
           <>
             <button
@@ -228,6 +252,7 @@ export function MainFormShell({
             canDecide={canDecide}
             rev={rev}
             onRev={setRev}
+            canvas={{ cmd: canvasCmd, done: () => setCanvasCmd(null), sel: canvasSel, onSel: setCanvasSel, moving: canvasMoving, onMoving: setCanvasMoving }}
           />
         </main>
 

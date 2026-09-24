@@ -16,7 +16,38 @@ const TABS: { key: WorkTab; label: string }[] = [
 ];
 
 const DEPTS = ["영업", "기술", "설계", "구매", "생산", "품질"];
-const CANVAS_CMDS = ["Arrangement", "Move", "Delete", "Add", "DWG", "View", "Free CAD", "설계 심볼", "승인"];
+
+/**
+ * p58 Main Work place Toolbar — 명령 버튼. 버튼은 일을 직접 하지 않고 **명령만 보낸다**:
+ * 편집은 Design 탭의 Arrangement 초안(같은 저장 버튼·같은 API)으로, 승인은 Inspector 의 Approval 로,
+ * 도면은 이미 있는 /api/dxf 로 간다. 같은 일을 하는 두 번째 길을 만들지 않기 위해서다.
+ */
+export type CanvasCmd = "arrangement" | "move" | "delete" | "add" | "copy" | "approval";
+export const DWG_VIEWS: [string, string][] = [
+  ["plan", "평면도"], ["front", "정면도"], ["right", "우측면도"], ["assembly", "조립도"], ["iso", "3D 등각도"], ["exploded", "분해도"],
+];
+const EDIT_CMDS: { cmd: CanvasCmd; label: string; needsSel: boolean }[] = [
+  { cmd: "move", label: "Move", needsSel: true },
+  { cmd: "delete", label: "Delete", needsSel: true },
+  { cmd: "add", label: "Add", needsSel: false },
+  { cmd: "copy", label: "Copy", needsSel: true },
+];
+/** 아직 EDIM 안에 없는 것 — 자리만 두고 이유를 적는다(누르면 된다고 착각하지 않게). */
+const NOT_YET: [string, string][] = [
+  ["Free CAD", "EDIM 안의 CAD 편집기는 아직 없습니다 — 도면은 DWG View 의 DXF 를 외부 CAD(AutoCAD·FreeCAD)에서 여십시오"],
+  ["설계 심볼", "설계 심볼 배치(p59)는 아직 없습니다 — 부품 배치는 Arrangement 의 Component 칸에서 합니다"],
+];
+const cmdBtn = (on: boolean, off: boolean): CSSProperties => ({
+  fontFamily: "var(--font-mono)",
+  fontSize: 11,
+  color: off ? "var(--line)" : on ? "var(--accent-contrast)" : "var(--ink-muted)",
+  background: on ? "var(--accent)" : "var(--surface-2)",
+  border: "1px solid var(--line)",
+  borderRadius: 4,
+  padding: "2px 7px",
+  cursor: off ? "not-allowed" : "pointer",
+  whiteSpace: "nowrap",
+});
 
 const tier: CSSProperties = {
   display: "flex",
@@ -43,12 +74,26 @@ export function Toolbar({
   tab,
   onTab,
   right,
+  onCmd,
+  canEdit = false,
+  runId = null,
+  selected = null,
+  moving = false,
+  hasProject = false,
 }: {
   modules: ModuleDef[];
   stage: PipelineStage;
   tab: WorkTab;
   onTab: (t: WorkTab) => void;
   right: ReactNode;
+  onCmd?: (c: CanvasCmd) => void;
+  canEdit?: boolean;
+  /** 도면은 BOM 스냅샷에서 나온다 — 스냅샷이 없으면 DWG View 가 잠긴다. */
+  runId?: string | null;
+  /** Design 개념도에서 고른 구획(Move·Delete·Copy 의 대상). */
+  selected?: string | null;
+  moving?: boolean;
+  hasProject?: boolean;
 }) {
   const primary = modules.filter((m) => ["cpq", "plm", "toolbox", "project"].includes(m.key));
   const idx = stageIndex(stage);
@@ -160,25 +205,43 @@ export function Toolbar({
           ))}
         </div>
         <span style={{ width: 1, height: 20, background: "var(--line)", margin: "0 6px" }} />
-        <div style={{ display: "flex", gap: 3, overflow: "hidden" }}>
-          {CANVAS_CMDS.map((c) => (
-            <button
-              key={c}
-              type="button"
-              style={{
-                fontFamily: "var(--font-mono)",
-                fontSize: 11,
-                color: "var(--ink-muted)",
-                background: "var(--surface-2)",
-                border: "1px solid var(--line)",
-                borderRadius: 4,
-                padding: "2px 7px",
-                cursor: "pointer",
-              }}
-            >
-              {c}
-            </button>
+        <div data-testid="canvas-cmds" style={{ display: "flex", alignItems: "center", gap: 3, overflow: "hidden" }}>
+          <button type="button" data-cmd="arrangement" disabled={!canEdit} title={canEdit ? "Design 탭의 Arrangement 편집을 엽니다" : "편집 권한이 없습니다"}
+            onClick={() => onCmd?.("arrangement")} style={cmdBtn(false, !canEdit)}>
+            Arrangement ▼
+          </button>
+          {EDIT_CMDS.map(({ cmd, label, needsSel }) => {
+            const off = !canEdit || (needsSel && !selected);
+            const on = cmd === "move" && moving;
+            return (
+              <button key={cmd} type="button" data-cmd={cmd} disabled={off} aria-pressed={on || undefined}
+                title={!canEdit ? "편집 권한이 없습니다" : off ? "먼저 Design 개념도에서 구획을 고르십시오" : selected ? `대상: ${selected}` : ""}
+                onClick={() => onCmd?.(cmd)} style={cmdBtn(on, off)}>
+                {label}
+              </button>
+            );
+          })}
+          <select data-cmd="dwg-view" value="" disabled={!runId} title={runId ? "BOM 스냅샷에서 도면(DXF)을 받습니다" : "먼저 BOM Run 을 실행하십시오 — 도면은 BOM 스냅샷에서 나옵니다"}
+            onChange={(e) => {
+              const t = e.target.value;
+              if (!t || !runId) return;
+              const a = document.createElement("a");
+              a.href = `/api/dxf?runId=${runId}&type=${t}`;
+              a.setAttribute("download", "");
+              document.body.appendChild(a); a.click(); a.remove();
+            }}
+            style={{ ...cmdBtn(false, !runId), padding: "1px 4px" }}>
+            <option value="">DWG View ▼</option>
+            {DWG_VIEWS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          </select>
+          {NOT_YET.map(([label, why]) => (
+            <button key={label} type="button" data-cmd-none={label} disabled title={why} style={cmdBtn(false, true)}>{label}</button>
           ))}
+          <button type="button" data-cmd="approval" disabled={!hasProject}
+            title={hasProject ? "Inspector 의 Approval 로 갑니다 — 요청·결정은 거기서 합니다" : "먼저 Work Hierarchy 에서 프로젝트를 고르십시오"}
+            onClick={() => onCmd?.("approval")} style={cmdBtn(false, !hasProject)}>
+            승인
+          </button>
         </div>
       </div>
     </header>
