@@ -18,7 +18,7 @@ from PIL import Image
 
 CORPUS, SHOTS, OUTDIR = sys.argv[1], sys.argv[2], sys.argv[3]
 MAIN = sys.argv[4] if len(sys.argv) > 4 else "p6"
-DATE = "2026-09-23 (b)"
+DATE = "2026-09-24"
 HERE = os.path.dirname(os.path.abspath(__file__))
 DECK = os.path.join(HERE, "..", "deck")
 
@@ -72,7 +72,7 @@ PAGES = {
         ["Product Code 표시 · BOM / EDIM Run / Quotation·PCR / Drawing 버튼과 목록 ✓", "Arrangement 개념도 = 등록된 구획(하드코딩 아님) — 활성 구획이 폭 비례로 그려진다",
          "**Arrangement 편집이 돈다**: 구획 길이 · 순서(Move) · 추가(Add) · 삭제(Delete) · 방향(L0~R270) · 부품 배치를 고쳐 저장하면 다음 BOM 의 도면이 그대로 따라온다",
          "Schedule management(To-do·Done·기한·승인 요청 목록)가 Inspector 에 들어왔다"],
-        ["**Main Work place Toolbar 의 같은 이름 버튼들(p58)은 여전히 자리만**이다 — 도는 것은 Design 탭 안의 편집 패널이다", "Sub Item list · DWG View(뷰어) 없음"],
+        ["Sub Item list · DWG View(뷰어) 없음 — p58 툴바의 DWG View ▼ 는 DXF 를 내려받을 뿐 화면에 띄우지 않는다"],
         "e2e S21a · S21b · S31a~h · S32a~h · S36a~c · S38a~f", "16_design_tab", "남은 것은 Detail Dimension · 실제 3D 뷰어"),
  14: pg("L", "공기조화기 사양", "사양표 — 우리 제품의 말로",
         ["BOM 의 사양 열이 p14 문구 그대로 나온다(Base Frame · Casing · Fan · Coil · Damper)"],
@@ -196,11 +196,14 @@ PAGES = {
  57: pg("P", "E-2 · EDIM System Toolbar", "Toolbox Macro — 다섯 갈래 상호 연동",
         ["Prompt · Macro · Flowchart · Description · Coding 이 같은 매크로를 본다"], ["Data Management(Directory · Type of source: Table/Chart/Formula drawing) 없음", "함수 마법사 · 그래프 마법사 없음"],
         "e2e S13b · S13c · S13e", "30_toolbox_program"),
- 58: pg("N", "E-2 · Toolbar Module", "Main Work place Toolbar",
-        [], ["**이 툴바의 9개 버튼은 여전히 onClick 이 없다**(toolbar.tsx CANVAS_CMDS) — 눌러도 동작 0",
-             "Arrangement 만 **Design 탭 안의 편집 패널**로 따로 돈다(p13) — 툴바 버튼에 물린 것이 아니라 여기서는 미착수로 셌다",
-             "그림 제작 Module 없음 (Action Bar 편집은 p25 의 것이라 여기서 세지 않았다)"],
-        "grep toolbar.tsx CANVAS_CMDS(핸들러 0건) · 동작하는 쪽은 e2e S31g", "16_design_tab", "Arrangement 묶음(p13·35·36·46)과 함께 — 회장님 우선순위 결정"),
+ 58: pg("P", "E-2 · Toolbar Module", "Main Work place Toolbar",
+        ["**명령 버튼이 돈다**: Arrangement ▼ · Move · Delete · Add · Copy · DWG View ▼ · 승인(Module)",
+         "개념도에서 구획을 고르면 Move·Delete·Copy 가 풀리고, 편집은 Design 초안 → 기존 '저장' 한 곳으로만 반영된다(두 번째 편집 길 없음)",
+         "BOM 관계가 걸린 구획은 툴바로도 못 지운다 · DWG View 는 BOM 스냅샷이 없으면 잠긴다 · 승인은 Inspector Approval 로 데려간다"],
+        ["그림 제작 Module(도면 그리기 도구) 없음",
+         "Free CAD · 설계 심볼은 잠긴 자리 — 누를 수 없고 이유가 적혀 있다(EDIM 안 CAD 편집기·심볼 배치는 아직 없다)",
+         "Delete 는 선택이 잠긴 구획이어도 눌리고 거부 문구로 막는다(표 쪽 Delete 는 미리 잠김)"],
+        "e2e S41a~l", "54_toolbar", "그림 제작 Module · Free CAD 는 실제 CAD 편집기 결정 후"),
  59: pg("L", "E-3 · Key Work Place", "Hierarchy 와 Run 심볼",
         ["Work Hierarchy 트리에서 노드를 고르면 작업 대상이 호출된다", "EDIM Run · BOM Run · EBOM Run · Cost · Approval Request ✓"], ["Hierarchy(Edit) · Data Up-Load · DWG 폴더 없음"],
         "hierarchy:test · e2e S1 · S3", "10_project_bound"),
@@ -292,7 +295,7 @@ def s_rule():
     return f'''<section class="slide"><div class="stage"><header><span class="no">01</span><h2>읽는 법 — 판정 기준과 실측</h2></header>
 <div class="honest">
 <div class="h"><b>판정 네 가지</b><p><u>실동</u> 그 장의 핵심 동작이 화면에서 끝까지 돌고, e2e 나 DB 검증이 그것을 못 박고 있다.<br><u>부분</u> 일부만 돈다 — 도는 것과 없는 것을 둘 다 적는다.<br><u>미착수</u> 구현 대상인데 도는 것이 없다. <b>버튼 자리만 있는 것은 미착수로 셌다.</b><br><u>개념·표지</u> 구현 대상이 아닌 장. 반영된 곳이 있으면 적었다.</p></div>
-<div class="h hb"><b>실측 (main {MAIN} · 엘 샌드박스)</b><p>typecheck 11 · 단위 테스트 189(vitest) + auth 12 PASS · 발표 시나리오 e2e <b>165/165</b><br>DB 검증 9종 전부 PASS: rls · revision 8 · project · hierarchy · macro 10 · backbone 13 · platform 25 · drawing 23 · document 37<br>회귀: 슬롯 1,200 조합에서 BOM 불변<br>각 장의 근거 칸에 적힌 S번호는 <code>scripts/demo_e2e.py</code> 의 단계 이름이다.</p></div>
+<div class="h hb"><b>실측 (main {MAIN} · 엘 샌드박스)</b><p>typecheck 11 · 단위 테스트 189(vitest) + auth 12 PASS · 발표 시나리오 e2e <b>177/177</b><br>DB 검증 9종 전부 PASS: rls · revision 8 · project · hierarchy · macro 10 · backbone 14 · platform 25 · drawing 23 · document 37<br>회귀: 슬롯 1,200 조합에서 BOM 불변<br>각 장의 근거 칸에 적힌 S번호는 <code>scripts/demo_e2e.py</code> 의 단계 이름이다.</p></div>
 <div class="h"><b>오른쪽 화면은 전부 실제 캡처</b><p>목업이 아니다. <code>demo_e2e.py</code> 가 매번 새로 찍는 화면이고, 이번부터 <code>docs/screens/</code> 에 함께 올렸다. 도면은 내려받은 DXF 를 ezdxf 로 다시 그린 것이다.</p></div>
 <div class="h hc"><b>여전히 검증되지 않은 것</b><p><b>회장님 Windows PC 실행 0회</b> — 위 수치는 전부 엘 샌드박스(Linux) 기준.<br>표·단가는 샘플 · Prompt→Macro 실모델 호출 0회 · 도면은 선과 글자 수준.</p></div>
 </div></div></section>'''
@@ -421,7 +424,7 @@ def page_map_md():
 
 if __name__ == "__main__":
     os.makedirs(OUTDIR, exist_ok=True)
-    for theme, name in (("dark", "EDIM_청사진70장_대조_20260923.html"), ("light", "_print.html")):
+    for theme, name in (("dark", "EDIM_청사진70장_대조_20260924.html"), ("light", "_print.html")):
         open(os.path.join(OUTDIR, name), "w", encoding="utf-8").write(build(theme))
     open(os.path.join(OUTDIR, "page-map.md"), "w", encoding="utf-8").write(page_map_md())
     c = counts(); print("pages 70 ·", " · ".join(f"{ST[k]} {c[k]}" for k in "LPNC"), "· slides", 70 + 5)

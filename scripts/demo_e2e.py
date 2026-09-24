@@ -634,7 +634,7 @@ with sync_playwright() as p:
         return pg.eval_on_selector_all("[data-testid=arr-table] tbody tr","es=>es.map(e=>e.dataset.testid.replace('arr-row-',''))")
     def wait_canvas():
         pg.wait_for_selector("[data-testid=canvas-cmds]",timeout=30000); nuke(pg)
-        pg.wait_for_function("()=>{const b=document.querySelector('[data-cmd=add]'); return b && !b.disabled;}",timeout=30000)  # 하이드레이션 대기
+        pg.wait_for_selector("[data-testid=canvas-cmds][data-ready='1']",timeout=60000)  # 하이드레이션 대기 — SSR 버튼은 풀려 보여도 클릭이 사라진다
     pg.goto(NODE4,wait_until="domcontentloaded"); wait_canvas()
     cmds=pg.eval_on_selector_all("[data-testid=canvas-cmds] [data-cmd]","es=>es.map(e=>e.dataset.cmd)")
     none=pg.eval_on_selector_all("[data-testid=canvas-cmds] [data-cmd-none]","es=>es.map(e=>[e.dataset.cmdNone,e.disabled,e.title.length>10])")
@@ -684,7 +684,9 @@ with sync_playwright() as p:
     ok("S41j 원복(API) — 뒤 단계가 오염되지 않게 등록 구획을 되돌린다", (rs.status, g_back==[x["name"] for x in g_before]), rs.status==200 and g_back==[x["name"] for x in g_before])
     pg.goto(NODE4,wait_until="domcontentloaded"); wait_canvas()
     dwg_off=pg.eval_on_selector("[data-cmd=dwg-view]","e=>e.disabled")
-    pg.click("[data-run=bom]")
+    if pg.get_attribute("[data-testid=toolbox-toggle]","aria-pressed")=="true":   # 앞 단계(S13)가 열어 둔 Toolbox 창이 Action Bar 를 가린다
+        pg.click("[data-testid=toolbox-toggle]"); pg.wait_for_selector("[data-testid=toolbox-toggle][aria-pressed=false]",timeout=30000)
+    nuke(pg); pg.click("[data-run=bom]")   # 개발 서버 표시기(nextjs-portal)가 왼쪽 아래 BOM Run 을 덮는다 — 기존 단계와 같이 치운다
     pg.wait_for_function("()=>{const s=document.querySelector('[data-cmd=dwg-view]'); return s && !s.disabled;}",timeout=60000)
     with pg.expect_download(timeout=30000) as dl:
         pg.select_option("[data-cmd=dwg-view]","front")
@@ -693,7 +695,9 @@ with sync_playwright() as p:
     pg.click("[data-cmd=approval]")
     pg.wait_for_function("()=>document.querySelector('[data-testid=inspector-approval]')?.dataset.focused==='1'",timeout=30000)
     ok("S41l 승인 — Inspector 의 Approval 로 데려가 강조한다 (요청·결정은 거기서만 — 보는 곳/하는 곳 분리)", True, True)
-    pg.screenshot(path=f"{OUT}/54_toolbar.png")
+    pg.click("[data-cmd=arrangement]"); pg.wait_for_selector("[data-testid=canvas-sec-Fan]",timeout=30000)
+    pg.click("[data-testid=canvas-sec-Fan]"); pg.wait_for_function("()=>{const b=document.querySelector('[data-cmd=move]'); return b && !b.disabled;}",timeout=30000)
+    nuke(pg); pg.screenshot(path=f"{OUT}/54_toolbar.png")   # 캡처만 — 초안은 저장하지 않는다
 
     # ── S36 Schedule management (p12·18·50) — 작업대를 떠나지 않고 일정을 잡는다 ──
     pg.goto(BASE+"/workbench?node=a0000000-0000-4000-8000-000000000004",wait_until="domcontentloaded")

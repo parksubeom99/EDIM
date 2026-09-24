@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import type { CSSProperties, ReactNode } from "react";
+import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import type { ModuleDef } from "@/app/lib/modules";
 import { PIPELINE, stageIndex, type PipelineStage } from "@/app/lib/approval-state";
 
@@ -97,6 +97,9 @@ export function Toolbar({
 }) {
   const primary = modules.filter((m) => ["cpq", "plm", "toolbox", "project"].includes(m.key));
   const idx = stageIndex(stage);
+  // 서버 렌더 직후에는 버튼이 보여도 눌러지지 않는다 — 하이드레이션이 끝났다는 표지(e2e 가 이것을 기다린다)
+  const [ready, setReady] = useState(false);
+  useEffect(() => setReady(true), []);
 
   return (
     <header data-testid="region-toolbar" style={{ background: "var(--surface-1)" }}>
@@ -205,7 +208,7 @@ export function Toolbar({
           ))}
         </div>
         <span style={{ width: 1, height: 20, background: "var(--line)", margin: "0 6px" }} />
-        <div data-testid="canvas-cmds" style={{ display: "flex", alignItems: "center", gap: 3, overflow: "hidden" }}>
+        <div data-testid="canvas-cmds" data-ready={ready ? "1" : "0"} style={{ display: "flex", alignItems: "center", gap: 3, overflow: "hidden" }}>
           <button type="button" data-cmd="arrangement" disabled={!canEdit} title={canEdit ? "Design 탭의 Arrangement 편집을 엽니다" : "편집 권한이 없습니다"}
             onClick={() => onCmd?.("arrangement")} style={cmdBtn(false, !canEdit)}>
             Arrangement ▼
