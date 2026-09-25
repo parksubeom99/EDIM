@@ -859,15 +859,52 @@ with sync_playwright() as p:
     pg.goto(BASE+"/m/project",wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=project-mgmt][data-ready='1']",timeout=60000)
     pg.click(f"[data-testid=pm-row-{PNO}]"); pg.wait_for_selector("[data-testid=pm-att-row][data-has-file='1']",timeout=30000); nuke(pg)
     pg.screenshot(path=f"{OUT}/55_project_mgmt.png",full_page=True)
+    # ── S43 p48 Print Set-up Form — 종류별 인쇄 양식. 모양만 바뀌고 숫자는 그대로 ──
+    PS=BASE+"/api/print-setup"
+    g0=ctx.request.get(PS+"?type=quotation").json()
+    ok("S43a 저장 전에는 기본 양식이고, Print Test 에 쓸 최근 견적서가 있다", (g0["saved"], g0["settings"]["paper"], bool(g0["sample"])), (not g0["saved"]) and g0["settings"]["paper"]=="A4" and g0["sample"] is not None)
+    SAMPLE=g0["sample"]["id"]
+    def quote_total():
+        h=ctx.request.get(BASE+f"/api/documents/{SAMPLE}/print").text()
+        m=re.search(r'data-testid="quote-total">([^<]+)<',h); return (m.group(1) if m else None), h
+    qt0,_=quote_total()
+    bad=ctx.request.put(PS,headers=J0,data=json.dumps({"type":"quotation","settings":{"marginMm":99}}))
+    ok("S43b 허용 범위 밖 값은 필드 이름과 함께 거부된다 (여백 99mm → 400)", (bad.status, bad.json().get("error","")[-8:]), bad.status==400 and "marginMm" in bad.json().get("error",""))
+    pg.goto(BASE+"/setup/print",wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=print-setup][data-ready='1']",timeout=60000); nuke(pg)
+    for _ in range(20):
+        pg.select_option("[data-testid=ps-orientation]","landscape"); pg.select_option("[data-testid=ps-color]","mono")
+        pg.fill("[data-testid=ps-header]","Acme AHU · 기술영업팀"); pg.fill("[data-testid=ps-footer]","Good air makes Good Life"); pg.fill("[data-testid=ps-watermark]","CONFIDENTIAL")
+        if pg.eval_on_selector("[data-testid=ps-save]","e=>!e.disabled"): break
+        time.sleep(0.3)   # 하이드레이션 대기 재시도
+    pg.click("[data-testid=ps-save]")
+    pg.wait_for_selector("[data-testid=ps-msg][data-ok='1']",timeout=30000)
+    g1=ctx.request.get(PS+"?type=quotation").json()["settings"]
+    ok("S43c 화면에서 저장 — 방향·색상·머리글·바닥글·워터마크가 견적서 양식으로 남는다", (g1["orientation"],g1["color"],g1["watermark"]),
+       g1["orientation"]=="landscape" and g1["color"]=="mono" and g1["header"].startswith("Acme") and g1["footer"].startswith("Good air") and g1["watermark"]=="CONFIDENTIAL")
+    qt1,h1=quote_total()
+    ok("S43d 인쇄본이 양식을 입는다 (A4 가로 흑백 · 머리글 · 바닥글 · 워터마크) — 견적 금액은 그대로",
+       (qt0, qt1, 'data-print-setup="A4-landscape-mono"' in h1),
+       qt0 is not None and qt0==qt1 and 'data-print-setup="A4-landscape-mono"' in h1 and "size: A4 landscape" in h1 and 'data-testid="print-watermark">CONFIDENTIAL' in h1 and 'data-testid="print-header"' in h1 and 'data-testid="print-footer"' in h1)
+    td=ctx.request.get(PS+"?type=techdata").json()
+    ok("S43e 양식은 문서 종류마다 따로다 — Tech Data 는 여전히 기본", (td["saved"], td["settings"]["color"]), (not td["saved"]) and td["settings"]["color"]=="color")
+    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data={"email":"viewer@acme.test"})
+    vp=vw.request.put(PS,headers=J0,data=json.dumps({"type":"quotation","settings":{"color":"color"}})); vw.close()
+    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data={"email":"owner@globex.test"})
+    gq=gb.request.get(PS+"?type=quotation").json(); gb.close()
+    ok("S43f viewer 는 양식을 못 바꾸고(403), 다른 회사는 이 회사 양식을 못 본다(자기 기본값)", (vp.status, gq["saved"]), vp.status==403 and not gq["saved"])
+    fr=pg.frame_locator("[data-testid=ps-preview]")
+    fr.locator("[data-testid=print-watermark]").wait_for(timeout=30000)
+    ok("S43g Print Test — 오른쪽 미리보기가 저장된 양식(워터마크)으로 다시 그려진다", True, True)
+    nuke(pg); pg.screenshot(path=f"{OUT}/56_print_setup.png",full_page=True)
     # S37 은 맨 끝에서 센다 — 중간(옛 자리)에서는 뒤에 찍히는 5장(40·41·42·52·53)이 아직 없어,
     # 빈 폴더에서는 25장이라 실패하고 이전 실행 잔재가 있을 때만 통과했다(2026-09-24 실측).
     _want=["00_login","05_project_mgmt","06_module_cpq_stub","10_project_bound","11_code_builder","11b_revisions","12_macro_tab",
            "13_macro_approved","14_edim_run","15_bom_cost","16_design_tab","20_setup_subcode","21_setup_product_table",
            "22_setup_relationship","23_codebuilder_from_subcode","30_toolbox_program","31_toolbox_ui_tool","40_company_admin",
            "41_platform_console","42_user_management","43_drawings","44_document_tab","45_purchasing","46_quotation_print",
-           "47_techdata_print","48_dxf_plan","49_dxf_assembly","51_accepted","52_register","53_schedule","54_toolbar","55_project_mgmt"]
+           "47_techdata_print","48_dxf_plan","49_dxf_assembly","51_accepted","52_register","53_schedule","54_toolbar","55_project_mgmt","56_print_setup"]
     _miss=[w for w in _want if not os.path.exists(f"{OUT}/{w}.png") or os.path.getmtime(f"{OUT}/{w}.png")<T0]
-    ok("S37 캡처 32장이 이번 실행에서 전부 나온다 (잔재 파일은 세지 않음)", _miss or len(_want), not _miss)
+    ok("S37 캡처 33장이 이번 실행에서 전부 나온다 (잔재 파일은 세지 않음)", _miss or len(_want), not _miss)
     b.close()
 n=sum(1 for v in R.values() if v[0]); print(f"\n[demo_e2e] {n}/{len(R)} steps passed"); json.dump(R,open(f"{OUT}/demo_e2e_result.json","w"),ensure_ascii=False,indent=1)
 sys.exit(0 if n==len(R) else 1)
