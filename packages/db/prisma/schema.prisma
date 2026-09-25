@@ -42,6 +42,7 @@ model Tenant {
   purchaseReqs    PurchaseRequest[]
   purchaseLines   PurchaseRequestLine[]
   printSetups     PrintSetup[]
+  uiForms         UiForm[]
 
   @@map("tenant")
 }
@@ -529,4 +530,21 @@ model PrintSetup {
 
   @@unique([tenantId, docType])
   @@map("print_setup")
+}
+
+/// 0016 · p25 사용자 UI Form · p26 UI Design 작업장 — 위젯 배치(spec)와 Templet 여부.
+model UiForm {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  name       String
+  scope      String
+  isTemplet  Boolean  @default(false) @map("is_templet")
+  spec       Json
+  updatedAt  DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+  updatedBy  String   @map("updated_by") @db.Uuid
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, name])
+  @@map("ui_form")
 }
