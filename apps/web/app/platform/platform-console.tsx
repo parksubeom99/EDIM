@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 /**
  * 요청 대기열의 결정 UI. 결정은 서버(POST /api/platform/requests)로만 나가고,
@@ -32,6 +32,9 @@ export function RequestQueue({ initial }: { initial: QueueRow[] }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState("");
+  // 하이드레이션 표지 — 서버 렌더 직후 버튼은 보여도 클릭이 사라진다(e2e 가 이것을 기다린다)
+  const [ready, setReady] = useState(false);
+  useEffect(() => setReady(true), []);
 
   async function decide(id: string, state: "approved" | "rejected") {
     setBusy(id);
@@ -61,7 +64,7 @@ export function RequestQueue({ initial }: { initial: QueueRow[] }) {
     );
 
   return (
-    <div data-testid="request-queue">
+    <div data-testid="request-queue" data-ready={ready ? "1" : "0"}>
       <input
         value={note}
         onChange={(e) => setNote(e.target.value)}

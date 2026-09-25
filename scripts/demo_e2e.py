@@ -776,7 +776,7 @@ with sync_playwright() as p:
     plp.goto(BASE+"/workbench",wait_until="domcontentloaded"); time.sleep(1.2)
     ok("S16h 플랫폼 계정은 /workbench에 들어갈 수 없다", plp.url.split(BASE)[-1], "/login" in plp.url)
     # S16i 플랫폼이 승인 → 회사 화면에 '승인됨'으로 돌아온다
-    plp.goto(BASE+"/platform",wait_until="domcontentloaded"); plp.wait_for_selector("[data-testid=request-queue]",timeout=30000); time.sleep(1.0); nuke(plp)
+    plp.goto(BASE+"/platform",wait_until="domcontentloaded"); plp.wait_for_selector("[data-testid=request-queue][data-ready='1']",timeout=60000); nuke(plp)   # 하이드레이션 대기(고정 sleep 1.0 은 첫 컴파일에서 모자랐다 — 2026-09-25 새 DB 재현)
     plp.fill("[data-testid=decision-note]","Special 개발 착수")
     row=plp.locator("[data-testid=request-row]").filter(has_text=subj).first
     row.locator("[data-testid=approve]").click()
