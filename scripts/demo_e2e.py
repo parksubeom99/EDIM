@@ -896,15 +896,63 @@ with sync_playwright() as p:
     fr.locator("[data-testid=print-watermark]").wait_for(timeout=30000)
     ok("S43g Print Test — 오른쪽 미리보기가 저장된 양식(워터마크)으로 다시 그려진다", True, True)
     nuke(pg); pg.screenshot(path=f"{OUT}/56_print_setup.png",full_page=True)
+    # ── S44 p25·p26 사용자 UI Form · UI Design 작업장 — 끌어다 놓기 · Set-up · Templet · Run(실제 카탈로그) ──
+    UF=BASE+"/api/ui-forms"
+    pg.goto(BASE+"/setup/ui",wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=ui-designer][data-ready='1']",timeout=60000); nuke(pg)
+    pg.fill("[data-testid=ui-new-name]","E2E 용량 조회"); pg.click("[data-testid=ui-new]")
+    pg.wait_for_selector("[data-testid='ui-form-E2E 용량 조회'][data-selected='1']",timeout=30000)
+    pg.wait_for_selector("[data-testid=ui-canvas]",timeout=30000)
+    pg.drag_and_drop("[data-palette=combo]","[data-testid=ui-canvas]",target_position={"x":40,"y":40})
+    pg.wait_for_selector("[data-widget=combo1]",timeout=30000)
+    pos=pg.eval_on_selector("[data-widget=combo1]","e=>[e.style.left,e.style.top]")
+    ok("S44a 위젯 상자의 Combo box 를 캔버스로 끌어다 놓으면 놓은 칸에 생긴다 (Drag)", pos, pos==["34px","34px"])
+    pg.select_option("[data-testid=ui-w-subcode]","B"); pg.fill("[data-testid=ui-w-label]","용량 (B)")
+    pg.click("[data-palette=table]"); pg.wait_for_selector("[data-widget=table1]",timeout=30000)
+    pg.select_option("[data-testid=ui-w-table]","EU|cap")
+    pg.click("[data-palette=button]"); pg.wait_for_selector("[data-widget=button1]",timeout=30000)
+    pg.select_option("[data-testid=ui-w-target]","table1"); pg.select_option("[data-testid=ui-w-filter]","combo1")
+    pg.click("[data-testid=ui-templet]")
+    pg.click("[data-testid=ui-save]"); pg.wait_for_function("()=>document.querySelector('[data-testid=ui-msg]')?.innerText.includes('저장')",timeout=30000)
+    f1=[x for x in ctx.request.get(UF).json()["rows"] if x["name"]=="E2E 용량 조회"][0]
+    wb={w["id"]:w for w in f1["spec"]["widgets"]}
+    rects=[(w["x"],w["y"],w["w"],w["h"]) for w in f1["spec"]["widgets"]]
+    lap=[(i,j) for i in range(len(rects)) for j in range(i+1,len(rects)) if rects[i][0]<rects[j][0]+rects[j][2] and rects[j][0]<rects[i][0]+rects[i][2] and rects[i][1]<rects[j][1]+rects[j][3] and rects[j][1]<rects[i][1]+rects[i][3]]
+    ok("S44a2 누르기로 추가한 위젯은 기존 위젯과 겹치지 않는 빈 자리에 놓인다", rects, not lap)
+    ok("S44b Set-up 이 저장된다 — Combo=Sub Code B · Table=EU.cap · Button=찾기→table1 (Active Set-up=combo1) · Templet",
+       sorted(wb), f1["isTemplet"] and wb["combo1"]["source"]=={"kind":"subcode","itemKey":"B"} and wb["table1"]["source"]=={"kind":"table","code":"EU","table":"cap"}
+       and wb["button1"]["action"]=="find" and wb["button1"]["target"]=="table1" and wb["button1"]["filterBy"]=="combo1")
+    bad=ctx.request.put(UF+"/"+f1["id"],headers=J0,data=json.dumps({"spec":{"widgets":[{"id":"button1","type":"button","x":0,"y":0,"w":4,"h":2,"label":"x","action":"find","target":"combo1"},
+        {"id":"combo1","type":"combo","x":5,"y":0,"w":4,"h":2,"label":"c"}]}}))
+    out=ctx.request.put(UF+"/"+f1["id"],headers=J0,data=json.dumps({"spec":{"widgets":[{"id":"label1","type":"label","x":22,"y":0,"w":4,"h":1,"label":"x"}]}}))
+    ok("S44c 잘못된 폼은 저장되지 않는다 — 대상이 Table 이 아님 · 캔버스 밖 (400 · 400)", (bad.status, out.status), bad.status==400 and out.status==400)
+    pg.click("[data-testid=ui-mode-run]"); pg.wait_for_selector("[data-run-table=table1]",timeout=30000)
+    all_rows=int(pg.get_attribute("[data-run-table=table1]","data-rows"))
+    pg.select_option("[data-run-combo=combo1]","55"); pg.click("[data-run-button=button1]")
+    pg.wait_for_function("()=>document.querySelector('[data-run-table=table1]')?.dataset.rows==='1'",timeout=30000)
+    first=pg.inner_text("[data-run-table=table1] tbody tr td")
+    ok("S44d Run — Combo 에서 55 를 고르고 찾기를 누르면 EU.cap 표에서 Item 55 행만 남는다 (실제 카탈로그 데이터)", (all_rows, first), all_rows==4 and first=="55")
+    pg.click("[data-testid=ui-mode-design]")
+    pg.click("[data-testid='ui-call-E2E 용량 조회']")
+    pg.wait_for_selector("[data-testid='ui-form-E2E 용량 조회 사본'][data-selected='1']",timeout=30000)
+    cp=[x for x in ctx.request.get(UF).json()["rows"] if x["name"]=="E2E 용량 조회 사본"][0]
+    ok("S44e Templet 호출하여 Customizing — 같은 위젯·Set-up 의 사본이 새 폼으로 생긴다(사본은 Templet 아님)", (len(cp["spec"]["widgets"]), cp["isTemplet"]),
+       cp["spec"]==f1["spec"] and not cp["isTemplet"])
+    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data={"email":"viewer@acme.test"})
+    vp=vw.request.post(UF,headers=J0,data=json.dumps({"name":"viewer 폼"})); vw.close()
+    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data={"email":"owner@globex.test"})
+    gl=gb.request.get(UF).json()["rows"]; gd=gb.request.delete(UF+"/"+f1["id"]); gb.close()
+    ok("S44f viewer 는 폼을 못 만들고(403), 다른 회사는 이 폼을 못 보고 못 지운다(0건 · 404)", (vp.status, len(gl), gd.status), vp.status==403 and len(gl)==0 and gd.status==404)
+    pg.click("[data-testid='ui-form-E2E 용량 조회']"); pg.wait_for_selector("[data-widget=table1]",timeout=30000); pg.click("[data-widget=button1]")
+    nuke(pg); pg.screenshot(path=f"{OUT}/57_ui_design.png",full_page=True)
     # S37 은 맨 끝에서 센다 — 중간(옛 자리)에서는 뒤에 찍히는 5장(40·41·42·52·53)이 아직 없어,
     # 빈 폴더에서는 25장이라 실패하고 이전 실행 잔재가 있을 때만 통과했다(2026-09-24 실측).
     _want=["00_login","05_project_mgmt","06_module_cpq_stub","10_project_bound","11_code_builder","11b_revisions","12_macro_tab",
            "13_macro_approved","14_edim_run","15_bom_cost","16_design_tab","20_setup_subcode","21_setup_product_table",
            "22_setup_relationship","23_codebuilder_from_subcode","30_toolbox_program","31_toolbox_ui_tool","40_company_admin",
            "41_platform_console","42_user_management","43_drawings","44_document_tab","45_purchasing","46_quotation_print",
-           "47_techdata_print","48_dxf_plan","49_dxf_assembly","51_accepted","52_register","53_schedule","54_toolbar","55_project_mgmt","56_print_setup"]
+           "47_techdata_print","48_dxf_plan","49_dxf_assembly","51_accepted","52_register","53_schedule","54_toolbar","55_project_mgmt","56_print_setup","57_ui_design"]
     _miss=[w for w in _want if not os.path.exists(f"{OUT}/{w}.png") or os.path.getmtime(f"{OUT}/{w}.png")<T0]
-    ok("S37 캡처 33장이 이번 실행에서 전부 나온다 (잔재 파일은 세지 않음)", _miss or len(_want), not _miss)
+    ok("S37 캡처 34장이 이번 실행에서 전부 나온다 (잔재 파일은 세지 않음)", _miss or len(_want), not _miss)
     b.close()
 n=sum(1 for v in R.values() if v[0]); print(f"\n[demo_e2e] {n}/{len(R)} steps passed"); json.dump(R,open(f"{OUT}/demo_e2e_result.json","w"),ensure_ascii=False,indent=1)
 sys.exit(0 if n==len(R) else 1)

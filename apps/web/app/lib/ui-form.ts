@@ -63,3 +63,11 @@ export function parseSpec(v: unknown): { ok: true; spec: UiSpec } | { ok: false;
   }
   return { ok: true, spec: { widgets: out } };
 }
+
+/** 누르기로 추가할 때: 그 크기가 다른 위젯과 겹치지 않는 첫 자리(위→아래, 왼→오른). 없으면 null. */
+export function freeSpot(type: WidgetType, widgets: Widget[]): { x: number; y: number } | null {
+  const [w, h] = DEFAULT_SIZE[type];
+  const hit = (x: number, y: number) => widgets.some((q) => x < q.x + q.w && q.x < x + w && y < q.y + q.h && q.y < y + h);
+  for (let y = 0; y + h <= GRID_H; y++) for (let x = 0; x + w <= GRID_W; x++) if (!hit(x, y)) return { x, y };
+  return null;
+}

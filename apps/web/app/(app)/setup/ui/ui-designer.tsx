@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, type CSSProperties, type DragEvent } from "react";
 import {
-  ACTIONS, ACTION_LABEL, GRID_H, GRID_W, SCOPES, WIDGET_TYPES, newWidget,
+  ACTIONS, ACTION_LABEL, GRID_H, GRID_W, SCOPES, WIDGET_TYPES, freeSpot, newWidget,
   type Action, type UiSpec, type Widget, type WidgetType,
 } from "@/app/lib/ui-form";
 
@@ -164,7 +164,7 @@ export function UiDesigner({ canEdit }: { canEdit: boolean }) {
                 {WIDGET_TYPES.map((t) => (
                   <button key={t} type="button" draggable={canEdit} data-palette={t} disabled={!canEdit}
                     onDragStart={(e) => { e.dataTransfer.setData("text/edim-widget", t); e.dataTransfer.effectAllowed = "copy"; }}
-                    onClick={() => { let y = 0; while (y < GRID_H - 1 && spec.widgets.some((q) => q.y <= y && y < q.y + q.h)) y++; add(t, 0, y); }}
+                    onClick={() => { const at = freeSpot(t, spec.widgets); if (at) add(t, at.x, at.y); else setMsg({ ok: false, text: "캔버스에 빈 자리가 없습니다" }); }}
                     title="캔버스로 끌어다 놓거나 누르십시오" style={{ ...btn(), cursor: canEdit ? "grab" : "not-allowed" }}>{TYPE_LABEL[t]}</button>
                 ))}
               </div>
