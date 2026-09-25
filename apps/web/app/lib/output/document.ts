@@ -279,15 +279,33 @@ function techDataHtml(b: TechDataBody): string {
 <table><tr><th>${esc(b.output.name)}</th><td class="n"><span class="amount" data-testid="techdata-value">${esc(Math.round(b.output.value * 1000) / 1000)}</span></td></tr></table>`;
 }
 
-export function renderDocumentHtml(doc: { docNo: string; currentRev: string; status: string; docType: string; body: unknown }): string {
+/** p48 Print Set-up — 모양만 바꾸는 CSS. 숫자·내용은 그대로다(스냅샷에서 옮긴 body 를 다시 계산하지 않는다). */
+const PAPER_MM: Record<string, [number, number]> = { A4: [210, 297], A3: [297, 420], Letter: [216, 279] };
+export interface PrintLook { paper: string; orientation: "portrait" | "landscape"; marginMm: number; font: string; fontSizePx: number; color: "color" | "mono"; header: string; footer: string; watermark: string }
+function setupCss(p: PrintLook): string {
+  const [w, h] = PAPER_MM[p.paper] ?? PAPER_MM.A4!;
+  const width = p.orientation === "landscape" ? h : w;
+  return `
+@page { size: ${p.paper} ${p.orientation}; margin: ${p.marginMm}mm; }
+body { font-family: "${p.font}", "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif; font-size: ${p.fontSizePx}px; }
+.sheet { max-width: ${width - 2 * p.marginMm}mm; }
+${p.color === "mono" ? "html { filter: grayscale(1); }" : ""}
+.ph, .pf { font-size: 10.5px; color: #44525f; }
+.ph { border-bottom: 1px solid #9aa7b3; padding-bottom: 4px; margin-bottom: 8px; }
+.pf { border-top: 1px solid #9aa7b3; padding-top: 4px; margin-top: 10px; text-align: center; }
+.wm { position: fixed; left: 50%; top: 45%; transform: translate(-50%, -50%) rotate(-30deg); font-size: 84px; font-weight: 800; color: #14202b; opacity: .07; white-space: nowrap; pointer-events: none; z-index: 0; }
+`;
+}
+
+export function renderDocumentHtml(doc: { docNo: string; currentRev: string; status: string; docType: string; body: unknown }, look?: PrintLook): string {
   const b = doc.body as QuotationBody | TechDataBody;
   const title = b.kind === "quotation" ? "견 적 서" : "TECH DATA";
   const inner = b.kind === "quotation" ? quotationHtml(b) : techDataHtml(b);
   return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${esc(doc.docNo)} Rev ${esc(doc.currentRev)}</title><style>${PRINT_CSS}</style></head><body><div class="sheet">
-<div class="top"><h1>${title}</h1><div class="meta"><span class="mono">${esc(doc.docNo)}</span> · Rev ${esc(doc.currentRev)} · <span class="status" data-testid="doc-status">${esc(STATUS_LABEL[doc.status] ?? doc.status)}</span><br>${esc(b.date)}</div></div>
+<title>${esc(doc.docNo)} Rev ${esc(doc.currentRev)}</title><style>${PRINT_CSS}${look ? setupCss(look) : ""}</style></head><body${look ? ` data-print-setup="${esc(`${look.paper}-${look.orientation}-${look.color}`)}"` : ""}>${look?.watermark ? `<div class="wm" data-testid="print-watermark">${esc(look.watermark)}</div>` : ""}<div class="sheet">
+${look?.header ? `<div class="ph" data-testid="print-header">${esc(look.header)}</div>` : ""}<div class="top"><h1>${title}</h1><div class="meta"><span class="mono">${esc(doc.docNo)}</span> · Rev ${esc(doc.currentRev)} · <span class="status" data-testid="doc-status">${esc(STATUS_LABEL[doc.status] ?? doc.status)}</span><br>${esc(b.date)}</div></div>
 ${inner}
 ${footOf(b.source)}
-<p class="noprint" style="margin-top:14px"><button onclick="window.print()">인쇄 / PDF 저장</button></p>
+${look?.footer ? `<div class="pf" data-testid="print-footer">${esc(look.footer)}</div>` : ""}<p class="noprint" style="margin-top:14px"><button onclick="window.print()">인쇄 / PDF 저장</button></p>
 </div></body></html>`;
 }

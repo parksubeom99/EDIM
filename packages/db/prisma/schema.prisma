@@ -41,6 +41,7 @@ model Tenant {
   documents       Document[]
   purchaseReqs    PurchaseRequest[]
   purchaseLines   PurchaseRequestLine[]
+  printSetups     PrintSetup[]
 
   @@map("tenant")
 }
@@ -512,4 +513,20 @@ model PurchaseRequestLine {
 
   @@unique([prId, lineNo], map: "purchase_request_line_pr_no_key")
   @@map("purchase_request_line")
+}
+
+/// 0015 · p48 Print Set-up Form — 문서 종류별 인쇄 양식(용지·방향·여백·글꼴·크기·색상·머리글/바닥글·워터마크).
+/// 문서의 숫자(body)는 건드리지 않는다 — 보이는 모양만 정한다.
+model PrintSetup {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  docType   String   @map("doc_type")
+  settings  Json
+  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+  updatedBy String   @map("updated_by") @db.Uuid
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, docType])
+  @@map("print_setup")
 }

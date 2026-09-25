@@ -652,6 +652,7 @@ function DocumentPanel({ project, code, runs, nodeStable, canEdit }: { project: 
         <button type="button" data-testid="pr-make" disabled={off || !!prOfRun} onClick={() => void post("/api/purchase-requests", { runId })} style={{ ...btn, opacity: off || prOfRun ? 0.5 : 1 }}>
           {prOfRun ? `구매 요청 있음 · ${prOfRun.prNo}` : "구매 요청 만들기"}
         </button>
+        <a data-testid="doc-print-setup" href="/setup/print" style={{ marginLeft: "auto", fontSize: "var(--fs-12)", color: "var(--accent)", alignSelf: "center" }}>Print 설정 (p48) →</a>
       </div>
       {msg && <p data-testid="document-msg" data-ok={msg.ok ? "1" : "0"} style={{ margin: "8px 0 0", fontSize: "var(--fs-12)", color: msg.ok ? "var(--accent)" : "var(--warn)" }}>{msg.text}</p>}
 

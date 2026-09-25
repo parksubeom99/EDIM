@@ -138,3 +138,7 @@ export { isRunApproved, assertRunApproved, BomNotApprovedError } from "./approva
 export { traceRun } from "./trace";
 export type { RunTrace } from "./trace";
 
+export {
+  PRINT_DOC_TYPES, PAPERS, FONTS, DEFAULT_PRINT, isPrintDocType, parsePrintSettings, getPrintSetup, savePrintSetup,
+  type PrintDocType, type PrintSettings,
+} from "./print";
