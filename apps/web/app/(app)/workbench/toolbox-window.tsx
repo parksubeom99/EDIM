@@ -148,7 +148,14 @@ function UiTool({ commands, onCommands, onRun, busyKind, runDisabled, canEdit }:
           <div><button type="button" data-testid="cmd-reset" onClick={() => onCommands(DEFAULT_COMMANDS)} disabled={!canEdit} style={btn()}>기본값</button></div>
         </div>
       </div>
-      <p style={{ ...muted, margin: 0 }}>p25의 Combo box set-up · Templet · Canvas Drag는 아직 없습니다. 이 설정은 이 브라우저에만 저장됩니다(회사 공용 저장은 테이블 필요).</p>
+      <div style={pane}>
+        <div style={paneHead}>Combo box · Templet · Canvas<span style={muted}>p25 · p26</span></div>
+        <div style={{ padding: 8 }}>
+          <a data-testid="toolbox-ui-design" href="/setup/ui" style={{ ...btn(true), display: "inline-block", textDecoration: "none" }}>UI Design 작업장 열기 →</a>
+          <p style={{ ...muted, margin: "6px 0 0" }}>위젯(Button · Combo box · Table · Label)을 캔버스에 끌어다 놓고 동작·대상 Data 를 정한 폼을 회사 공용으로 저장합니다. Templet 로 표시하면 다른 폼이 호출해 고쳐 씁니다.</p>
+        </div>
+      </div>
+      <p style={{ ...muted, margin: 0 }}>위 Command button 설정은 이 브라우저에만 저장됩니다(Action Bar 는 개인 화면이라).</p>
     </>
   );
 }
