@@ -601,6 +601,14 @@ function DesignCanvas({ code, slots, runs, nodeStable, canEdit, link }: { code: 
         >
           조립도 DXF
         </a>
+        {/* ⑩ 3D 보기 — 같은 스냅샷의 구획 박스를 브라우저에서 돌려 본다(새 데이터 없음) */}
+        <a
+          data-testid="view-3d"
+          href={runId ? `/viewer3d?runId=${runId}` : "#"}
+          style={{ fontSize: "var(--fs-12)", color: "var(--accent)", background: "var(--surface-2)", border: "1px solid var(--accent)", borderRadius: "var(--radius-sm)", padding: "5px 10px", textDecoration: "none", opacity: runId ? 1 : 0.5, pointerEvents: runId ? "auto" : "none" }}
+        >
+          3D 보기
+        </a>
         <DrawingRegister runId={runId} nodeStable={nodeStable} canEdit={canEdit} verify={runs.find((r) => r.kind === "bom" && r.runId)?.dims} />
         <span style={muted}>
           {runId
