@@ -47,6 +47,9 @@ export function SetupShell({ initialTab }: { initialTab: Tab }) {
     <main data-testid="setup" style={{ padding: "14px 18px", display: "grid", gap: 12 }}>
       <header style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
         <Link href="/workbench" style={{ color: "var(--accent)", fontSize: "var(--fs-13)" }}>← MainForm</Link>
+        <Link href="/setup/material" data-testid="setup-link-material" style={{ color: "var(--accent)", fontSize: "var(--fs-13)" }}>자재·구매품 등록 (p32) →</Link>
+        <Link href="/setup/print" data-testid="setup-link-print" style={{ color: "var(--accent)", fontSize: "var(--fs-13)" }}>Print 설정 (p48) →</Link>
+        <Link href="/setup/ui" data-testid="setup-link-ui" style={{ color: "var(--accent)", fontSize: "var(--fs-13)" }}>UI Design (p26) →</Link>
         <h1 style={{ fontFamily: "var(--font-display)", fontSize: "var(--fs-18, 18px)", fontWeight: 600, margin: 0 }}>Set-up / PLM · BOM Code Set-Up</h1>
         <span style={muted}>Code › Product › Item › Hierarchy › Relationship</span>
         {cat && <span data-testid="catalog-fp" style={{ ...muted, ...mono, marginLeft: "auto" }}>catalog {cat.fingerprint} · {cat.subCodes.length} sub · {cat.productCodes.length} codes · {cat.relationships.length} rel</span>}
