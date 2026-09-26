@@ -51,6 +51,8 @@ async function resetDemo(): Promise<void> {
   await adminPrisma.productCode.deleteMany({ where: { tenantId: t, code: { startsWith: "E2E-" } } });
   // 0018: 리허설이 등록한 Arrangement Code(p35)를 지운다.
   await adminPrisma.arrangementCode.deleteMany({ where: { tenantId: t } });
+  // 0019: 리허설이 더한 사양 항목(p46)을 지운다 — 시드 항목은 아래 seedDemo(forceCatalog) 가 다시 넣는다.
+  await adminPrisma.specItem.deleteMany({ where: { tenantId: t } });
   // 리허설이 역할을 바꿔 놓았을 수 있다(User Management 시연) → 시드 역할로 되돌린다.
   await adminPrisma.membership.updateMany({ where: { tenantId: t, userId: IDS.viewerA }, data: { role: "viewer" } });
   await adminPrisma.membership.updateMany({ where: { tenantId: t, userId: IDS.ownerA }, data: { role: "owner" } });

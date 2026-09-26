@@ -8,6 +8,7 @@ import type { WorkbenchProject } from "./mainform-shell";
 import type { RunResult } from "./action-bar";
 import { MacroPanel } from "./macro-panel";
 import { BomPanel } from "./bom-panel";
+import { SpecInput } from "./spec-input";
 
 const card: CSSProperties = {
   background: "var(--surface-2)",
@@ -66,6 +67,7 @@ export function WorkPlace({
           </div>
         )}
         {tab === "code" && <CodeBuilder slotDefs={slotDefs} slots={slots} onSlots={onSlots} assembled={assembled} nodeStable={nodeStable} canEdit={canEdit} rev={rev} onRev={onRev} />}
+        {tab === "code" && <SpecInput product={slots.A ?? ""} slots={slots} onSlots={onSlots} card={card} h={h} muted={muted} />}
         {tab === "design" && <DesignCanvas code={assembled.code} slots={slots} runs={runs} nodeStable={nodeStable} canEdit={canEdit} link={canvas} />}
         {tab === "bom" && <BomPanel code={assembled.code} runs={runs} />}
         {tab === "macro" && <MacroPanel project={project} nodeStable={nodeStable} canEdit={canEdit} canDecide={canDecide} runs={runs} />}

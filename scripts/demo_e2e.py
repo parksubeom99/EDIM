@@ -1029,15 +1029,53 @@ with sync_playwright() as p:
     ok("S46f 다른 회사는 이 코드를 못 보고 적용도 못 한다 (0건 · 404)", (len(gl), ga.status), len(gl)==0 and ga.status==404)
     pg.click("[data-testid=ac-row-FDV-E2E]"); pg.wait_for_selector("[data-testid=ac-detail][data-code=FDV-E2E]",timeout=30000)
     nuke(pg); pg.screenshot(path=f"{OUT}/59_arrangement_code.png",full_page=True)
+    # ── S47 ⑥ p46 Spec List in-put table — 사양 입력 → 코드 추천(등록값에서만) · 저장은 기존 개정 한 곳 ──
+    SI=BASE+"/api/setup/spec-items"; SR=BASE+"/api/setup/spec-recommend"
+    pg.goto(BASE+"/setup/spec",wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=spec-items][data-ready='1']",timeout=60000); nuke(pg)
+    pg.select_option("[data-testid=spec-product]","EU"); pg.wait_for_selector("[data-testid=spec-items][data-ready='1'][data-product=EU]",timeout=30000)
+    seeded=pg.eval_on_selector_all("[data-testid^=spec-row-]","es=>es.map(e=>e.dataset.testid.replace('spec-row-',''))")
+    pg.fill("[data-testid=spec-new-key]","fan_kw"); pg.fill("[data-testid=spec-new-label]","팬 동력"); pg.fill("[data-testid=spec-new-unit]","kW")
+    pg.select_option("[data-testid=spec-new-slot]","B"); pg.select_option("[data-testid=spec-new-kind]","table")
+    pg.select_option("[data-testid=spec-new-table]","cap"); pg.select_option("[data-testid=spec-new-col]","A"); pg.select_option("[data-testid=spec-new-op]","ge")
+    pg.click("[data-testid=spec-add]"); pg.wait_for_selector("[data-testid=spec-row-fan_kw]",timeout=30000)
+    ok("S47a 사양 항목 — EU 에 시드 3종(풍량·가습량·재질)이 있고, 화면에서 제품 표의 열(cap.A 팬 kW)을 읽는 항목을 추가한다", seeded,
+       seeded==["airflow","humid","material"] and bool(pg.query_selector("[data-testid=spec-row-fan_kw]")))
+    pg.goto(NODE4,wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=spec-panel][data-ready='1']",timeout=60000); nuke(pg)
+    pg.wait_for_selector("[data-testid=spec-in-fan_kw]",timeout=30000)
+    pg.fill("[data-testid=spec-in-airflow]","11000"); pg.fill("[data-testid=spec-in-fan_kw]","10"); pg.fill("[data-testid=spec-in-material]","SS")
+    pg.click("[data-testid=spec-recommend]"); pg.wait_for_selector("[data-testid=spec-msg]",timeout=30000)
+    pg.wait_for_function("()=>document.querySelector('[data-testid=assembled-code]')?.innerText.startsWith('EU-25-')",timeout=30000)
+    bv=pg.eval_on_selector("[data-testid=code-builder] select[data-slot=B]","e=>e.value"); ev=pg.eval_on_selector("[data-testid=code-builder] select[data-slot=E]","e=>e.value")
+    asm=pg.inner_text("[data-testid=assembled-code]").strip(); fan_line=pg.get_attribute("[data-testid=spec-line-fan_kw]","data-picked")
+    ok("S47b 사양 입력 → 코드 추천 — 풍량 11,000 CMH 와 팬 10 kW 를 둘 다 만족하는 최소 용량 25, 재질 SS 가 Code Builder 에 채워진다", (bv, ev, asm, fan_line),
+       bv=="25" and ev=="SS" and asm.startswith("EU-25-") and "SS" in asm and fan_line=="25")
+    nuke(pg); pg.screenshot(path=f"{OUT}/60_spec_input.png",full_page=True)
+    rv0=len(ctx.request.get(BASE+"/api/rccs/revisions?node=a0000000-0000-4000-8000-000000000004").json().get("revisions",[]))
+    pg.fill("[data-testid=rev-reason]","spec input recommend (E2E)"); pg.click("[data-testid=rev-save]",force=True)
+    pg.wait_for_function("(n)=>fetch('/api/rccs/revisions?node=a0000000-0000-4000-8000-000000000004').then(r=>r.json()).then(j=>(j.revisions||[]).length>n)", arg=rv0, timeout=30000)
+    rv1=ctx.request.get(BASE+"/api/rccs/revisions?node=a0000000-0000-4000-8000-000000000004").json().get("revisions",[])
+    ok("S47c 저장은 기존 개정(Rev) 한 곳 — 추천된 코드가 새 개정으로 남는다", (len(rv1)-rv0, rv1[0]["code"] if rv1 else None),
+       len(rv1)==rv0+1 and rv1[0]["code"]==asm)
+    bad=ctx.request.post(SI,headers=J0,data=json.dumps({"productCode":"EU","key":"bad_slot","label":"x","slot":"E","source":{"kind":"table","table":"cap","col":"M","op":"ge"}}))
+    un=ctx.request.post(SR,headers=J0,data=json.dumps({"productCode":"EU","inputs":{"airflow":"90000"}})).json()
+    uk=ctx.request.post(SR,headers=J0,data=json.dumps({"productCode":"EU","inputs":{"nope":"1"}}))
+    ok("S47d 잘못된 정의는 400(표의 행 슬롯과 사양 슬롯이 다르다) · 맞는 등록값이 없으면 지어내지 않고 unmet · 없는 사양 키는 400",
+       (bad.status, un.get("unmet"), un.get("slots"), uk.status), bad.status==400 and un.get("unmet")==["B"] and un.get("slots")=={} and uk.status==400)
+    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data={"email":"viewer@acme.test"})
+    vp=vw.request.post(SI,headers=J0,data=json.dumps({"productCode":"EU","key":"v_try","label":"v","slot":"E","source":{"kind":"choice"}})); vw.close()
+    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data={"email":"owner@globex.test"})
+    gl=gb.request.get(SI+"?product=EU").json()["rows"]; gr=gb.request.post(SR,headers=J0,data=json.dumps({"productCode":"EU","inputs":{"airflow":"11000"}})); gb.close()
+    ok("S47e viewer 는 사양 항목을 못 만든다(403) · 다른 회사는 이 항목을 못 보고(0건) 우리 제품으로 추천도 못 받는다(404)", (vp.status, len(gl), gr.status),
+       vp.status==403 and len(gl)==0 and gr.status==404)
     # S37 은 맨 끝에서 센다 — 중간(옛 자리)에서는 뒤에 찍히는 5장(40·41·42·52·53)이 아직 없어,
     # 빈 폴더에서는 25장이라 실패하고 이전 실행 잔재가 있을 때만 통과했다(2026-09-24 실측).
     _want=["00_login","05_project_mgmt","06_module_cpq_stub","10_project_bound","11_code_builder","11b_revisions","12_macro_tab",
            "13_macro_approved","14_edim_run","15_bom_cost","16_design_tab","20_setup_subcode","21_setup_product_table",
            "22_setup_relationship","23_codebuilder_from_subcode","30_toolbox_program","31_toolbox_ui_tool","40_company_admin",
            "41_platform_console","42_user_management","43_drawings","44_document_tab","45_purchasing","46_quotation_print",
-           "47_techdata_print","48_dxf_plan","49_dxf_assembly","51_accepted","52_register","53_schedule","54_toolbar","55_project_mgmt","56_print_setup","57_ui_design","58_material","59_arrangement_code"]
+           "47_techdata_print","48_dxf_plan","49_dxf_assembly","51_accepted","52_register","53_schedule","54_toolbar","55_project_mgmt","56_print_setup","57_ui_design","58_material","59_arrangement_code","60_spec_input"]
     _miss=[w for w in _want if not os.path.exists(f"{OUT}/{w}.png") or os.path.getmtime(f"{OUT}/{w}.png")<T0]
-    ok("S37 캡처 36장이 이번 실행에서 전부 나온다 (잔재 파일은 세지 않음)", _miss or len(_want), not _miss)
+    ok("S37 캡처 37장이 이번 실행에서 전부 나온다 (잔재 파일은 세지 않음)", _miss or len(_want), not _miss)
     b.close()
 n=sum(1 for v in R.values() if v[0]); print(f"\n[demo_e2e] {n}/{len(R)} steps passed"); json.dump(R,open(f"{OUT}/demo_e2e_result.json","w",encoding="utf-8"),ensure_ascii=False,indent=1)
 sys.exit(0 if n==len(R) else 1)

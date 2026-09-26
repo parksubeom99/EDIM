@@ -2215,5 +2215,12 @@
       },
       "remarks": "승인 매크로 값이 있을 때"
     }
-  ]
+  ],
+  "specItems": {
+    "EU": [
+      { "key": "airflow", "label": "풍량", "unit": "CMH", "slot": "B", "source": { "kind": "item", "scale": 1000, "op": "ge" } },
+      { "key": "humid", "label": "가습량", "unit": "kg/h", "slot": "B", "source": { "kind": "table", "table": "cap", "col": "M", "op": "ge" } },
+      { "key": "material", "label": "재질", "unit": "", "slot": "E", "source": { "kind": "choice" } }
+    ]
+  }
 }

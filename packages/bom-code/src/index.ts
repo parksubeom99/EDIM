@@ -501,3 +501,5 @@ export function dimsFor(p: ProductCode, slots: SlotValues): DimsResult {
   }
   return { ok: true, dims, item, tableName };
 }
+
+export * from "./spec";

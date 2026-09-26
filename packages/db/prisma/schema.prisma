@@ -45,6 +45,7 @@ model Tenant {
   uiForms         UiForm[]
   priceHistory    PriceHistory[]
   arrangementCodes ArrangementCode[]
+  specItems       SpecItem[]
 
   @@map("tenant")
 }
@@ -591,4 +592,26 @@ model ArrangementCode {
 
   @@unique([tenantId, code])
   @@map("arrangement_code")
+}
+
+/// 0019 · p46 Spec List in-put table — 제품 코드마다 사양 항목(이름·단위·정하는 슬롯·값을 읽는 곳).
+/// source = { kind: "item", scale?, op } | { kind: "table", table, col, op } | { kind: "choice" }.
+/// 사양 값 → 슬롯 추천은 등록된 Sub Code·제품 표에서만 고른다(@edim/bom-code recommendSlots). 저장은 code_revision 한 곳.
+model SpecItem {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  productCode String   @map("product_code")
+  seq         Int      @default(0)
+  key         String
+  label       String
+  unit        String   @default("")
+  slot        String
+  source      Json
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdBy   String   @map("created_by") @db.Uuid
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, productCode, key], map: "spec_item_tenant_id_product_code_key_key")
+  @@map("spec_item")
 }
