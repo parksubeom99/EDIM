@@ -45,6 +45,8 @@ async function resetDemo(): Promise<void> {
   await adminPrisma.printSetup.deleteMany({ where: { tenantId: t } });
   // 0016: 리허설이 만든 사용자 UI Form(p25·p26)을 지운다.
   await adminPrisma.uiForm.deleteMany({ where: { tenantId: t } });
+  // 0017: 리허설이 쌓은 단가 이력(p32·p67)을 지운다.
+  await adminPrisma.priceHistory.deleteMany({ where: { tenantId: t } });
   // 리허설이 역할을 바꿔 놓았을 수 있다(User Management 시연) → 시드 역할로 되돌린다.
   await adminPrisma.membership.updateMany({ where: { tenantId: t, userId: IDS.viewerA }, data: { role: "viewer" } });
   await adminPrisma.membership.updateMany({ where: { tenantId: t, userId: IDS.ownerA }, data: { role: "owner" } });

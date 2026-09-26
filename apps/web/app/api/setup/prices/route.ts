@@ -1,0 +1,47 @@
+import { NextResponse, type NextRequest } from "next/server";
+import { withTenant, writeAudit, requireTenant } from "@edim/db";
+import { guard, str } from "../_guard";
+
+/**
+ * p32 G:Price · p67 단가 이력. GET ?code= → 그 코드의 이력(최근 유효일 먼저) + 품목별 현재 단가.
+ * POST { code, item?, price, currency?, supplier?, effectiveFrom(YYYY-MM-DD), note? } → 새 행을 쌓는다(고치기 없음).
+ * 현재 단가 = 오늘까지 유효한 가장 최근 행. 미래 유효일 행은 "예정"으로 보인다.
+ */
+const CURRENCIES = ["KRW", "USD", "EUR", "JPY", "CNY"];
+const today = () => new Date().toISOString().slice(0, 10);
+
+export async function GET(req: NextRequest) {
+  const g = await guard(false);
+  if ("res" in g) return g.res;
+  const code = new URL(req.url).searchParams.get("code") ?? "";
+  if (!code) return NextResponse.json({ error: "code 필수" }, { status: 400 });
+  const rows = await withTenant(g.session.tenantId, (tx) =>
+    tx.priceHistory.findMany({ where: { code }, orderBy: [{ effectiveFrom: "desc" }, { createdAt: "desc" }] }));
+  const t = today();
+  const view = rows.map((r) => ({ id: r.id, item: r.item, price: Number(r.price), currency: r.currency, supplier: r.supplier,
+    effectiveFrom: r.effectiveFrom.toISOString().slice(0, 10), note: r.note, createdAt: r.createdAt }));
+  const current: Record<string, (typeof view)[number]> = {};
+  for (const r of view) if (r.effectiveFrom <= t && !current[r.item]) current[r.item] = r;   // 정렬상 첫 번째가 가장 최근
+  return NextResponse.json({ rows: view.map((r) => ({ ...r, state: r.effectiveFrom > t ? "예정" : current[r.item]?.id === r.id ? "현재" : "지난" })), current });
+}
+
+export async function POST(req: NextRequest) {
+  const g = await guard(true);
+  if ("res" in g) return g.res;
+  const b = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+  const code = str(b.code, 40), item = str(b.item, 40), supplier = str(b.supplier, 80), note = str(b.note, 200);
+  const price = Number(b.price), currency = str(b.currency, 3) || "KRW", eff = str(b.effectiveFrom, 10);
+  if (!code) return NextResponse.json({ error: "code 필수" }, { status: 400 });
+  if (!Number.isFinite(price) || price <= 0 || price >= 1e12) return NextResponse.json({ error: "단가는 0 보다 커야 합니다" }, { status: 400 });
+  if (!CURRENCIES.includes(currency)) return NextResponse.json({ error: `통화는 ${CURRENCIES.join("·")}` }, { status: 400 });
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(eff) || Number.isNaN(Date.parse(eff))) return NextResponse.json({ error: "유효일은 YYYY-MM-DD" }, { status: 400 });
+  const out = await withTenant(g.session.tenantId, async (tx) => {
+    if (!(await tx.productCode.findFirst({ where: { code } }))) return null;   // 등록된 코드에만 단가를 단다
+    const tenantId = await requireTenant(tx);
+    const row = await tx.priceHistory.create({ data: { tenantId, code, item, price, currency, supplier, effectiveFrom: new Date(eff + "T00:00:00Z"), note: note || null, createdBy: g.session.userId } });
+    await writeAudit(tx, g.session.userId, "create", "price_history", row.id, null, { code, item, price, currency, supplier, effectiveFrom: eff });
+    return row.id;
+  });
+  if (!out) return NextResponse.json({ error: `등록되지 않은 코드: ${code}` }, { status: 404 });
+  return NextResponse.json({ ok: true, id: out });
+}

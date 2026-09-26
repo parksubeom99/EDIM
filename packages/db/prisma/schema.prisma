@@ -43,6 +43,7 @@ model Tenant {
   purchaseLines   PurchaseRequestLine[]
   printSetups     PrintSetup[]
   uiForms         UiForm[]
+  priceHistory    PriceHistory[]
 
   @@map("tenant")
 }
@@ -547,4 +548,24 @@ model UiForm {
 
   @@unique([tenantId, name])
   @@map("ui_form")
+}
+
+/// 0017 · p32 G:Price · p67 단가 이력 — 구매품(자재) 코드의 단가를 날짜별로 쌓는다. 현재 단가 = 오늘까지 유효한 가장 최근 행.
+model PriceHistory {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  code          String
+  item          String   @default("")
+  price         Decimal  @db.Decimal(14, 2)
+  currency      String   @default("KRW")
+  supplier      String   @default("")
+  effectiveFrom DateTime @map("effective_from") @db.Date
+  note          String?
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdBy     String   @map("created_by") @db.Uuid
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, code, item, effectiveFrom])
+  @@map("price_history")
 }
