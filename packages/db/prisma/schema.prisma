@@ -426,6 +426,8 @@ model Drawing {
   size            String   @default("A3")
   currentRev      String   @default("A") @map("current_rev")
   status          String   @default("draft") // draft|review|approved|issued (작성중/검토/승인/발행)
+  /// 0020 · 용도: approval(승인도) | manufacturing(제작도) | quotation(견적도) · NULL = 미지정(옛 도면)
+  purpose         String?
   code            String
   dxf             String
   meta            Json     @default("{}") @db.JsonB

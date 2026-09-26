@@ -745,23 +745,33 @@ function KeyDims({ slots, runs }: { slots: SlotValues; runs: RunResult[] }) {
  */
 const DRAW_LABEL: Record<string, string> = { draft: "작성중", review: "검토", approved: "승인", issued: "발행" };
 const DRAW_NEXT: Record<string, string> = { draft: "review", review: "approved", approved: "issued" };
+/** 0020 · 도면 용도(p17 · p39) — 승인도·제작도·견적도. 발행 뒤에는 바꿀 수 없다(DB 트리거). */
+const DRAW_PURPOSE: Record<string, string> = { approval: "승인도", manufacturing: "제작도", quotation: "견적도" };
 
 function DrawingRegister({ runId, nodeStable, canEdit, verify }: { runId: string | null; nodeStable: string | null; canEdit: boolean; verify?: RunResult["dims"] }) {
-  const [rows, setRows] = useState<{ id: string; drawingNo: string; currentRev: string; status: string; drawingType: string; meta: unknown }[]>([]);
+  const [rows, setRows] = useState<{ id: string; drawingNo: string; currentRev: string; status: string; drawingType: string; meta: unknown; purpose: string | null }[]>([]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [purpose, setPurpose] = useState("");   // 등록(발행 흐름의 시작) 때 고르는 용도 — 비우면 미지정
+  const [filter, setFilter] = useState("");     // 목록 거르기 — "" = 전체
+  const [listed, setListed] = useState(false);
 
   const load = useCallback(async () => {
-    const r = await fetch(`/api/drawings${nodeStable ? `?node=${nodeStable}` : ""}`);
+    const q = new URLSearchParams();
+    if (nodeStable) q.set("node", nodeStable);
+    if (filter) q.set("purpose", filter);
+    const qs = q.toString();
+    const r = await fetch(`/api/drawings${qs ? `?${qs}` : ""}`);
     const j = (await r.json().catch(() => ({}))) as { rows?: typeof rows };
     setRows(j.rows ?? []);
-  }, [nodeStable]);
+    setListed(true);
+  }, [nodeStable, filter]);
   useEffect(() => { void load(); }, [load]);
 
   async function make(type: "plan" | "front" | "right" | "assembly" | "iso" | "exploded") {
     if (!runId || busy) return;
     setBusy(true); setErr(null);
-    const r = await fetch("/api/drawings", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ runId, type }) });
+    const r = await fetch("/api/drawings", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ runId, type, ...(purpose ? { purpose } : {}) }) });
     const j = (await r.json().catch(() => ({}))) as { error?: string };
     setBusy(false);
     if (!r.ok) { setErr(j.error ?? "도면 생성 실패"); return; }
@@ -776,7 +786,23 @@ function DrawingRegister({ runId, nodeStable, canEdit, verify }: { runId: string
   }
 
   return (
-    <span data-testid="drawing-register" style={{ display: "inline-flex", flexDirection: "column", gap: 6 }}>
+    <span data-testid="drawing-register" data-listed={listed ? "1" : "0"} data-filter={filter} style={{ display: "inline-flex", flexDirection: "column", gap: 6 }}>
+      <span style={{ display: "inline-flex", gap: 8, alignItems: "center", flexWrap: "wrap", fontSize: "var(--fs-12)", color: "var(--ink-muted)" }}>
+        용도
+        <select data-testid="drawing-purpose" value={purpose} onChange={(e) => setPurpose(e.target.value)} disabled={!canEdit}
+          style={{ fontSize: "var(--fs-12)", padding: "3px 6px", border: "1px solid var(--line)", borderRadius: "var(--radius-sm)", background: "var(--surface-0)", color: "var(--ink)" }}>
+          <option value="">미지정</option>
+          {Object.entries(DRAW_PURPOSE).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+        </select>
+        <span>목록</span>
+        <select data-testid="drawing-filter" value={filter} onChange={(e) => { setListed(false); setFilter(e.target.value); }}
+          style={{ fontSize: "var(--fs-12)", padding: "3px 6px", border: "1px solid var(--line)", borderRadius: "var(--radius-sm)", background: "var(--surface-0)", color: "var(--ink)" }}>
+          <option value="">전체</option>
+          {Object.entries(DRAW_PURPOSE).map(([k, v]) => <option key={k} value={k}>{v}만</option>)}
+          <option value="none">미지정만</option>
+        </select>
+        <span>아직 없음: Sub Drawing(구획별 하부 도면) · Detail Dimension(mm 좌표 — 회사 실 CAD 규칙 필요)</span>
+      </span>
       <span style={{ display: "inline-flex", gap: 8 }}>
         {(() => {
           // p36 Design Verification — 판정은 BOM Run 때 스냅샷에 박힌 값을 그대로 보여 준다(화면이 다시 재지 않는다)
@@ -824,10 +850,11 @@ function DrawingRegister({ runId, nodeStable, canEdit, verify }: { runId: string
       {rows.length > 0 && (
         <span data-testid="drawing-list" style={{ display: "inline-flex", flexDirection: "column", gap: 4 }}>
           {rows.map((d) => (
-            <span key={d.id} data-testid="drawing-row" data-status={d.status} style={{ display: "inline-flex", gap: 8, alignItems: "center", fontSize: "var(--fs-12)" }}>
+            <span key={d.id} data-testid="drawing-row" data-status={d.status} data-purpose={d.purpose ?? ""} style={{ display: "inline-flex", gap: 8, alignItems: "center", fontSize: "var(--fs-12)" }}>
               <a href={`/api/drawings/${d.id}`} style={{ fontFamily: "var(--font-mono)", color: "var(--accent)" }}>
                 {d.drawingNo} Rev {d.currentRev}
               </a>
+              {d.purpose && <span style={{ padding: "0 6px", borderRadius: 3, border: "1px solid var(--accent)", color: "var(--accent)", fontSize: 11 }}>{DRAW_PURPOSE[d.purpose] ?? d.purpose}</span>}
               <span>{DRAW_LABEL[d.status] ?? d.status}</span>
               {canEdit && DRAW_NEXT[d.status] && (
                 <button type="button" data-testid={`drawing-advance-${d.drawingNo}-${d.currentRev}`} onClick={() => void advance(d.id, DRAW_NEXT[d.status]!)}

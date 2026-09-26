@@ -24,6 +24,17 @@ export const DRAWING_STATUS_LABEL: Record<DrawingStatus, string> = {
 export const isDrawingStatus = (v: unknown): v is DrawingStatus =>
   typeof v === "string" && (DRAWING_STATUSES as readonly string[]).includes(v);
 
+/** 0020 · 도면 용도(p17 · p39). 발행 뒤에는 0008 트리거가 바꾸지 못하게 한다. */
+export const DRAWING_PURPOSES = ["approval", "manufacturing", "quotation"] as const;
+export type DrawingPurpose = (typeof DRAWING_PURPOSES)[number];
+export const DRAWING_PURPOSE_LABEL: Record<DrawingPurpose, string> = {
+  approval: "승인도",
+  manufacturing: "제작도",
+  quotation: "견적도",
+};
+export const isDrawingPurpose = (v: unknown): v is DrawingPurpose =>
+  typeof v === "string" && (DRAWING_PURPOSES as readonly string[]).includes(v);
+
 export class DrawingLockedError extends Error {
   readonly code = "DRAWING_LOCKED";
   constructor(no: string) {
@@ -49,6 +60,8 @@ export interface SaveDrawingInput {
   meta: object;
   scale?: string;
   size?: string;
+  /** 0020 · 용도. 없으면 미지정 */
+  purpose?: DrawingPurpose | null;
   createdBy: string;
 }
 
@@ -84,6 +97,7 @@ export async function saveDrawing(tx: TenantClient, input: SaveDrawingInput) {
       currentRev: rev,
       ...(input.scale ? { scale: input.scale } : {}),
       ...(input.size ? { size: input.size } : {}),
+      purpose: input.purpose ?? null,
       createdBy: input.createdBy,
     },
   });
@@ -91,19 +105,23 @@ export async function saveDrawing(tx: TenantClient, input: SaveDrawingInput) {
     drawingNo: row.drawingNo,
     rev: row.currentRev,
     type: row.drawingType,
+    purpose: row.purpose,
     bomRunId: row.bomRunId,
   });
   return row;
 }
 
-export async function listDrawings(tx: TenantClient, stableId?: string | null) {
+export async function listDrawings(tx: TenantClient, stableId?: string | null, purpose?: DrawingPurpose | "none" | null) {
   return tx.drawing.findMany({
-    where: stableId ? { hierarchyStable: stableId } : {},
+    where: {
+      ...(stableId ? { hierarchyStable: stableId } : {}),
+      ...(purpose === "none" ? { purpose: null } : purpose ? { purpose } : {}),
+    },
     orderBy: { createdAt: "desc" },
     take: 100,
     select: {
       id: true, drawingNo: true, drawingType: true, scale: true, size: true,
-      currentRev: true, status: true, code: true, meta: true, bomRunId: true,
+      currentRev: true, status: true, code: true, meta: true, bomRunId: true, purpose: true,
       createdAt: true, updatedAt: true,
     },
   });
@@ -130,6 +148,19 @@ export async function setDrawingStatus(
     data: { status: input.status },
   });
   await writeAudit(tx, input.actorId, "update", "drawing", row.id, { status: cur.status }, { status: row.status });
+  return row;
+}
+
+/** 0020 · 용도 바꾸기 — 발행 전까지만. 발행된 도면은 여기서 한국어로 막고, DB 트리거가 한 번 더 막는다. */
+export async function setDrawingPurpose(
+  tx: TenantClient,
+  input: { id: string; purpose: DrawingPurpose | null; actorId: string },
+) {
+  const cur = await tx.drawing.findUnique({ where: { id: input.id } });
+  if (!cur) throw new Error("drawing not found");
+  if (cur.status === "issued") throw new DrawingLockedError(cur.drawingNo);
+  const row = await tx.drawing.update({ where: { id: input.id }, data: { purpose: input.purpose } });
+  await writeAudit(tx, input.actorId, "update", "drawing", row.id, { purpose: cur.purpose }, { purpose: row.purpose });
   return row;
 }
 

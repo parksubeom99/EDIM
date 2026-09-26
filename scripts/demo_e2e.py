@@ -203,7 +203,10 @@ with sync_playwright() as p:
     # S21 화면: Design 탭에서 도면을 등록하고 상태가 보인다
     nuke(pg); pg.goto(BASE+"/workbench",wait_until="domcontentloaded"); time.sleep(2); nuke(pg)
     pg.click("text=PS-61313"); time.sleep(1.5); nuke(pg)
-    pg.locator("button", has_text=re.compile(r"^Design$")).first.click(force=True); time.sleep(1.5); nuke(pg)
+    pg.locator("button", has_text=re.compile(r"^Design$")).first.click(force=True); nuke(pg)
+    # 고정 1.5초 대신 도면 목록 로딩 표지(data-listed)와 첫 행을 기다린다 (Windows 첫 컴파일에서 1.5초를 넘겼다 — 2026-09-26)
+    try: pg.wait_for_function("()=>document.querySelector('[data-testid=drawing-register]')?.dataset.listed==='1' && !!document.querySelector('[data-testid=drawing-row]')",timeout=30000)
+    except Exception: pass
     body=pg.inner_text("[data-testid=design-canvas]")
     ok("S21a Design 탭에 등록된 도면과 상태가 보인다", ("발행" in body, "Rev" in body), "Rev" in body and ("발행" in body or "작성중" in body))
     # S31g 화면: Arrangement 버튼 → 구획 길이를 고치고 저장하면 캔버스에 그 길이가 뜬다 (실동 · 버튼 자리만 있던 청사진 p13·58 채움)
@@ -1067,15 +1070,54 @@ with sync_playwright() as p:
     gl=gb.request.get(SI+"?product=EU").json()["rows"]; gr=gb.request.post(SR,headers=J0,data=json.dumps({"productCode":"EU","inputs":{"airflow":"11000"}})); gb.close()
     ok("S47e viewer 는 사양 항목을 못 만든다(403) · 다른 회사는 이 항목을 못 보고(0건) 우리 제품으로 추천도 못 받는다(404)", (vp.status, len(gl), gr.status),
        vp.status==403 and len(gl)==0 and gr.status==404)
+    # ── S48 ⑦ 도면 용도 구분 (p17 · p39 · 0020) — 승인도·제작도·견적도로 등록하고 목록에서 거른다 · 발행 뒤에는 못 바꾼다 ──
+    DW=BASE+"/api/drawings"; N4="a0000000-0000-4000-8000-000000000004"
+    pg.goto(NODE4,wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=canvas-cmds][data-ready='1']",timeout=60000); nuke(pg)
+    if pg.get_attribute("[data-testid=toolbox-toggle]","aria-pressed")=="true":
+        pg.click("[data-testid=toolbox-toggle]"); pg.wait_for_selector("[data-testid=toolbox-toggle][aria-pressed=false]",timeout=30000)
+    nuke(pg); pg.click("[data-run=bom]")
+    pg.locator("button", has_text=re.compile(r"^Design$")).first.click(force=True)
+    pg.wait_for_selector("[data-testid=design-canvas][data-loaded='1']",timeout=30000)
+    pg.wait_for_function("()=>{const b=document.querySelector('[data-testid=drawing-make-front]'); return b && !b.disabled;}",timeout=60000)
+    for pu in ("approval","manufacturing"):
+        pg.select_option("[data-testid=drawing-purpose]",pu); nuke(pg); pg.click("[data-testid=drawing-make-front]")
+        pg.wait_for_selector(f"[data-testid=drawing-row][data-purpose={pu}]",timeout=30000)
+    apv=ctx.request.get(DW+f"?node={N4}&purpose=approval").json()["rows"]; mfg=ctx.request.get(DW+f"?node={N4}&purpose=manufacturing").json()["rows"]
+    ok("S48a 용도를 골라 등록 — 같은 정면도라도 승인도(-APV)·제작도(-MFG)로 번호·개정이 따로 간다",
+       ([x["drawingNo"]+" "+x["currentRev"] for x in apv], [x["drawingNo"]+" "+x["currentRev"] for x in mfg]),
+       len(apv)>=1 and len(mfg)>=1 and apv[0]["drawingNo"].endswith("-FRT-APV") and mfg[0]["drawingNo"].endswith("-FRT-MFG") and apv[0]["currentRev"]=="A")
+    pg.select_option("[data-testid=drawing-filter]","approval"); pg.wait_for_selector("[data-testid=drawing-register][data-filter=approval][data-listed='1']",timeout=30000)
+    fa=pg.eval_on_selector_all("[data-testid=drawing-row]","es=>es.map(e=>e.dataset.purpose)")
+    nuke(pg); pg.screenshot(path=f"{OUT}/61_drawing_purpose.png",full_page=True)
+    pg.select_option("[data-testid=drawing-filter]","none"); pg.wait_for_selector("[data-testid=drawing-register][data-filter=none][data-listed='1']",timeout=30000)
+    fn_=pg.eval_on_selector_all("[data-testid=drawing-row]","es=>es.map(e=>e.dataset.purpose)")
+    ok("S48b 목록에서 용도로 거른다 — 승인도만 / 미지정(옛 도면)만", (fa, len(fn_)), len(fa)>=1 and all(x=="approval" for x in fa) and all(x=="" for x in fn_))
+    rid=ctx.request.post(BASE+"/api/run/bom",headers=J0,data=json.dumps({"slots":S55_0,"code":"EU-55-2123-630SS-1-21-13-15","node":N4})).json().get("runId")
+    b400=ctx.request.post(DW,headers=J0,data=json.dumps({"runId":rid,"type":"front","purpose":"sales"}))
+    g400=ctx.request.get(DW+"?purpose=sales")
+    ch=ctx.request.patch(DW+f"/{mfg[0]['id']}",headers=J0,data=json.dumps({"purpose":"quotation"}))
+    now=[x for x in ctx.request.get(DW+f"?node={N4}").json()["rows"] if x["id"]==mfg[0]["id"]][0]["purpose"]
+    iss=[x for x in ctx.request.get(DW).json()["rows"] if x["status"]=="issued"]
+    li=ctx.request.patch(DW+f"/{iss[0]['id']}",headers=J0,data=json.dumps({"purpose":"approval"})) if iss else None
+    ok("S48c 잘못된 용도는 400(등록·목록) · 발행 전에는 용도를 바꿀 수 있고(제작도→견적도) · 발행된 도면은 409(잠금)",
+       (b400.status, g400.status, ch.status, now, li.status if li else "발행 도면 없음"),
+       b400.status==400 and g400.status==400 and ch.status==200 and now=="quotation" and li is not None and li.status==409)
+    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data={"email":"viewer@acme.test"})
+    vp=vw.request.post(DW,headers=J0,data=json.dumps({"runId":rid,"type":"front","purpose":"approval"}))
+    vpa=vw.request.patch(DW+f"/{apv[0]['id']}",headers=J0,data=json.dumps({"purpose":"quotation"})); vw.close()
+    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data={"email":"owner@globex.test"})
+    gl=gb.request.get(DW+"?purpose=approval").json()["rows"]; gpa=gb.request.patch(DW+f"/{apv[0]['id']}",headers=J0,data=json.dumps({"purpose":"quotation"})); gb.close()
+    ok("S48d viewer 는 용도 도면을 못 만들고 못 바꾼다(403·403) · 다른 회사는 우리 승인도를 못 보고(0건) 못 바꾼다(404)",
+       (vp.status, vpa.status, len(gl), gpa.status), vp.status==403 and vpa.status==403 and len(gl)==0 and gpa.status==404)
     # S37 은 맨 끝에서 센다 — 중간(옛 자리)에서는 뒤에 찍히는 5장(40·41·42·52·53)이 아직 없어,
     # 빈 폴더에서는 25장이라 실패하고 이전 실행 잔재가 있을 때만 통과했다(2026-09-24 실측).
     _want=["00_login","05_project_mgmt","06_module_cpq_stub","10_project_bound","11_code_builder","11b_revisions","12_macro_tab",
            "13_macro_approved","14_edim_run","15_bom_cost","16_design_tab","20_setup_subcode","21_setup_product_table",
            "22_setup_relationship","23_codebuilder_from_subcode","30_toolbox_program","31_toolbox_ui_tool","40_company_admin",
            "41_platform_console","42_user_management","43_drawings","44_document_tab","45_purchasing","46_quotation_print",
-           "47_techdata_print","48_dxf_plan","49_dxf_assembly","51_accepted","52_register","53_schedule","54_toolbar","55_project_mgmt","56_print_setup","57_ui_design","58_material","59_arrangement_code","60_spec_input"]
+           "47_techdata_print","48_dxf_plan","49_dxf_assembly","51_accepted","52_register","53_schedule","54_toolbar","55_project_mgmt","56_print_setup","57_ui_design","58_material","59_arrangement_code","60_spec_input","61_drawing_purpose"]
     _miss=[w for w in _want if not os.path.exists(f"{OUT}/{w}.png") or os.path.getmtime(f"{OUT}/{w}.png")<T0]
-    ok("S37 캡처 37장이 이번 실행에서 전부 나온다 (잔재 파일은 세지 않음)", _miss or len(_want), not _miss)
+    ok("S37 캡처 38장이 이번 실행에서 전부 나온다 (잔재 파일은 세지 않음)", _miss or len(_want), not _miss)
     b.close()
 n=sum(1 for v in R.values() if v[0]); print(f"\n[demo_e2e] {n}/{len(R)} steps passed"); json.dump(R,open(f"{OUT}/demo_e2e_result.json","w",encoding="utf-8"),ensure_ascii=False,indent=1)
 sys.exit(0 if n==len(R) else 1)

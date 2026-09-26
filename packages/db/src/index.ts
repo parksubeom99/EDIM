@@ -103,10 +103,14 @@ export {
   DRAWING_STATUSES,
   DRAWING_STATUS_LABEL,
   isDrawingStatus,
+  DRAWING_PURPOSES,
+  DRAWING_PURPOSE_LABEL,
+  isDrawingPurpose,
+  setDrawingPurpose,
   DrawingLockedError,
   DrawingStatusBackwardsError,
 } from "./drawing";
-export type { DrawingStatus, SaveDrawingInput } from "./drawing";
+export type { DrawingStatus, DrawingPurpose, SaveDrawingInput } from "./drawing";
 export {
   saveDocument,
   listDocuments,
