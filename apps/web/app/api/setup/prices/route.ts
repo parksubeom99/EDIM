@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { withTenant, writeAudit, requireTenant } from "@edim/db";
 import { guard, str } from "../_guard";
 import { partnerOk } from "@/app/lib/partner";
+import { businessToday } from "@/app/lib/today";
 
 /**
  * p32 G:Price · p67 단가 이력. GET ?code= → 그 코드의 이력(최근 유효일 먼저) + 품목별 현재 단가.
@@ -10,7 +11,7 @@ import { partnerOk } from "@/app/lib/partner";
  * 현재 단가 = 오늘까지 유효한 가장 최근 행. 미래 유효일 행은 "예정"으로 보인다.
  */
 const CURRENCIES = ["KRW", "USD", "EUR", "JPY", "CNY"];
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => businessToday();   // 회사 시간대의 오늘 — UTC 로 자르면 KST 00~09시에 어제가 된다
 
 export async function GET(req: NextRequest) {
   const g = await guard(false);

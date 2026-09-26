@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { withTenant, saveDocument, listDocuments, isDocumentType } from "@edim/db";
 import { getServerSession } from "@/app/lib/session";
+import { businessToday } from "@/app/lib/today";
 import { canEditProject } from "@/app/lib/project-perms";
 import { documentSourceFromRun } from "@/app/lib/output/document-source";
 import { buildQuotationBody, buildTechDataBody, noCoreOf, resolveInputData, type InputDataValue } from "@/app/lib/output/document";
@@ -43,7 +44,7 @@ export async function POST(req: NextRequest) {
   }
 
   // 본문을 먼저 한 번 만들어 본다 — 거부할 스냅샷이면 번호를 쓰기 전에 돌려보낸다.
-  const date = new Date().toISOString().slice(0, 10);
+  const date = businessToday();   // 문서 날짜 = 회사 시간대의 오늘
   const opts = {
     ...(typeof b.qty === "number" ? { qty: b.qty } : {}),
     deliveryTerms: str(b.deliveryTerms), paymentTerms: str(b.paymentTerms),

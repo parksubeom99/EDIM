@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type CSSProperties, type ReactNode } from "react";
+import { localToday } from "@/app/lib/today";
 import { useRouter } from "next/navigation";
 import { CodeChip } from "@edim/ui";
 import { TIER_PREFIX, type ApprovalTier } from "@/app/lib/approval-state";
@@ -189,7 +190,7 @@ export function Inspector({
               ) : (
                 <ul style={{ margin: 0, paddingLeft: 0, listStyle: "none", fontSize: "var(--fs-12)" }}>
                   {list.map((t) => {
-                    const over = state === "todo" && t.dueAt && t.dueAt.slice(0, 10) < new Date().toISOString().slice(0, 10);
+                    const over = state === "todo" && t.dueAt && t.dueAt.slice(0, 10) < localToday();
                     return (
                       <li key={t.id} data-testid="task-row" data-state={t.state} style={{ display: "flex", gap: 6, alignItems: "baseline" }}>
                         {canEdit && (

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
+import { localToday } from "@/app/lib/today";
 
 /**
  * p32 Material code & General purchase items Registration.
@@ -41,7 +42,7 @@ export function MaterialRegistry({ canEdit }: { canEdit: boolean }) {
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [ready, setReady] = useState(false);
   const [nw, setNw] = useState({ code: "", name: "", category: "General Purchase items/", unit: "ea" });
-  const [pf, setPf] = useState({ item: "", price: "", currency: "KRW", supplier: "", supplierId: "", effectiveFrom: new Date().toISOString().slice(0, 10), note: "" });
+  const [pf, setPf] = useState({ item: "", price: "", currency: "KRW", supplier: "", supplierId: "", effectiveFrom: localToday(), note: "" });
   // 0021 · Company DB 공급처 — 고르면 id 와 이름(글자 열)을 함께 채운다
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   useEffect(() => { fetch("/api/setup/partners?kind=supplier").then((r) => r.json()).then((j) => setSuppliers(j.rows ?? [])).catch(() => setSuppliers([])); }, []);
