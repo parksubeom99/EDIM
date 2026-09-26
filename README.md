@@ -3,8 +3,8 @@
 **제품 코드 한 줄에서 BOM · 도면 · 원가 · 견적 · 기술 자료 · 구매 요청이 나온다.**
 공기조화기(AHU) 같은 주문 생산(Configure-to-Order) 제품을 위한 CPQ + PLM + ERP 통합 플랫폼의 베타입니다.
 
-> 상태(2026-09-24 · main): 발표 시나리오 e2e **177/177** · 단위 테스트 **189**(vitest) + auth PASS · DB 검증 **9종** PASS · 청사진 70장 중 **실동 18 · 부분 27 · 미착수 6**(개념·표지 19)
-> 이 수치는 전부 개발 샌드박스(Linux) 실측입니다. **Windows 로컬 실행은 아직 0회**입니다 — 아래 [정직 고지](#정직-고지) 참조.
+> 상태(2026-09-27 · main): 발표 시나리오 e2e **234/234** · 단위 테스트 **203**(vitest) + auth PASS · DB 검증 **9종** PASS · 청사진 70장 중 **실동 18 · 부분 28 · 미착수 5**(개념·표지 19 — 2026-09-27 판정은 초안)
+> 이 수치는 **Windows 11 로컬 실측**입니다(Node 24 · pnpm 9.15.4 · Docker PG16 · Python 3.12). Windows 첫 실행은 2026-09-26, 이후 e2e 를 여러 번 연속으로 돌렸습니다 — 아래 [정직 고지](#정직-고지) 참조.
 
 ## 📸 화면
 
@@ -88,7 +88,7 @@ packages/macro-verify       정적 검증 + dry-run            packages/macro-re
 packages/hierarchy-address  Work Hierarchy 주소 체계        packages/core-ontology    순수 도메인 타입
 packages/db                 스키마 · 마이그레이션 · RLS · DB 검증 스크립트(prisma/*-test.ts)
 packages/auth · packages/ui 세션/RBAC · 디자인 시스템
-scripts/demo_e2e.py         발표 시나리오 177단계 (화면 + API + DXF 파싱)
+scripts/demo_e2e.py         발표 시나리오 234단계 (화면 + API + DXF 파싱 · 3D 뷰어 WebGL)
 scripts/publish_screens.py  스크린샷 → docs/screens/*.webp
 docs/                       00-corpus(청사진 색인) · 01-design(설계) · 02-reports(보고서 생성기) · plan · deck · DEMO.md
 ```
@@ -110,10 +110,10 @@ Windows 기준 상세 절차와 발표 당일 순서는 [`docs/DEMO.md`](docs/DE
 
 ```bash
 pnpm typecheck                                        # 11 패키지
-pnpm -r --workspace-concurrency=1 test                # 단위 테스트 189 (PostgreSQL 필요)
+pnpm -r --workspace-concurrency=1 test                # 단위 테스트 203 (PostgreSQL 필요)
 pnpm --filter @edim/db rls:test                       # + revision · backbone · platform · drawing · document
 pnpm db:reset:demo && pnpm dev &                      # 발표 시나리오
-python scripts/demo_e2e.py http://localhost:3000 shots   # 177/177 이면 시연 11장면이 기계적으로 재현된다
+python scripts/demo_e2e.py http://localhost:3000 <캡처 폴더>   # 234/234 이면 시연 장면이 기계적으로 재현된다 (캡처 41장)
 ```
 
 | 검증 | 무엇을 못 박는가 |
@@ -122,19 +122,19 @@ python scripts/demo_e2e.py http://localhost:3000 shots   # 177/177 이면 시연
 | `revision:test` | 코드 개정은 append-only — 앱 역할에 UPDATE/DELETE 권한이 없다 |
 | `backbone:test`(13) | BOM 이 등록된 관계에서 나온다 |
 | `drawing:test`(16) · `document:test`(37) | 산출물은 스냅샷을 참조하고, 발행·발주되면 **앱을 우회해도** 수정·삭제가 거부된다 |
-| `demo_e2e.py`(99) | 치수 표 한 칸 → 도면 폭만 변함(ezdxf 파싱) · 견적 합계 = 원가 · 구매 줄 = 스냅샷의 구매 품목 |
+| `demo_e2e.py`(234) | 치수 표 한 칸 → 도면 폭만 변함(ezdxf 파싱) · 견적 합계 = 원가 · 구매 줄 = 스냅샷의 구매 품목 |
 
 CI 워크플로는 [`docs/ci/ci.yml`](docs/ci) 에 준비돼 있으나 **아직 `.github/workflows/` 에 배선되지 않았습니다**(작업 토큰에 Workflows 권한이 없음).
 
 ## 정직 고지
 
-- **Windows 로컬 실행 0회** — 위 수치는 전부 개발 샌드박스(Ubuntu · PG16 · Node 22) 기준입니다.
+- **Windows 로컬 실행** — 2026-09-26 첫 실행. 샌드박스(Ubuntu · UTC)에서 안 보이던 결함 셋이 Windows 에서 드러나 고쳤습니다: 결과 파일 cp949 인코딩 · 저장 직후 읽기 경합(e2e) · **"오늘"을 UTC 로 자르던 날짜 결함**(KST 00~09시에 오늘 유효 단가가 "예정"). 클라우드 배포는 여전히 0회입니다.
 - 표 · 단가는 **샘플**입니다. 견적은 구조 시연이며, 회사 실 단가표가 들어와야 실 견적이 됩니다.
-- 도면은 아직 **선과 글자** 수준입니다(평면도 · 조립도). 제작도가 아닙니다.
+- 도면은 아직 **선과 글자** 수준입니다(뷰 여섯 종 · 용도 구분 승인도/제작도/견적도는 분류와 번호). 제작도 깊이가 아닙니다. 3D 는 구획 박스를 돌려 보는 뷰어이고 실제 형상 모델(glTF)은 없습니다.
 - `hierarchy:test` · `macro:test` 는 7월 이후 한 번도 돌지 않은 채 실패 상태였고 2026-09-21 에 수리했습니다 — hierarchy 는 기대값이 낡은 것, macro 는 **제품 결함**(첫 승인이 r1 이 아니라 r2 로 매겨짐)이었습니다. 경위는 연결 장부에 있습니다.
 - 자연어 → 매크로 번역은 경로만 있고 실모델 호출은 0회입니다.
 - 로그인은 이메일만 받는 베타 최소 인증입니다. 클라우드 배포는 하지 않았습니다.
-- 청사진 70쪽 중 없는 것은 [`page-map.md`](docs/00-corpus/page-map.md) 에 쪽마다 적혀 있습니다 — Arrangement(p13·35·36·46) · Drawing Data Set-Up(p42~44) · AI 학습 DB(p23) 가 가장 큰 빈 곳입니다.
+- 청사진 70쪽 중 없는 것은 [`page-map.md`](docs/00-corpus/page-map.md) 에 쪽마다 적혀 있습니다 — Drawing Data Set-Up(p42~44) · AI 학습 DB(p23) · Warehouse/Inventory(p64) 가 가장 큰 빈 곳입니다.
 
 ---
 엘리베이터 CAD 프로젝트는 2026-07-17 에 [elevator-cad](https://github.com/parksubeom99/elevator-cad) repo 로 분리됐습니다([결정 로그](docs/04-decisions/2026-07-17-repo-separation.md)).
