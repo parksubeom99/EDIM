@@ -44,6 +44,7 @@ model Tenant {
   printSetups     PrintSetup[]
   uiForms         UiForm[]
   priceHistory    PriceHistory[]
+  arrangementCodes ArrangementCode[]
 
   @@map("tenant")
 }
@@ -568,4 +569,26 @@ model PriceHistory {
 
   @@index([tenantId, code, item, effectiveFrom])
   @@map("price_history")
+}
+
+/// 0018 · p35 Arrangement Code Registration — 제품 배치(구획 순서·길이·방향·부품 위치)의 승인된 스냅샷.
+/// 등록(pending) → 승인(approved)/반려(rejected). 승인된 것만 제품 코드에 적용할 수 있다(적용은 기존 Arrangement 저장 경로 한 곳).
+model ArrangementCode {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  code        String
+  productCode String    @map("product_code")
+  description String    @default("")
+  sections    Json
+  status      String    @default("pending")
+  requestedBy String    @map("requested_by") @db.Uuid
+  decidedBy   String?   @map("decided_by") @db.Uuid
+  decidedAt   DateTime? @map("decided_at") @db.Timestamptz(6)
+  decisionNote String?  @map("decision_note")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, code])
+  @@map("arrangement_code")
 }
