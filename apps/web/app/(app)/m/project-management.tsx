@@ -20,8 +20,11 @@ interface Proj {
   clientName: string | null; clientContact: string | null; itemType: string | null;
   salesStage: string; status: string; createdAt: string;
   ownerId: string | null; remarks: string | null; description: string | null;
+  /** 0021 · Company DB 고객 */
+  clientId: string | null;
   owner: { email: string; name: string | null } | null;
 }
+interface Customer { id: string; code: string; name: string; contact: string }
 interface Member { userId: string; email: string; name: string | null; role: string }
 interface Att { id: string; department: string; docType: string; name: string; description: string | null; hasFile: boolean; fileMime: string | null; fileSize: number | null; uploadedAt: string }
 
@@ -45,6 +48,7 @@ async function send(url: string, method: string, body: unknown) {
 export function ProjectManagement({ canEdit }: { canEdit: boolean }) {
   const [rows, setRows] = useState<Proj[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [selId, setSelId] = useState<string | null>(null);
   const [form, setForm] = useState<Partial<Proj>>({});
   const [atts, setAtts] = useState<Att[]>([]);
@@ -57,9 +61,10 @@ export function ProjectManagement({ canEdit }: { canEdit: boolean }) {
   const [fileKey, setFileKey] = useState(0);
 
   const load = useCallback(async (keep?: string | null) => {
-    const [p, m] = await Promise.all([fetch("/api/projects").then((r) => r.json()), fetch("/api/company/members").then((r) => r.json())]);
+    const [p, m, c] = await Promise.all([fetch("/api/projects").then((r) => r.json()), fetch("/api/company/members").then((r) => r.json()),
+      fetch("/api/setup/partners?kind=customer").then((r) => r.json()).catch(() => ({}))]);
     const list = (p.rows ?? []) as Proj[];
-    setRows(list); setMembers((m.rows ?? []) as Member[]);
+    setRows(list); setMembers((m.rows ?? []) as Member[]); setCustomers((c.rows ?? []) as Customer[]);
     const pick = list.find((x) => x.id === (keep ?? selId)) ?? list[0] ?? null;
     setSelId(pick?.id ?? null); setForm(pick ?? {});
     setReady(true);
@@ -79,7 +84,7 @@ export function ProjectManagement({ canEdit }: { canEdit: boolean }) {
     if (!sel) return;
     setBusy(true); setMsg(null);
     const r = await send(`/api/projects/${sel.id}`, "PATCH", {
-      name: form.name ?? "", type: form.type, clientName: form.clientName ?? "", clientContact: form.clientContact ?? "",
+      name: form.name ?? "", type: form.type, clientName: form.clientName ?? "", clientContact: form.clientContact ?? "", clientId: form.clientId ?? "",
       itemType: form.itemType ?? "", ownerId: form.ownerId ?? "", remarks: form.remarks ?? "", description: form.description ?? "",
     });
     let ok = r.ok, text = r.ok ? "저장했습니다" : `거부: ${r.error ?? r.status}`;
@@ -116,7 +121,7 @@ export function ProjectManagement({ canEdit }: { canEdit: boolean }) {
     if (r.ok) { setUp((u) => ({ ...u, name: "", description: "" })); setFile(null); setFileKey((k) => k + 1); await loadAtts(sel.id); }
   }
 
-  const dirty = !!sel && (["name", "type", "clientName", "clientContact", "itemType", "ownerId", "remarks", "description", "salesStage"] as const)
+  const dirty = !!sel && (["name", "type", "clientName", "clientContact", "clientId", "itemType", "ownerId", "remarks", "description", "salesStage"] as const)
     .some((k) => (form[k] ?? "") !== (sel[k] ?? ""));
 
   return (
@@ -182,7 +187,18 @@ export function ProjectManagement({ canEdit }: { canEdit: boolean }) {
               <span style={lab}>Item</span>
               <input data-testid="pm-item" disabled={!canEdit} value={form.itemType ?? ""} placeholder="AHU" onChange={(e) => set("itemType", e.target.value)} style={inp} />
               <span style={lab}>Client</span>
-              <input data-testid="pm-client" disabled={!canEdit} value={form.clientName ?? ""} onChange={(e) => set("clientName", e.target.value)} style={inp} />
+              <span style={{ display: "flex", gap: 6 }}>
+                <input data-testid="pm-client" disabled={!canEdit} value={form.clientName ?? ""} onChange={(e) => set("clientName", e.target.value)} style={inp} />
+                {/* 0021 · Company DB 고객에서 고르면 id 와 이름(글자 열)을 함께 채운다 — 글자만 있는 옛 데이터도 그대로 보인다 */}
+                <select data-testid="pm-client-pick" disabled={!canEdit} value={form.clientId ?? ""} title="Company DB 고객"
+                  onChange={(e) => {
+                    const c = customers.find((x) => x.id === e.target.value);
+                    setForm((f) => ({ ...f, clientId: c?.id ?? null, ...(c ? { clientName: c.name, clientContact: f.clientContact || c.contact } : {}) }));
+                  }} style={{ ...inp, width: 150 }}>
+                  <option value="">Company DB —</option>
+                  {customers.map((c) => <option key={c.id} value={c.id}>{c.code} · {c.name}</option>)}
+                </select>
+              </span>
               <span style={lab}>Remarks</span>
               <input data-testid="pm-remarks" disabled={!canEdit} value={form.remarks ?? ""} onChange={(e) => set("remarks", e.target.value)} style={inp} />
               <span style={lab}>Client 담당자 정보</span>

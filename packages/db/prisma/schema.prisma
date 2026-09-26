@@ -46,6 +46,7 @@ model Tenant {
   priceHistory    PriceHistory[]
   arrangementCodes ArrangementCode[]
   specItems       SpecItem[]
+  partners        Partner[]
 
   @@map("tenant")
 }
@@ -179,8 +180,11 @@ model Project {
   ownerId         String?  @map("owner_id") @db.Uuid
   remarks         String?
   description     String?
+  /// 0021 · Company DB 고객(p64). client_name 글자 열은 그대로 둔다(옛 데이터 보존)
+  clientId        String?  @map("client_id") @db.Uuid
 
   tenant      Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  client      Partner?            @relation("ProjectClient", fields: [clientId], references: [id], onDelete: SetNull)
   creator     AppUser             @relation("ProjectCreator", fields: [createdBy], references: [id])
   owner       AppUser?            @relation("ProjectOwner", fields: [ownerId], references: [id])
   attachments ProjectAttachment[]
@@ -567,8 +571,11 @@ model PriceHistory {
   note          String?
   createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   createdBy     String   @map("created_by") @db.Uuid
+  /// 0021 · Company DB 공급처(p64 · p67). supplier 글자 열은 그대로 둔다
+  supplierId    String?  @map("supplier_id") @db.Uuid
 
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant         Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  supplierPartner Partner? @relation("PriceSupplier", fields: [supplierId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, code, item, effectiveFrom])
   @@map("price_history")
@@ -616,4 +623,26 @@ model SpecItem {
 
   @@unique([tenantId, productCode, key], map: "spec_item_tenant_id_product_code_key_key")
   @@map("spec_item")
+}
+
+/// 0021 · Company DB (p64 [ERP Set-up]) — 고객(customer) · 공급처(supplier). 한 테이블 · kind 로 나눈다.
+/// Warehouse · Inventory · Bank · Employee · Nation 은 아직 없음.
+model Partner {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  kind      String
+  code      String
+  name      String
+  contact   String   @default("")
+  nation    String   @default("")
+  remarks   String   @default("")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdBy String   @map("created_by") @db.Uuid
+
+  tenant   Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  projects Project[]      @relation("ProjectClient")
+  prices   PriceHistory[] @relation("PriceSupplier")
+
+  @@unique([tenantId, kind, code], map: "partner_tenant_id_kind_code_key")
+  @@map("partner")
 }

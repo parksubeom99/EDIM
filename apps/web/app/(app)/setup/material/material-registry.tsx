@@ -14,7 +14,8 @@ interface Col { key: string; name: string; label?: string }
 interface Row { item: string; cells: Record<string, string | number> }
 interface Table { no: number; by: string; default: string; role?: string; cols: Col[]; rows: Row[] }
 interface Code { code: string; name: string; kind: string; category: string; unit: string; specTemplate: string; materialTemplate: string; tables: Record<string, Table>; sections?: unknown }
-interface Price { id: string; item: string; price: number; currency: string; supplier: string; effectiveFrom: string; note: string | null; state: string }
+interface Price { id: string; item: string; price: number; currency: string; supplier: string; supplierId?: string | null; effectiveFrom: string; note: string | null; state: string }
+interface Supplier { id: string; code: string; name: string }
 
 const card: CSSProperties = { background: "var(--surface-1)", border: "1px solid var(--line)", borderRadius: "var(--radius-md)", padding: 12 };
 const lab: CSSProperties = { fontSize: "var(--fs-12)", color: "var(--ink-muted)", fontWeight: 600 };
@@ -40,7 +41,10 @@ export function MaterialRegistry({ canEdit }: { canEdit: boolean }) {
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [ready, setReady] = useState(false);
   const [nw, setNw] = useState({ code: "", name: "", category: "General Purchase items/", unit: "ea" });
-  const [pf, setPf] = useState({ item: "", price: "", currency: "KRW", supplier: "", effectiveFrom: new Date().toISOString().slice(0, 10), note: "" });
+  const [pf, setPf] = useState({ item: "", price: "", currency: "KRW", supplier: "", supplierId: "", effectiveFrom: new Date().toISOString().slice(0, 10), note: "" });
+  // 0021 · Company DB 공급처 — 고르면 id 와 이름(글자 열)을 함께 채운다
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  useEffect(() => { fetch("/api/setup/partners?kind=supplier").then((r) => r.json()).then((j) => setSuppliers(j.rows ?? [])).catch(() => setSuppliers([])); }, []);
 
   const load = useCallback(async (keep?: string | null) => {
     const c = (await fetch("/api/setup/catalog").then((r) => r.json())) as { productCodes?: Code[] };
@@ -60,7 +64,7 @@ export function MaterialRegistry({ canEdit }: { canEdit: boolean }) {
   function choose(p: Code, clearMsg = true) {
     const [name, t] = Object.entries(p.tables).find(([, x]) => x.role === "buy") ?? ["buy", null];
     setSelCode(p.code); setBuyName(name); setDraft(t ? JSON.parse(JSON.stringify(t)) : JSON.parse(JSON.stringify(DEFAULT_BUY))); if (clearMsg) setMsg(null);
-    setPf((f) => ({ ...f, item: t?.rows[0]?.item ?? "", supplier: String(t?.rows[0]?.cells.A ?? "") }));
+    setPf((f) => ({ ...f, item: t?.rows[0]?.item ?? "", supplier: String(t?.rows[0]?.cells.A ?? ""), supplierId: "" }));
     void loadPrices(p.code);
   }
   const sel = codes.find((c) => c.code === selCode) ?? null;
@@ -190,13 +194,18 @@ export function MaterialRegistry({ canEdit }: { canEdit: boolean }) {
               </tbody>
             </table>
             {canEdit && (
-              <div style={{ display: "grid", gridTemplateColumns: "90px 110px 70px 1fr 120px 1fr auto", gap: 6, marginTop: 8 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "90px 110px 70px 1fr 130px 120px 1fr auto", gap: 6, marginTop: 8 }}>
                 <select data-testid="mat-p-item" value={pf.item} onChange={(e) => setPf({ ...pf, item: e.target.value })} style={inp}>
                   {draft.rows.map((r) => <option key={r.item} value={r.item}>{r.item || "(기본)"}</option>)}
                 </select>
                 <input data-testid="mat-p-price" type="number" min={0} placeholder="단가" value={pf.price} onChange={(e) => setPf({ ...pf, price: e.target.value })} style={inp} />
                 <select data-testid="mat-p-cur" value={pf.currency} onChange={(e) => setPf({ ...pf, currency: e.target.value })} style={inp}>{["KRW", "USD", "EUR", "JPY", "CNY"].map((c) => <option key={c}>{c}</option>)}</select>
-                <input data-testid="mat-p-supplier" placeholder="공급처" value={pf.supplier} onChange={(e) => setPf({ ...pf, supplier: e.target.value })} style={inp} />
+                <input data-testid="mat-p-supplier" placeholder="공급처" value={pf.supplier} onChange={(e) => setPf({ ...pf, supplier: e.target.value, supplierId: "" })} style={inp} />
+                <select data-testid="mat-p-supplier-pick" value={pf.supplierId} title="Company DB 공급처"
+                  onChange={(e) => { const x = suppliers.find((s) => s.id === e.target.value); setPf({ ...pf, supplierId: x?.id ?? "", supplier: x?.name ?? pf.supplier }); }} style={inp}>
+                  <option value="">Company DB —</option>
+                  {suppliers.map((x) => <option key={x.id} value={x.id}>{x.code} · {x.name}</option>)}
+                </select>
                 <input data-testid="mat-p-date" type="date" value={pf.effectiveFrom} onChange={(e) => setPf({ ...pf, effectiveFrom: e.target.value })} style={inp} />
                 <input data-testid="mat-p-note" placeholder="메모" value={pf.note} onChange={(e) => setPf({ ...pf, note: e.target.value })} style={inp} />
                 <button type="button" data-testid="mat-p-add" disabled={!(Number(pf.price) > 0)} onClick={() => void addPrice()} style={btn(true, !(Number(pf.price) > 0))}>쌓기</button>

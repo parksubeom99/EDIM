@@ -27,6 +27,8 @@ export interface CreateProjectInput {
   type: ProjectType;
   clientName?: string | null;
   clientContact?: string | null;
+  /** 0021 · Company DB 고객 id (client_name 글자 열과 함께 채운다) */
+  clientId?: string | null;
   itemType?: string | null;
   salesStage?: SalesStage;
   createdBy: string;
@@ -56,6 +58,7 @@ export async function createProject(
       type: input.type,
       clientName: input.clientName ?? null,
       clientContact: input.clientContact ?? null,
+      clientId: input.clientId ?? null,
       itemType: input.itemType ?? null,
       salesStage: input.salesStage ?? "기술제안",
       status: "active",
@@ -90,6 +93,8 @@ export interface UpdateProjectPatch {
   type?: ProjectType;
   clientName?: string | null;
   clientContact?: string | null;
+  /** 0021 · Company DB 고객 id */
+  clientId?: string | null;
   itemType?: string | null;
   /** 0014 · p12 담당자 · Remarks · Description */
   ownerId?: string | null;
@@ -116,6 +121,7 @@ export async function updateProject(
       type: before.type,
       clientName: before.clientName,
       clientContact: before.clientContact,
+      clientId: before.clientId,
       itemType: before.itemType,
       ownerId: before.ownerId,
       remarks: before.remarks,
@@ -126,6 +132,7 @@ export async function updateProject(
       type: after.type,
       clientName: after.clientName,
       clientContact: after.clientContact,
+      clientId: after.clientId,
       itemType: after.itemType,
       ownerId: after.ownerId,
       remarks: after.remarks,

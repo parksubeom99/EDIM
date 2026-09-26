@@ -4,6 +4,7 @@ import { createProject, updateProject } from "@edim/db";
 import { getServerSession } from "@/app/lib/session";
 import { canEditProject } from "@/app/lib/project-perms";
 import { ownerOk, projectType, txt } from "@/app/lib/project-input";
+import { partnerOk } from "@/app/lib/partner";
 
 /**
  * p12·p50 Project Management — 목록(GET)과 등록(POST, Registration Process).
@@ -31,10 +32,14 @@ export async function POST(req: NextRequest) {
     if (await tx.project.findFirst({ where: { projectNo } })) return { dup: true as const };
     const owner = await ownerOk(tx, b.ownerId);
     if (owner === false) return { badOwner: true as const };
+    // 0021 · 고객을 목록에서 고르면 id 와 글자(client_name)를 함께 채운다
+    const client = await partnerOk(tx, b.clientId, "customer");
+    if (client === false) return { badClient: true as const };
     const sibling = await tx.hierarchyNode.findFirst({ where: { kind: "project", isCurrent: true }, orderBy: { createdAt: "asc" } });
     const made = await createProject(tx, {
       parentStable: sibling?.parentStable ?? null, projectNo, name, type,
-      clientName: txt(b.clientName, 120) ?? null, clientContact: txt(b.clientContact, 200) ?? null,
+      clientName: txt(b.clientName, 120) ?? client?.name ?? null, clientContact: txt(b.clientContact, 200) ?? null,
+      clientId: client?.id ?? null,
       itemType: txt(b.itemType, 40) ?? null, createdBy: session.userId,
     });
     const extra = { ownerId: owner ?? undefined, remarks: txt(b.remarks, 500) ?? undefined, description: txt(b.description, 2000) ?? undefined };
@@ -43,5 +48,6 @@ export async function POST(req: NextRequest) {
   });
   if ("dup" in out) return NextResponse.json({ error: `이미 있는 Project No: ${projectNo}` }, { status: 409 });
   if ("badOwner" in out) return NextResponse.json({ error: "담당자는 이 회사 구성원이어야 합니다" }, { status: 400 });
+  if ("badClient" in out) return NextResponse.json({ error: "고객은 Company DB 의 이 회사 고객이어야 합니다" }, { status: 400 });
   return NextResponse.json({ ok: true, ...out });
 }

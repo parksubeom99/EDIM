@@ -22,9 +22,20 @@ import { seedCatalog } from "./seed-catalog";
 export const DEMO_DSL =
   "=IF(CAP,CAP>25, SUM(Table1(A,4:4))*Var(NS,15)*Var(NS,20), SUM(Table1(A,1:1))*Var(NS,20))";
 
+/** 0021 · Company DB 데모 — 고객 1 · 공급처 1. 데모 프로젝트의 client_name("Micron")은 연결하지 않고 둔다(옛 데이터 보존을 보이려고). */
+export const DEMO_PARTNERS = [
+  { kind: "customer", code: "C-MICRON", name: "Micron", contact: "FAB 설비팀", nation: "KR" },
+  { kind: "supplier", code: "S-KSB", name: "KSB Motor", contact: "영업 1팀", nation: "KR" },
+] as const;
+
 export async function seedDemo(opts: { forceCatalog?: boolean } = {}): Promise<void> {
   // P1: BOM Code Set-Up 데모 카탈로그 — BOM Run은 등록된 코드·관계에서만 나온다.
   await seedCatalog({ force: opts.forceCatalog });
+  await withTenant(IDS.tenantA, async (tx) => {
+    if ((await tx.partner.count()) > 0) return;
+    for (const p of DEMO_PARTNERS) await tx.partner.create({ data: { tenantId: IDS.tenantA, ...p, createdBy: IDS.ownerA } });
+    console.log(`Demo seed: ${DEMO_PARTNERS.length} partners (p64 Company DB).`);
+  });
   await withTenant(IDS.tenantA, async (tx) => {
     const current = await getApproved(tx, IDS.a_proj);
     if (current && current.dsl === DEMO_DSL) {

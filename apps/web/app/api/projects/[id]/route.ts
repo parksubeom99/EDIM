@@ -4,6 +4,7 @@ import { getProject, updateProject, type UpdateProjectPatch } from "@edim/db";
 import { getServerSession } from "@/app/lib/session";
 import { canEditProject } from "@/app/lib/project-perms";
 import { isUuid, ownerOk, projectType, txt } from "@/app/lib/project-input";
+import { partnerOk } from "@/app/lib/partner";
 
 /**
  * p12 헤더 수정 — Project Type · Client · Client 담당자 정보 · 담당자 · Item · Remarks · Description · Name.
@@ -24,10 +25,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (!(await getProject(tx, id))) return "missing" as const;
     const owner = await ownerOk(tx, b.ownerId);
     if (owner === false) return "badOwner" as const;
+    const client = await partnerOk(tx, b.clientId, "customer");   // 0021 · Company DB 고객
+    if (client === false) return "badClient" as const;
     const patch: UpdateProjectPatch = {
       ...(name !== undefined ? { name } : {}), ...(type ? { type } : {}),
       ...(b.clientName !== undefined ? { clientName: txt(b.clientName, 120) ?? null } : {}),
       ...(b.clientContact !== undefined ? { clientContact: txt(b.clientContact, 200) ?? null } : {}),
+      ...(client !== undefined ? { clientId: client?.id ?? null, ...(b.clientName === undefined && client ? { clientName: client.name } : {}) } : {}),
       ...(b.itemType !== undefined ? { itemType: txt(b.itemType, 40) ?? null } : {}),
       ...(owner !== undefined ? { ownerId: owner } : {}),
       ...(b.remarks !== undefined ? { remarks: txt(b.remarks, 500) ?? null } : {}),
@@ -38,5 +42,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   });
   if (out === "missing") return NextResponse.json({ error: "not found" }, { status: 404 });
   if (out === "badOwner") return NextResponse.json({ error: "담당자는 이 회사 구성원이어야 합니다" }, { status: 400 });
+  if (out === "badClient") return NextResponse.json({ error: "고객은 Company DB 의 이 회사 고객이어야 합니다" }, { status: 400 });
   return NextResponse.json({ ok: true });
 }

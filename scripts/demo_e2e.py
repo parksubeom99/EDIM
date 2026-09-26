@@ -1109,15 +1109,53 @@ with sync_playwright() as p:
     gl=gb.request.get(DW+"?purpose=approval").json()["rows"]; gpa=gb.request.patch(DW+f"/{apv[0]['id']}",headers=J0,data=json.dumps({"purpose":"quotation"})); gb.close()
     ok("S48d viewer 는 용도 도면을 못 만들고 못 바꾼다(403·403) · 다른 회사는 우리 승인도를 못 보고(0건) 못 바꾼다(404)",
        (vp.status, vpa.status, len(gl), gpa.status), vp.status==403 and vpa.status==403 and len(gl)==0 and gpa.status==404)
+    # ── S49 ⑧ Company DB (p64 · p67 · 0021) — 고객·공급처 목록 · 프로젝트 Client 와 단가 공급처가 목록을 가리킨다(글자 열도 함께) ──
+    PT=BASE+"/api/setup/partners"; PJ=BASE+"/api/projects"; PRC=BASE+"/api/setup/prices"
+    pg.goto(BASE+"/setup/company",wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=company-db][data-ready='1']",timeout=60000); nuke(pg)
+    seeded_p=sorted(x["code"] for x in ctx.request.get(PT).json()["rows"])
+    pg.fill("[data-testid=pn-customer-code]","E2E-C1"); pg.fill("[data-testid=pn-customer-name]","Samsung Bio (E2E)"); pg.fill("[data-testid=pn-customer-contact]","설비팀 010-0000-0000"); pg.fill("[data-testid=pn-customer-nation]","KR")
+    pg.click("[data-testid=pn-customer-add]"); pg.wait_for_selector("[data-testid=partner-row-E2E-C1]",timeout=30000)
+    pg.fill("[data-testid=pn-supplier-code]","E2E-S1"); pg.fill("[data-testid=pn-supplier-name]","Hanil Pump (E2E)")
+    pg.click("[data-testid=pn-supplier-add]"); pg.wait_for_selector("[data-testid=partner-row-E2E-S1]",timeout=30000)
+    nuke(pg); pg.screenshot(path=f"{OUT}/62_company_db.png",full_page=True)
+    rows_p=ctx.request.get(PT).json()["rows"]; c1=[x for x in rows_p if x["code"]=="E2E-C1"][0]; s1=[x for x in rows_p if x["code"]=="E2E-S1"][0]
+    ok("S49a Company DB — 시드 고객·공급처(C-MICRON·S-KSB)에 화면에서 고객 E2E-C1 · 공급처 E2E-S1 을 등록한다", (seeded_p, c1["kind"], s1["kind"]),
+       seeded_p==["C-MICRON","S-KSB"] and c1["kind"]=="customer" and s1["kind"]=="supplier")
+    pg.goto(BASE+"/m/project",wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=pm-detail][data-project='PS-61313-5']",timeout=30000); nuke(pg)
+    pj0=[x for x in ctx.request.get(PJ).json()["rows"] if x["projectNo"]=="PS-61313-5"][0]
+    pg.select_option("[data-testid=pm-client-pick]",c1["id"]); pg.click("[data-testid=pm-save]")
+    pg.wait_for_function("()=>(document.querySelector('[data-testid=pm-msg]')?.innerText||'').startsWith('저장')",timeout=30000)
+    pj1=[x for x in ctx.request.get(PJ).json()["rows"] if x["projectNo"]=="PS-61313-5"][0]
+    ok("S49b 프로젝트 Client 를 Company DB 에서 고르면 client_id 와 글자(client_name)가 함께 바뀐다 — 옛 데이터는 글자만 있었다",
+       (pj0.get("clientId"), pj0["clientName"], pj1.get("clientId")==c1["id"], pj1["clientName"]),
+       pj0.get("clientId") is None and pj0["clientName"]=="Micron" and pj1.get("clientId")==c1["id"] and pj1["clientName"]=="Samsung Bio (E2E)")
+    rs_=ctx.request.patch(PJ+f"/{pj1['id']}",headers=J0,data=json.dumps({"clientId":"","clientName":"Micron"}))   # 원복(뒤 단계·시연 화면 보존)
+    mc=[x["code"] for x in ctx.request.get(CAT).json()["productCodes"] if x["kind"]=="purchase"][0]
+    pr=ctx.request.post(PRC,headers=J0,data=json.dumps({"code":mc,"price":123000,"effectiveFrom":"2026-01-02","supplierId":s1["id"],"note":"E2E company db"}))
+    ph=[x for x in ctx.request.get(PRC+"?code="+mc).json()["rows"] if x["note"]=="E2E company db"]
+    ok("S49c 단가 이력의 공급처를 Company DB 로 가리키면 supplier_id 와 글자(supplier)가 함께 남는다", (pr.status, ph[0]["supplier"] if ph else None, rs_.status),
+       pr.status==200 and ph and ph[0]["supplierId"]==s1["id"] and ph[0]["supplier"]=="Hanil Pump (E2E)" and rs_.status==200)
+    bk=ctx.request.post(PT,headers=J0,data=json.dumps({"kind":"bank","code":"B1","name":"x"}))
+    dup=ctx.request.post(PT,headers=J0,data=json.dumps({"kind":"customer","code":"E2E-C1","name":"dup"}))
+    wrong=ctx.request.patch(PJ+f"/{pj1['id']}",headers=J0,data=json.dumps({"clientId":s1["id"]}))
+    wrong2=ctx.request.post(PRC,headers=J0,data=json.dumps({"code":mc,"price":1000,"effectiveFrom":"2026-01-03","supplierId":c1["id"]}))
+    ok("S49d 없는 종류는 400 · 같은 코드는 409 · 공급처를 고객으로(프로젝트) · 고객을 공급처로(단가) 가리키면 400",
+       (bk.status, dup.status, wrong.status, wrong2.status), bk.status==400 and dup.status==409 and wrong.status==400 and wrong2.status==400)
+    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data={"email":"viewer@acme.test"})
+    vp=vw.request.post(PT,headers=J0,data=json.dumps({"kind":"customer","code":"V1","name":"v"})); vw.close()
+    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data={"email":"owner@globex.test"})
+    gl=gb.request.get(PT).json()["rows"]; gc=gb.request.post(PJ,headers=J0,data=json.dumps({"projectNo":"GX-E2E-1","name":"gx","clientId":c1["id"]})); gb.close()
+    ok("S49e viewer 는 등록 못 한다(403) · 다른 회사는 우리 고객·공급처를 못 보고(0건) 자기 프로젝트에 우리 고객을 걸 수 없다(400)",
+       (vp.status, len(gl), gc.status), vp.status==403 and len(gl)==0 and gc.status==400)
     # S37 은 맨 끝에서 센다 — 중간(옛 자리)에서는 뒤에 찍히는 5장(40·41·42·52·53)이 아직 없어,
     # 빈 폴더에서는 25장이라 실패하고 이전 실행 잔재가 있을 때만 통과했다(2026-09-24 실측).
     _want=["00_login","05_project_mgmt","06_module_cpq_stub","10_project_bound","11_code_builder","11b_revisions","12_macro_tab",
            "13_macro_approved","14_edim_run","15_bom_cost","16_design_tab","20_setup_subcode","21_setup_product_table",
            "22_setup_relationship","23_codebuilder_from_subcode","30_toolbox_program","31_toolbox_ui_tool","40_company_admin",
            "41_platform_console","42_user_management","43_drawings","44_document_tab","45_purchasing","46_quotation_print",
-           "47_techdata_print","48_dxf_plan","49_dxf_assembly","51_accepted","52_register","53_schedule","54_toolbar","55_project_mgmt","56_print_setup","57_ui_design","58_material","59_arrangement_code","60_spec_input","61_drawing_purpose"]
+           "47_techdata_print","48_dxf_plan","49_dxf_assembly","51_accepted","52_register","53_schedule","54_toolbar","55_project_mgmt","56_print_setup","57_ui_design","58_material","59_arrangement_code","60_spec_input","61_drawing_purpose","62_company_db"]
     _miss=[w for w in _want if not os.path.exists(f"{OUT}/{w}.png") or os.path.getmtime(f"{OUT}/{w}.png")<T0]
-    ok("S37 캡처 38장이 이번 실행에서 전부 나온다 (잔재 파일은 세지 않음)", _miss or len(_want), not _miss)
+    ok("S37 캡처 39장이 이번 실행에서 전부 나온다 (잔재 파일은 세지 않음)", _miss or len(_want), not _miss)
     b.close()
 n=sum(1 for v in R.values() if v[0]); print(f"\n[demo_e2e] {n}/{len(R)} steps passed"); json.dump(R,open(f"{OUT}/demo_e2e_result.json","w",encoding="utf-8"),ensure_ascii=False,indent=1)
 sys.exit(0 if n==len(R) else 1)
