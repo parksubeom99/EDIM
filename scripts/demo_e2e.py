@@ -1155,9 +1155,10 @@ with sync_playwright() as p:
         pg.click("[data-testid=toolbox-toggle]"); pg.wait_for_selector("[data-testid=toolbox-toggle][aria-pressed=false]",timeout=30000)
     nuke(pg); pg.click("[data-run=bom]")
     pg.locator("button", has_text=re.compile(r"^Document$")).first.click(force=True)
-    pg.wait_for_selector("[data-testid=doc-in-temperature]",timeout=30000)
+    pg.wait_for_selector("[data-testid=doc-inputdata][data-ready='1'] [data-testid=doc-in-temperature]",timeout=30000)
     pg.wait_for_function("()=>{const b=document.querySelector('[data-testid=doc-make-techdata]'); return b && !b.disabled;}",timeout=60000)
     pg.fill("[data-testid=doc-in-temperature]","25"); pg.fill("[data-testid=doc-in-humidity]","60"); nuke(pg)
+    pg.wait_for_function("()=>document.querySelector('[data-testid=doc-in-temperature]').value==='25' && document.querySelector('[data-testid=doc-in-humidity]').value==='60'",timeout=10000)
     with pg.expect_response(lambda q: q.url.endswith("/api/documents") and q.request.method=="POST",timeout=30000) as dres:
         pg.click("[data-testid=doc-make-techdata]")
     da=dres.value.json(); pg.wait_for_selector("[data-testid=document-msg][data-ok='1']",timeout=30000)

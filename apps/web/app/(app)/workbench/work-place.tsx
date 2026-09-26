@@ -639,12 +639,18 @@ function DocumentPanel({ project, code, runs, nodeStable, canEdit }: { project: 
   // 0022 · p16 Input Data 템플릿 — Tech Data 를 만들 때 받는 값(기본값으로 시작). 문서 body 에 스냅샷으로 들어간다.
   const [inItems, setInItems] = useState<{ key: string; label: string; unit: string; defaultValue: number | null; minValue: number | null; maxValue: number | null }[]>([]);
   const [inVals, setInVals] = useState<Record<string, string>>({});
+  const [inReady, setInReady] = useState(false);
   useEffect(() => {
+    // 늦게 온 응답(StrictMode 이중 effect)이 사용자가 이미 적은 값을 기본값으로 되돌리지 않게: 지난 요청은 버리고, 적힌 값은 남긴다.
+    let live = true;
     fetch("/api/setup/input-items").then((r) => r.json()).then((j) => {
+      if (!live) return;
       const rows = (j.rows ?? []) as typeof inItems;
       setInItems(rows);
-      setInVals(Object.fromEntries(rows.map((x) => [x.key, x.defaultValue == null ? "" : String(x.defaultValue)])));
-    }).catch(() => setInItems([]));
+      setInVals((prev) => Object.fromEntries(rows.map((x) => [x.key, prev[x.key] ?? (x.defaultValue == null ? "" : String(x.defaultValue))])));
+      setInReady(true);
+    }).catch(() => { if (live) { setInItems([]); setInReady(true); } });
+    return () => { live = false; };
   }, []);
 
   const load = useCallback(async () => {
@@ -699,7 +705,7 @@ function DocumentPanel({ project, code, runs, nodeStable, canEdit }: { project: 
         <a data-testid="doc-print-setup" href="/setup/print" style={{ marginLeft: "auto", fontSize: "var(--fs-12)", color: "var(--accent)", alignSelf: "center" }}>Print 설정 (p48) →</a>
       </div>
       {inItems.length > 0 && (
-        <div data-testid="doc-inputdata" style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap", marginTop: 8, fontSize: "var(--fs-12)", color: "var(--ink-muted)" }}>
+        <div data-testid="doc-inputdata" data-ready={inReady ? "1" : "0"} style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap", marginTop: 8, fontSize: "var(--fs-12)", color: "var(--ink-muted)" }}>
           <span style={{ fontWeight: 600 }}>Tech Data · Input Data (p16)</span>
           {inItems.map((x) => (
             <label key={x.key} style={{ display: "flex", flexDirection: "column", gap: 2 }}>
