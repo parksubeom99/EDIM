@@ -984,15 +984,55 @@ with sync_playwright() as p:
     ok("S45e 단가 0 은 400 · 없는 코드는 404 · viewer 는 403 · 다른 회사는 이 이력을 못 본다(0건)", (z.status, nf.status, vp.status, len(gp)),
        z.status==400 and nf.status==404 and vp.status==403 and len(gp)==0)
     nuke(pg); pg.screenshot(path=f"{OUT}/58_material.png",full_page=True)
+    # ── S46 p35 Arrangement Code — 등록(스냅샷) → 승인 → 적용(기존 저장 규칙) ──
+    AC=BASE+"/api/setup/arrangement-codes"
+    def eu_secs():
+        return [x for x in ctx.request.get(CAT).json()["productCodes"] if x["code"]=="EU"][0]["sections"]
+    snap=eu_secs(); names0=[x["name"] for x in snap]
+    pg.goto(BASE+"/setup/arrangement-code",wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=arr-codes][data-ready='1']",timeout=60000); nuke(pg)
+    pg.fill("[data-testid=ac-new-code]","FDV-E2E"); pg.select_option("[data-testid=ac-new-product]","EU"); pg.fill("[data-testid=ac-new-desc]","Fan Centrifugal · Double (E2E)")
+    pg.click("[data-testid=ac-register]"); pg.wait_for_selector("[data-testid=ac-row-FDV-E2E][data-status=pending]",timeout=30000)
+    fdv=[x for x in ctx.request.get(AC).json()["rows"] if x["code"]=="FDV-E2E"][0]
+    ok("S46a 등록 — EU 의 지금 배치가 스냅샷으로 떠지고 Approval Status 는 Pending", (fdv["status"], [x["name"] for x in fdv["sections"]]==names0),
+       fdv["status"]=="pending" and [x["name"] for x in fdv["sections"]]==names0)
+    ap0=ctx.request.post(AC+f"/{fdv['id']}/apply",headers=J0,data="{}")
+    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data={"email":"viewer@acme.test"})
+    vd=vw.request.post(AC+f"/{fdv['id']}/decide",headers=J0,data=json.dumps({"decision":"approve"})); vw.close()
+    ok("S46b 승인 전에는 적용이 막히고(409), viewer 는 승인할 수 없다(403)", (ap0.status, vd.status), ap0.status==409 and vd.status==403)
+    pg.click("[data-testid=ac-row-FDV-E2E]"); pg.wait_for_selector("[data-testid=ac-detail][data-code=FDV-E2E]",timeout=30000)
+    pg.fill("[data-testid=ac-note]","배치 검토 완료"); pg.click("[data-testid=ac-approve]")
+    pg.wait_for_selector("[data-testid=ac-detail][data-status=approved]",timeout=30000)
+    again=ctx.request.post(AC+f"/{fdv['id']}/decide",headers=J0,data=json.dumps({"decision":"reject"}))
+    ok("S46c owner 가 화면에서 승인 → Approved, 결정은 한 번뿐(다시 결정 409)", again.status, again.status==409)
+    moved=[snap[-1]]+snap[:-1]
+    mv=ctx.request.post(ARR,headers=J0,data=json.dumps({"code":"EU","sections":[{"name":x["name"],**({"len":x["len"]} if x.get("len") else {}),**({"dir":x["dir"]} if x.get("dir") else {}),"components":x.get("components",[])} for x in moved]}))
+    names_moved=[x["name"] for x in eu_secs()]
+    pg.wait_for_function("()=>{const b=document.querySelector('[data-testid=ac-apply]'); return b && !b.disabled;}",timeout=30000)
+    pg.click("[data-testid=ac-apply]"); pg.wait_for_function("()=>(document.querySelector('[data-testid=ac-msg]')?.innerText||'').includes('적용했습니다')",timeout=30000)
+    names_back=[x["name"] for x in eu_secs()]
+    ok("S46d 적용 — EU 배치를 바꿔 둔 뒤 승인된 코드를 적용하면 스냅샷 순서로 돌아온다 (기존 Arrangement 저장 경로)",
+       (mv.status, names_moved[0], names_back[0]), mv.status==200 and names_moved!=names0 and names_back==names0)
+    pg.fill("[data-testid=ac-new-code]","FDV-E2E-R"); pg.click("[data-testid=ac-register]"); pg.wait_for_selector("[data-testid=ac-row-FDV-E2E-R][data-status=pending]",timeout=30000)
+    pg.click("[data-testid=ac-row-FDV-E2E-R]"); pg.wait_for_selector("[data-testid=ac-detail][data-code=FDV-E2E-R]",timeout=30000)
+    pg.click("[data-testid=ac-reject]"); pg.wait_for_selector("[data-testid=ac-detail][data-status=rejected]",timeout=30000)
+    rj=[x for x in ctx.request.get(AC).json()["rows"] if x["code"]=="FDV-E2E-R"][0]
+    ap2=ctx.request.post(AC+f"/{rj['id']}/apply",headers=J0,data="{}")
+    dup=ctx.request.post(AC,headers=J0,data=json.dumps({"code":"FDV-E2E","productCode":"EU"}))
+    ok("S46e 반려된 코드는 적용할 수 없고(409), 같은 코드 이름은 다시 등록할 수 없다(409)", (ap2.status, dup.status), ap2.status==409 and dup.status==409)
+    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data={"email":"owner@globex.test"})
+    gl=gb.request.get(AC).json()["rows"]; ga=gb.request.post(AC+f"/{fdv['id']}/apply",headers=J0,data="{}"); gb.close()
+    ok("S46f 다른 회사는 이 코드를 못 보고 적용도 못 한다 (0건 · 404)", (len(gl), ga.status), len(gl)==0 and ga.status==404)
+    pg.click("[data-testid=ac-row-FDV-E2E]"); pg.wait_for_selector("[data-testid=ac-detail][data-code=FDV-E2E]",timeout=30000)
+    nuke(pg); pg.screenshot(path=f"{OUT}/59_arrangement_code.png",full_page=True)
     # S37 은 맨 끝에서 센다 — 중간(옛 자리)에서는 뒤에 찍히는 5장(40·41·42·52·53)이 아직 없어,
     # 빈 폴더에서는 25장이라 실패하고 이전 실행 잔재가 있을 때만 통과했다(2026-09-24 실측).
     _want=["00_login","05_project_mgmt","06_module_cpq_stub","10_project_bound","11_code_builder","11b_revisions","12_macro_tab",
            "13_macro_approved","14_edim_run","15_bom_cost","16_design_tab","20_setup_subcode","21_setup_product_table",
            "22_setup_relationship","23_codebuilder_from_subcode","30_toolbox_program","31_toolbox_ui_tool","40_company_admin",
            "41_platform_console","42_user_management","43_drawings","44_document_tab","45_purchasing","46_quotation_print",
-           "47_techdata_print","48_dxf_plan","49_dxf_assembly","51_accepted","52_register","53_schedule","54_toolbar","55_project_mgmt","56_print_setup","57_ui_design","58_material"]
+           "47_techdata_print","48_dxf_plan","49_dxf_assembly","51_accepted","52_register","53_schedule","54_toolbar","55_project_mgmt","56_print_setup","57_ui_design","58_material","59_arrangement_code"]
     _miss=[w for w in _want if not os.path.exists(f"{OUT}/{w}.png") or os.path.getmtime(f"{OUT}/{w}.png")<T0]
-    ok("S37 캡처 35장이 이번 실행에서 전부 나온다 (잔재 파일은 세지 않음)", _miss or len(_want), not _miss)
+    ok("S37 캡처 36장이 이번 실행에서 전부 나온다 (잔재 파일은 세지 않음)", _miss or len(_want), not _miss)
     b.close()
 n=sum(1 for v in R.values() if v[0]); print(f"\n[demo_e2e] {n}/{len(R)} steps passed"); json.dump(R,open(f"{OUT}/demo_e2e_result.json","w"),ensure_ascii=False,indent=1)
 sys.exit(0 if n==len(R) else 1)
