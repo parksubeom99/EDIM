@@ -47,6 +47,8 @@ async function resetDemo(): Promise<void> {
   await adminPrisma.uiForm.deleteMany({ where: { tenantId: t } });
   // 0017: 리허설이 쌓은 단가 이력(p32·p67)을 지운다.
   await adminPrisma.priceHistory.deleteMany({ where: { tenantId: t } });
+  // 리허설(e2e S45)이 만든 E2E- 자재 코드를 지운다 — 카탈로그 시드는 reset 이 다시 넣지 않으므로 접두어로만 골라 지운다.
+  await adminPrisma.productCode.deleteMany({ where: { tenantId: t, code: { startsWith: "E2E-" } } });
   // 리허설이 역할을 바꿔 놓았을 수 있다(User Management 시연) → 시드 역할로 되돌린다.
   await adminPrisma.membership.updateMany({ where: { tenantId: t, userId: IDS.viewerA }, data: { role: "viewer" } });
   await adminPrisma.membership.updateMany({ where: { tenantId: t, userId: IDS.ownerA }, data: { role: "owner" } });

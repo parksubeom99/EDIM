@@ -47,7 +47,7 @@ export function MaterialRegistry({ canEdit }: { canEdit: boolean }) {
     const list = (c.productCodes ?? []).filter((p) => p.kind === "purchase").sort((a, b) => (a.category + a.code).localeCompare(b.category + b.code));
     setCodes(list);
     const pick = list.find((p) => p.code === (keep ?? null)) ?? null;
-    if (pick) choose(pick);
+    if (pick) choose(pick, false);   // 다시 불러올 때는 방금 띄운 결과 메시지를 지우지 않는다
     setReady(true);
   }, []);  // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { void load(null); }, [load]);
@@ -57,9 +57,9 @@ export function MaterialRegistry({ canEdit }: { canEdit: boolean }) {
     setPrices(j.rows ?? []); setCurrent(j.current ?? {});
   }, []);
 
-  function choose(p: Code) {
+  function choose(p: Code, clearMsg = true) {
     const [name, t] = Object.entries(p.tables).find(([, x]) => x.role === "buy") ?? ["buy", null];
-    setSelCode(p.code); setBuyName(name); setDraft(t ? JSON.parse(JSON.stringify(t)) : JSON.parse(JSON.stringify(DEFAULT_BUY))); setMsg(null);
+    setSelCode(p.code); setBuyName(name); setDraft(t ? JSON.parse(JSON.stringify(t)) : JSON.parse(JSON.stringify(DEFAULT_BUY))); if (clearMsg) setMsg(null);
     setPf((f) => ({ ...f, item: t?.rows[0]?.item ?? "", supplier: String(t?.rows[0]?.cells.A ?? "") }));
     void loadPrices(p.code);
   }

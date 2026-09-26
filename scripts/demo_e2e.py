@@ -944,15 +944,55 @@ with sync_playwright() as p:
     ok("S44f viewer 는 폼을 못 만들고(403), 다른 회사는 이 폼을 못 보고 못 지운다(0건 · 404)", (vp.status, len(gl), gd.status), vp.status==403 and len(gl)==0 and gd.status==404)
     pg.click("[data-testid='ui-form-E2E 용량 조회']"); pg.wait_for_selector("[data-widget=table1]",timeout=30000); pg.click("[data-widget=button1]")
     nuke(pg); pg.screenshot(path=f"{OUT}/57_ui_design.png",full_page=True)
+    # ── S45 p32 Material code & General purchase items · p67 단가 이력 ──
+    CAT=BASE+"/api/setup/catalog"; PR=BASE+"/api/setup/prices"
+    psh0=[c for c in ctx.request.get(CAT).json()["productCodes"] if c["code"]=="PSH 1"][0]
+    pg.goto(BASE+"/setup/material",wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=material-reg][data-ready='1']",timeout=60000); nuke(pg)
+    n_codes=len(pg.query_selector_all("[data-testid^=mat-code-]"))
+    pg.click("[data-testid='mat-code-PSH 1']"); pg.wait_for_selector("[data-testid=mat-table][data-code='PSH 1']",timeout=30000)
+    ok("S45a 자재 등록 화면 — 구매품 코드가 분류 트리로 보이고, 고르면 속성 표(Supplier·V·Hz·IP·Insulation)가 열린다",
+       (n_codes, pg.input_value("[data-testid=mat-cell-0-A]")), n_codes>=5 and pg.input_value("[data-testid=mat-cell-0-A]")=="한국전열" and pg.input_value("[data-testid=mat-col-E]")=="Insulation")
+    pg.click("[data-testid=mat-add-col]"); pg.fill("[data-testid=mat-col-F]","Efficiency"); pg.fill("[data-testid=mat-cell-0-F]","IE3")
+    pg.click("[data-testid=mat-save]"); pg.wait_for_selector("[data-testid=mat-msg][data-ok='1']",timeout=30000)
+    psh1=[c for c in ctx.request.get(CAT).json()["productCodes"] if c["code"]=="PSH 1"][0]
+    buy=[t for t in psh1["tables"].values() if t.get("role")=="buy"][0]
+    ok("S45b 속성 추가 — Efficiency 열이 같은 buy 표(제품 코드 한 곳)에 저장된다", [c["name"] for c in buy["cols"]], [c["name"] for c in buy["cols"]][-1]=="Efficiency" and buy["rows"][0]["cells"].get("F")=="IE3")
+    rr=ctx.request.post(BASE+"/api/setup/product-codes",headers=J0,data=json.dumps(psh0))
+    ok("S45b2 원복(API) — PSH 1 속성 표를 되돌린다(카탈로그는 reset 이 되돌리지 않음)", rr.status, rr.status==200)
+    MC="E2E-MT"+str(int(time.time()))[-5:]
+    pg.fill("[data-testid=mat-new-code]",MC); pg.fill("[data-testid=mat-new-name]","Motor AC Φ3"); pg.fill("[data-testid=mat-new-cat]","General Purchase items/Motor/Industrial/AC")
+    pg.click("[data-testid=mat-create]"); pg.wait_for_selector(f"[data-testid=mat-table][data-code='{MC}']",timeout=30000)
+    mc=[c for c in ctx.request.get(CAT).json()["productCodes"] if c["code"]==MC][0]
+    ok("S45c 새 자재 코드 등록 — 분류 경로와 기본 속성 표(6열, Efficiency 포함)로 카탈로그에 생긴다", (mc["kind"], mc["category"]),
+       mc["kind"]=="purchase" and mc["category"]=="General Purchase items/Motor/Industrial/AC" and len(list(mc["tables"].values())[0]["cols"])==6)
+    import datetime as _dt
+    TODAY=_dt.date.today().isoformat()
+    for price,eff in (("1200000","2026-01-01"),("1280000",TODAY),("1500000","2099-01-01")):
+        pg.fill("[data-testid=mat-p-price]",price); pg.fill("[data-testid=mat-p-date]",eff); pg.fill("[data-testid=mat-p-supplier]","효성")
+        n0=len(pg.query_selector_all("[data-testid=mat-price-row]")); pg.click("[data-testid=mat-p-add]")
+        pg.wait_for_function("(n)=>document.querySelectorAll('[data-testid=mat-price-row]').length>n", arg=n0, timeout=30000)
+    st=pg.eval_on_selector_all("[data-testid=mat-price-row]","es=>es.map(e=>e.dataset.state)")
+    cur=pg.inner_text("[data-testid=mat-price-0]")
+    ok("S45d 단가 이력 — 3건을 쌓으면 예정(2099)·현재(오늘)·지난(1월)으로 갈리고, 표의 G:Price 는 오늘 유효한 1,280,000", (st, cur),
+       st==["예정","현재","지난"] and cur.startswith("1,280,000"))
+    z=ctx.request.post(PR,headers=J0,data=json.dumps({"code":MC,"price":0,"effectiveFrom":TODAY}))
+    nf=ctx.request.post(PR,headers=J0,data=json.dumps({"code":"NOPE-XX","price":10,"effectiveFrom":TODAY}))
+    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data={"email":"viewer@acme.test"})
+    vp=vw.request.post(PR,headers=J0,data=json.dumps({"code":MC,"price":10,"effectiveFrom":TODAY})); vw.close()
+    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data={"email":"owner@globex.test"})
+    gp=gb.request.get(PR+"?code="+MC).json()["rows"]; gb.close()
+    ok("S45e 단가 0 은 400 · 없는 코드는 404 · viewer 는 403 · 다른 회사는 이 이력을 못 본다(0건)", (z.status, nf.status, vp.status, len(gp)),
+       z.status==400 and nf.status==404 and vp.status==403 and len(gp)==0)
+    nuke(pg); pg.screenshot(path=f"{OUT}/58_material.png",full_page=True)
     # S37 은 맨 끝에서 센다 — 중간(옛 자리)에서는 뒤에 찍히는 5장(40·41·42·52·53)이 아직 없어,
     # 빈 폴더에서는 25장이라 실패하고 이전 실행 잔재가 있을 때만 통과했다(2026-09-24 실측).
     _want=["00_login","05_project_mgmt","06_module_cpq_stub","10_project_bound","11_code_builder","11b_revisions","12_macro_tab",
            "13_macro_approved","14_edim_run","15_bom_cost","16_design_tab","20_setup_subcode","21_setup_product_table",
            "22_setup_relationship","23_codebuilder_from_subcode","30_toolbox_program","31_toolbox_ui_tool","40_company_admin",
            "41_platform_console","42_user_management","43_drawings","44_document_tab","45_purchasing","46_quotation_print",
-           "47_techdata_print","48_dxf_plan","49_dxf_assembly","51_accepted","52_register","53_schedule","54_toolbar","55_project_mgmt","56_print_setup","57_ui_design"]
+           "47_techdata_print","48_dxf_plan","49_dxf_assembly","51_accepted","52_register","53_schedule","54_toolbar","55_project_mgmt","56_print_setup","57_ui_design","58_material"]
     _miss=[w for w in _want if not os.path.exists(f"{OUT}/{w}.png") or os.path.getmtime(f"{OUT}/{w}.png")<T0]
-    ok("S37 캡처 34장이 이번 실행에서 전부 나온다 (잔재 파일은 세지 않음)", _miss or len(_want), not _miss)
+    ok("S37 캡처 35장이 이번 실행에서 전부 나온다 (잔재 파일은 세지 않음)", _miss or len(_want), not _miss)
     b.close()
 n=sum(1 for v in R.values() if v[0]); print(f"\n[demo_e2e] {n}/{len(R)} steps passed"); json.dump(R,open(f"{OUT}/demo_e2e_result.json","w"),ensure_ascii=False,indent=1)
 sys.exit(0 if n==len(R) else 1)
