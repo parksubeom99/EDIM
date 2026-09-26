@@ -28,6 +28,12 @@ export const DEMO_PARTNERS = [
   { kind: "supplier", code: "S-KSB", name: "KSB Motor", contact: "영업 1팀", nation: "KR" },
 ] as const;
 
+/** 0022 · p16 Input Data 템플릿 데모 — 청사진의 두 항목. */
+export const DEMO_INPUT_ITEMS = [
+  { key: "temperature", label: "Temperature", unit: "°C", defaultValue: 20, minValue: -40, maxValue: 60 },
+  { key: "humidity", label: "Humidity", unit: "%", defaultValue: 50, minValue: 0, maxValue: 100 },
+];
+
 export async function seedDemo(opts: { forceCatalog?: boolean } = {}): Promise<void> {
   // P1: BOM Code Set-Up 데모 카탈로그 — BOM Run은 등록된 코드·관계에서만 나온다.
   await seedCatalog({ force: opts.forceCatalog });
@@ -35,6 +41,12 @@ export async function seedDemo(opts: { forceCatalog?: boolean } = {}): Promise<v
     if ((await tx.partner.count()) > 0) return;
     for (const p of DEMO_PARTNERS) await tx.partner.create({ data: { tenantId: IDS.tenantA, ...p, createdBy: IDS.ownerA } });
     console.log(`Demo seed: ${DEMO_PARTNERS.length} partners (p64 Company DB).`);
+  });
+  // 0022 · p16 Input Data 템플릿 — 청사진 그대로 Temperature °C · Humidity %
+  await withTenant(IDS.tenantA, async (tx) => {
+    if ((await tx.inputItem.count()) > 0) return;
+    for (const [i, it] of DEMO_INPUT_ITEMS.entries()) await tx.inputItem.create({ data: { tenantId: IDS.tenantA, docType: "techdata", seq: i + 1, ...it, createdBy: IDS.ownerA } });
+    console.log(`Demo seed: ${DEMO_INPUT_ITEMS.length} input data items (p16).`);
   });
   await withTenant(IDS.tenantA, async (tx) => {
     const current = await getApproved(tx, IDS.a_proj);

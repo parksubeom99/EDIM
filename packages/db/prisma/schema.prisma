@@ -47,6 +47,7 @@ model Tenant {
   arrangementCodes ArrangementCode[]
   specItems       SpecItem[]
   partners        Partner[]
+  inputItems      InputItem[]
 
   @@map("tenant")
 }
@@ -645,4 +646,26 @@ model Partner {
 
   @@unique([tenantId, kind, code], map: "partner_tenant_id_kind_code_key")
   @@map("partner")
+}
+
+/// 0022 · p16 Input Data 템플릿 — 문서(Tech Data) 입력 항목: 이름 · 단위 · 기본값 · 범위.
+/// 문서를 만들 때 값을 받아 body 에 스냅샷으로 넣는다(발행 후 다시 계산하지 않는다).
+model InputItem {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  docType      String   @default("techdata") @map("doc_type")
+  seq          Int      @default(0)
+  key          String
+  label        String
+  unit         String   @default("")
+  defaultValue Float?   @map("default_value")
+  minValue     Float?   @map("min_value")
+  maxValue     Float?   @map("max_value")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdBy    String   @map("created_by") @db.Uuid
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, docType, key], map: "input_item_tenant_id_doc_type_key_key")
+  @@map("input_item")
 }

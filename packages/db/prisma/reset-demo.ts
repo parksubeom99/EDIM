@@ -55,6 +55,8 @@ async function resetDemo(): Promise<void> {
   await adminPrisma.specItem.deleteMany({ where: { tenantId: t } });
   // 0021: 리허설이 더한 고객·공급처(p64)를 지운다(프로젝트·단가 이력의 연결은 ON DELETE SET NULL) — 시드 둘은 seedDemo 가 다시 넣는다.
   await adminPrisma.partner.deleteMany({ where: { tenantId: t } });
+  // 0022: 리허설이 더한 Input Data 항목(p16)을 지운다 — 시드 두 항목은 seedDemo 가 다시 넣는다.
+  await adminPrisma.inputItem.deleteMany({ where: { tenantId: t } });
   // 리허설이 역할을 바꿔 놓았을 수 있다(User Management 시연) → 시드 역할로 되돌린다.
   await adminPrisma.membership.updateMany({ where: { tenantId: t, userId: IDS.viewerA }, data: { role: "viewer" } });
   await adminPrisma.membership.updateMany({ where: { tenantId: t, userId: IDS.ownerA }, data: { role: "owner" } });

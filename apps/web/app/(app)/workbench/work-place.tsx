@@ -628,6 +628,16 @@ function DocumentPanel({ project, code, runs, nodeStable, canEdit }: { project: 
   const [prs, setPrs] = useState<{ id: string; prNo: string; status: string; bomRunId: string; lines: unknown[] }[]>([]);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  // 0022 · p16 Input Data 템플릿 — Tech Data 를 만들 때 받는 값(기본값으로 시작). 문서 body 에 스냅샷으로 들어간다.
+  const [inItems, setInItems] = useState<{ key: string; label: string; unit: string; defaultValue: number | null; minValue: number | null; maxValue: number | null }[]>([]);
+  const [inVals, setInVals] = useState<Record<string, string>>({});
+  useEffect(() => {
+    fetch("/api/setup/input-items").then((r) => r.json()).then((j) => {
+      const rows = (j.rows ?? []) as typeof inItems;
+      setInItems(rows);
+      setInVals(Object.fromEntries(rows.map((x) => [x.key, x.defaultValue == null ? "" : String(x.defaultValue)])));
+    }).catch(() => setInItems([]));
+  }, []);
 
   const load = useCallback(async () => {
     const q = nodeStable ? `?node=${nodeStable}` : "";
@@ -674,12 +684,26 @@ function DocumentPanel({ project, code, runs, nodeStable, canEdit }: { project: 
       </dl>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         <button type="button" data-testid="doc-make-quotation" disabled={off} onClick={() => void post("/api/documents", { runId, type: "quotation" })} style={{ ...btn, opacity: off ? 0.5 : 1 }}>견적서 등록 (PCR·Quotation)</button>
-        <button type="button" data-testid="doc-make-techdata" disabled={off} onClick={() => void post("/api/documents", { runId, type: "techdata" })} style={{ ...btn, opacity: off ? 0.5 : 1 }}>Tech Data 등록</button>
+        <button type="button" data-testid="doc-make-techdata" disabled={off} onClick={() => void post("/api/documents", { runId, type: "techdata", ...(inItems.length ? { inputData: inVals } : {}) })} style={{ ...btn, opacity: off ? 0.5 : 1 }}>Tech Data 등록</button>
         <button type="button" data-testid="pr-make" disabled={off || !!prOfRun} onClick={() => void post("/api/purchase-requests", { runId })} style={{ ...btn, opacity: off || prOfRun ? 0.5 : 1 }}>
           {prOfRun ? `구매 요청 있음 · ${prOfRun.prNo}` : "구매 요청 만들기"}
         </button>
         <a data-testid="doc-print-setup" href="/setup/print" style={{ marginLeft: "auto", fontSize: "var(--fs-12)", color: "var(--accent)", alignSelf: "center" }}>Print 설정 (p48) →</a>
       </div>
+      {inItems.length > 0 && (
+        <div data-testid="doc-inputdata" style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap", marginTop: 8, fontSize: "var(--fs-12)", color: "var(--ink-muted)" }}>
+          <span style={{ fontWeight: 600 }}>Tech Data · Input Data (p16)</span>
+          {inItems.map((x) => (
+            <label key={x.key} style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              <span>{x.label}{x.unit ? ` (${x.unit})` : ""}{x.minValue != null || x.maxValue != null ? ` · ${x.minValue ?? "−∞"}~${x.maxValue ?? "∞"}` : ""}</span>
+              <input data-testid={`doc-in-${x.key}`} value={inVals[x.key] ?? ""} onChange={(e) => setInVals({ ...inVals, [x.key]: e.target.value })}
+                style={{ width: 90, fontFamily: "var(--font-mono)", fontSize: "var(--fs-12)", padding: "3px 6px", border: "1px solid var(--line)", borderRadius: 4, background: "var(--surface-0)", color: "var(--ink)" }} />
+            </label>
+          ))}
+          <a href="/setup/input-data" style={{ color: "var(--accent)" }}>템플릿 →</a>
+          <span>아직 없음: Output Data 계산(밀도 등) · 그래프 · Coding List</span>
+        </div>
+      )}
       {msg && <p data-testid="document-msg" data-ok={msg.ok ? "1" : "0"} style={{ margin: "8px 0 0", fontSize: "var(--fs-12)", color: msg.ok ? "var(--accent)" : "var(--warn)" }}>{msg.text}</p>}
 
       {docs.length > 0 && (

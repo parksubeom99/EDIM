@@ -3,7 +3,7 @@ import { withTenant, saveDocument, listDocuments, isDocumentType } from "@edim/d
 import { getServerSession } from "@/app/lib/session";
 import { canEditProject } from "@/app/lib/project-perms";
 import { documentSourceFromRun } from "@/app/lib/output/document-source";
-import { buildQuotationBody, buildTechDataBody, noCoreOf } from "@/app/lib/output/document";
+import { buildQuotationBody, buildTechDataBody, noCoreOf, resolveInputData, type InputDataValue } from "@/app/lib/output/document";
 
 /** GET = 문서 목록 · POST = BOM 스냅샷에서 견적(p66)·Tech Data(p15~16)를 떠서 남긴다. */
 export async function GET(req: NextRequest) {
@@ -33,6 +33,15 @@ export async function POST(req: NextRequest) {
   const src = await documentSourceFromRun(session.tenantId, runId);
   if (!src.ok) return NextResponse.json({ error: src.error }, { status: src.status });
 
+  // 0022 · p16 Input Data 템플릿 — Tech Data 는 회사가 정한 입력 항목 값을 받아 body 에 스냅샷으로 넣는다.
+  let inputData: InputDataValue[] = [];
+  if (type === "techdata") {
+    const defs = await withTenant(session.tenantId, (tx) => tx.inputItem.findMany({ where: { docType: "techdata" }, orderBy: [{ seq: "asc" }, { createdAt: "asc" }] }));
+    const r = resolveInputData(defs.map((d) => ({ key: d.key, label: d.label, unit: d.unit, defaultValue: d.defaultValue, minValue: d.minValue, maxValue: d.maxValue })), b.inputData);
+    if (!r.ok) return NextResponse.json({ error: r.error }, { status: r.status });
+    inputData = r.values;
+  }
+
   // 본문을 먼저 한 번 만들어 본다 — 거부할 스냅샷이면 번호를 쓰기 전에 돌려보낸다.
   const date = new Date().toISOString().slice(0, 10);
   const opts = {
@@ -43,7 +52,7 @@ export async function POST(req: NextRequest) {
   const make = (docNo: string, rev: string) =>
     type === "quotation"
       ? buildQuotationBody(src.run, src.project, opts, docNo, rev, date)
-      : buildTechDataBody(src.run, src.project, docNo, rev, date);
+      : buildTechDataBody(src.run, src.project, docNo, rev, date, inputData);
   const probe = make("-", "-");
   if (!probe.ok) return NextResponse.json({ error: probe.error }, { status: probe.status });
 

@@ -48,6 +48,7 @@ export function SetupShell({ initialTab }: { initialTab: Tab }) {
       <header style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
         <Link href="/workbench" style={{ color: "var(--accent)", fontSize: "var(--fs-13)" }}>← MainForm</Link>
         <Link href="/setup/arrangement-code" data-testid="setup-link-arrangement-code" style={{ color: "var(--accent)", fontSize: "var(--fs-13)" }}>Arrangement Code (p35) →</Link>
+        <Link href="/setup/input-data" data-testid="setup-link-input-data" style={{ color: "var(--accent)", fontSize: "var(--fs-13)" }}>Input Data (p16) →</Link>
         <Link href="/setup/company" data-testid="setup-link-company" style={{ color: "var(--accent)", fontSize: "var(--fs-13)" }}>Company DB (p64) →</Link>
         <Link href="/setup/spec" data-testid="setup-link-spec" style={{ color: "var(--accent)", fontSize: "var(--fs-13)" }}>사양 항목 (p46) →</Link>
         <Link href="/setup/material" data-testid="setup-link-material" style={{ color: "var(--accent)", fontSize: "var(--fs-13)" }}>자재·구매품 등록 (p32) →</Link>

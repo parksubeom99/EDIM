@@ -131,6 +131,8 @@ export interface TechDataBody {
   code: string;
   /** p16 Input Data — 이 실행에 들어간 코드 슬롯 값 */
   input: { key: string; value: string }[];
+  /** 0022 · p16 Input Data 템플릿 값(온도·습도 …) — 만들 때의 스냅샷. 템플릿이 없으면 없다. */
+  inputData?: InputDataValue[];
   /** 그 값을 낸 승인 매크로 — 개정과 원문을 함께 박는다 */
   macro: { id: string; revision: number; dsl: string };
   /** p16 Output Data */
@@ -138,8 +140,33 @@ export interface TechDataBody {
   source: SourceStamp;
 }
 
+export interface InputDataValue { key: string; label: string; unit: string; value: number }
+export interface InputItemDef { key: string; label: string; unit: string; defaultValue: number | null; minValue: number | null; maxValue: number | null }
+
+/**
+ * 0022 · 템플릿 항목에 보낸 값을 맞춘다. 안 보낸 항목은 기본값, 기본값도 없으면 거부.
+ * 범위를 벗어나거나 템플릿에 없는 키를 보내면 거부(400) — 문서에 근거 없는 숫자가 들어가지 않게.
+ */
+export function resolveInputData(defs: InputItemDef[], raw: unknown): { ok: true; values: InputDataValue[] } | Refusal {
+  const given = (raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {}) as Record<string, unknown>;
+  if (raw !== undefined && raw !== null && (typeof raw !== "object" || Array.isArray(raw))) return { ok: false, status: 400, error: "inputData 는 { key: 수 } 객체" };
+  const unknown = Object.keys(given).filter((k) => !defs.some((d) => d.key === k));
+  if (unknown.length) return { ok: false, status: 400, error: `Input Data 템플릿에 없는 항목: ${unknown.join(", ")}` };
+  const values: InputDataValue[] = [];
+  for (const d of defs) {
+    const v = given[d.key];
+    const n = v === undefined || v === "" || v === null ? d.defaultValue : Number(v);
+    if (n === null) return { ok: false, status: 400, error: `Input Data 값 필요: ${d.label}` };
+    if (!Number.isFinite(n)) return { ok: false, status: 400, error: `Input Data 는 수: ${d.label}` };
+    if ((d.minValue !== null && n < d.minValue) || (d.maxValue !== null && n > d.maxValue))
+      return { ok: false, status: 400, error: `${d.label} ${n}${d.unit} 은 범위 밖 (${d.minValue ?? "−∞"} ~ ${d.maxValue ?? "∞"})` };
+    values.push({ key: d.key, label: d.label, unit: d.unit, value: n });
+  }
+  return { ok: true, values };
+}
+
 export function buildTechDataBody(
-  run: SnapshotLike, project: ProjectLike | null, docNo: string, rev: string, date: string,
+  run: SnapshotLike, project: ProjectLike | null, docNo: string, rev: string, date: string, inputData: InputDataValue[] = [],
 ): { ok: true; body: TechDataBody } | Refusal {
   if (run.macroValue === null || !Number.isFinite(run.macroValue))
     return { ok: false, status: 422, error: "이 BOM 스냅샷은 승인 매크로 없이 실행됐습니다 — Tech Data 로 낼 결과값이 없습니다." };
@@ -153,6 +180,7 @@ export function buildTechDataBody(
     ok: true,
     body: {
       kind: "techdata", docNo, rev, date, project, code: run.code, input,
+      ...(inputData.length > 0 ? { inputData } : {}),
       macro: { id: run.macroId, revision: run.macroRevision, dsl: run.macroDsl },
       output: { name: "Macro result", value: run.macroValue },
       source: stampOf(run),
@@ -273,6 +301,7 @@ function techDataHtml(b: TechDataBody): string {
   return `<h2>Input Data</h2>
 <table><tr><th>Project</th><td>${esc(b.project ? `${b.project.projectNo} · ${b.project.name}` : "—")}</td><th>Document Code</th><td class="mono">${esc(b.code)}</td></tr></table>
 <table data-testid="techdata-input"><tr>${b.input.map((i) => `<th>${esc(i.key)}</th>`).join("")}</tr><tr>${b.input.map((i) => `<td class="mono">${esc(i.value)}</td>`).join("")}</tr></table>
+${b.inputData && b.inputData.length > 0 ? `<table data-testid="techdata-inputdata"><tr>${b.inputData.map((i) => `<th>${esc(i.label)}</th>`).join("")}</tr><tr>${b.inputData.map((i) => `<td class="mono" data-key="${esc(i.key)}">${esc(i.value)} ${esc(i.unit)}</td>`).join("")}</tr></table>` : ""}
 <h2>Macro · 승인 개정 r${b.macro.revision}</h2>
 <table><tr><th>Macro id</th><td class="mono">${esc(b.macro.id)}</td></tr><tr><th>Coding</th><td><pre data-testid="techdata-dsl">${esc(b.macro.dsl)}</pre></td></tr></table>
 <h2>Output Data</h2>

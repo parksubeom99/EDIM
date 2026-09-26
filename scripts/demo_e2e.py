@@ -1147,15 +1147,55 @@ with sync_playwright() as p:
     gl=gb.request.get(PT).json()["rows"]; gc=gb.request.post(PJ,headers=J0,data=json.dumps({"projectNo":"GX-E2E-1","name":"gx","clientId":c1["id"]})); gb.close()
     ok("S49e viewer 는 등록 못 한다(403) · 다른 회사는 우리 고객·공급처를 못 보고(0건) 자기 프로젝트에 우리 고객을 걸 수 없다(400)",
        (vp.status, len(gl), gc.status), vp.status==403 and len(gl)==0 and gc.status==400)
+    # ── S50 ⑨ Input Data 템플릿 (p16 · 0022) — Tech Data 가 회사 입력 항목 값을 받아 문서에 스냅샷으로 남긴다 ──
+    II=BASE+"/api/setup/input-items"; DOCS=BASE+"/api/documents"; N4="a0000000-0000-4000-8000-000000000004"
+    seeded_i=[x["key"] for x in ctx.request.get(II).json()["rows"]]
+    pg.goto(NODE4,wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=canvas-cmds][data-ready='1']",timeout=60000); nuke(pg)
+    if pg.get_attribute("[data-testid=toolbox-toggle]","aria-pressed")=="true":
+        pg.click("[data-testid=toolbox-toggle]"); pg.wait_for_selector("[data-testid=toolbox-toggle][aria-pressed=false]",timeout=30000)
+    nuke(pg); pg.click("[data-run=bom]")
+    pg.locator("button", has_text=re.compile(r"^Document$")).first.click(force=True)
+    pg.wait_for_selector("[data-testid=doc-in-temperature]",timeout=30000)
+    pg.wait_for_function("()=>{const b=document.querySelector('[data-testid=doc-make-techdata]'); return b && !b.disabled;}",timeout=60000)
+    pg.fill("[data-testid=doc-in-temperature]","25"); pg.fill("[data-testid=doc-in-humidity]","60"); nuke(pg)
+    with pg.expect_response(lambda q: q.url.endswith("/api/documents") and q.request.method=="POST",timeout=30000) as dres:
+        pg.click("[data-testid=doc-make-techdata]")
+    da=dres.value.json(); pg.wait_for_selector("[data-testid=document-msg][data-ok='1']",timeout=30000)
+    nuke(pg); pg.screenshot(path=f"{OUT}/63_input_data.png",full_page=True)
+    ha=ctx.request.get(DOCS+f"/{da.get('id')}/print").text()
+    ok("S50a Tech Data 를 만들 때 Input Data(Temperature 25 °C · Humidity 60 %)를 받아 문서에 남긴다 — 시드 항목은 청사진 p16 두 개",
+       (seeded_i, da.get("docNo"), 'data-key="temperature">25 °C' in ha, 'data-key="humidity">60 %' in ha),
+       seeded_i==["temperature","humidity"] and 'data-key="temperature">25 °C' in ha and 'data-key="humidity">60 %' in ha)
+    pg.goto(BASE+"/setup/input-data",wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=input-items][data-ready='1']",timeout=60000); nuke(pg)
+    pg.fill("[data-testid=in-new-key]","pressure"); pg.fill("[data-testid=in-new-label]","Pressure"); pg.fill("[data-testid=in-new-unit]","Pa")
+    pg.fill("[data-testid=in-new-default]","101325"); pg.fill("[data-testid=in-new-min]","80000"); pg.fill("[data-testid=in-new-max]","110000")
+    pg.click("[data-testid=in-add]"); pg.wait_for_selector("[data-testid=input-row-pressure]",timeout=30000)
+    rid5=ctx.request.post(BASE+"/api/run/bom",headers=J0,data=json.dumps({"slots":S55_0,"code":"EU-55-2123-630SS-1-21-13-15","node":N4})).json().get("runId")
+    dbb=ctx.request.post(DOCS,headers=J0,data=json.dumps({"runId":rid5,"type":"techdata"})).json()
+    hb=ctx.request.get(DOCS+f"/{dbb.get('id')}/print").text(); ha2=ctx.request.get(DOCS+f"/{da.get('id')}/print").text()
+    ok("S50b 화면에서 항목(Pressure Pa)을 더하면 다음 문서부터 받고(안 보내면 기본값 101325) — 먼저 만든 문서는 스냅샷 그대로(항목 2개)",
+       ('data-key="pressure">101325 Pa' in hb, 'data-key="pressure"' in ha2),
+       'data-key="pressure">101325 Pa' in hb and 'data-key="temperature">20 °C' in hb and 'data-key="pressure"' not in ha2 and 'data-key="temperature">25 °C' in ha2)
+    o1=ctx.request.post(DOCS,headers=J0,data=json.dumps({"runId":rid5,"type":"techdata","inputData":{"humidity":120}}))
+    o2=ctx.request.post(DOCS,headers=J0,data=json.dumps({"runId":rid5,"type":"techdata","inputData":{"density":1.2}}))
+    o3=ctx.request.post(II,headers=J0,data=json.dumps({"key":"bad_range","label":"x","minValue":10,"maxValue":1}))
+    ok("S50c 범위 밖(습도 120 %) · 템플릿에 없는 항목(density) 은 문서를 만들지 않는다(400·400) · 최소>최대 정의는 400",
+       (o1.status, o2.status, o3.status), o1.status==400 and o2.status==400 and o3.status==400)
+    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data={"email":"viewer@acme.test"})
+    vi=vw.request.post(II,headers=J0,data=json.dumps({"key":"v_try","label":"v"})); vw.close()
+    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data={"email":"owner@globex.test"})
+    gi=gb.request.get(II).json()["rows"]; gd=gb.request.get(DOCS+f"/{da.get('id')}/print"); gb.close()
+    ok("S50d viewer 는 항목을 못 만든다(403) · 다른 회사는 우리 템플릿을 못 보고(0건) 우리 Tech Data 도 못 연다(404)",
+       (vi.status, len(gi), gd.status), vi.status==403 and len(gi)==0 and gd.status==404)
     # S37 은 맨 끝에서 센다 — 중간(옛 자리)에서는 뒤에 찍히는 5장(40·41·42·52·53)이 아직 없어,
     # 빈 폴더에서는 25장이라 실패하고 이전 실행 잔재가 있을 때만 통과했다(2026-09-24 실측).
     _want=["00_login","05_project_mgmt","06_module_cpq_stub","10_project_bound","11_code_builder","11b_revisions","12_macro_tab",
            "13_macro_approved","14_edim_run","15_bom_cost","16_design_tab","20_setup_subcode","21_setup_product_table",
            "22_setup_relationship","23_codebuilder_from_subcode","30_toolbox_program","31_toolbox_ui_tool","40_company_admin",
            "41_platform_console","42_user_management","43_drawings","44_document_tab","45_purchasing","46_quotation_print",
-           "47_techdata_print","48_dxf_plan","49_dxf_assembly","51_accepted","52_register","53_schedule","54_toolbar","55_project_mgmt","56_print_setup","57_ui_design","58_material","59_arrangement_code","60_spec_input","61_drawing_purpose","62_company_db"]
+           "47_techdata_print","48_dxf_plan","49_dxf_assembly","51_accepted","52_register","53_schedule","54_toolbar","55_project_mgmt","56_print_setup","57_ui_design","58_material","59_arrangement_code","60_spec_input","61_drawing_purpose","62_company_db","63_input_data"]
     _miss=[w for w in _want if not os.path.exists(f"{OUT}/{w}.png") or os.path.getmtime(f"{OUT}/{w}.png")<T0]
-    ok("S37 캡처 39장이 이번 실행에서 전부 나온다 (잔재 파일은 세지 않음)", _miss or len(_want), not _miss)
+    ok("S37 캡처 40장이 이번 실행에서 전부 나온다 (잔재 파일은 세지 않음)", _miss or len(_want), not _miss)
     b.close()
 n=sum(1 for v in R.values() if v[0]); print(f"\n[demo_e2e] {n}/{len(R)} steps passed"); json.dump(R,open(f"{OUT}/demo_e2e_result.json","w",encoding="utf-8"),ensure_ascii=False,indent=1)
 sys.exit(0 if n==len(R) else 1)
