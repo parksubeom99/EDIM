@@ -20,3 +20,4 @@ packages/db/prisma/*.db
 .turbo/
 *.tsbuildinfo
 .storage/
+shots/

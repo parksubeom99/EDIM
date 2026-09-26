@@ -62,7 +62,7 @@ with sync_playwright() as p:
     RUN0=r0.json().get("runId")
     d=ctx.request.get(BASE+f"/api/dxf?runId={RUN0}&type=plan"); ok("S7 DXF 200 + AC1009 (스냅샷 기준)", (d.status, d.headers.get("content-type")), d.status==200 and "AC1009" in d.text())
     nd=ctx.request.get(BASE+"/api/dxf"); ok("S7b 스냅샷 없이는 도면을 못 뜬다 (400)", nd.status, nd.status==400)
-    open(f"{OUT}/edim_sample.dxf","w").write(d.text())
+    open(f"{OUT}/edim_sample.dxf","w",encoding="utf-8").write(d.text())
     nuke(pg); pg.locator("button", has_text=re.compile(r"^Design$")).first.click(force=True); time.sleep(1.5); pg.screenshot(path=f"{OUT}/16_design_tab.png")
     # ── P1 코드 기반 등뼈 (EDIM.pdf p31·33·34) ─────────────────────────────────────────
     J={"content-type":"application/json"}; S55={"A":"EU","B":"55","C":"2123","D":"630","E":"SS","F":"1-21-13-15"}
@@ -165,7 +165,7 @@ with sync_playwright() as p:
     asm=ctx.request.get(BASE+f"/api/dxf?runId={RUN1}&type=assembly").text()
     am=ctx.request.get(BASE+f"/api/dxf?runId={RUN1}&type=assembly&meta=1").json()
     ok("S18f 조립도에 Item 표와 풍선번호가 들어간다 (p38·p40)", (am.get("items"), "Q'ty" in asm), am.get("items")==11 and "Q'ty" in asm and "0\nCIRCLE\n" in asm)
-    open(f"{OUT}/edim_assembly.dxf","w").write(asm)
+    open(f"{OUT}/edim_assembly.dxf","w",encoding="utf-8").write(asm)
     # S19 도면을 남긴다 — 번호·개정·상태·발행 잠금 (p24)
     g1=ctx.request.post(BASE+"/api/drawings",headers=J0,data=json.dumps({"runId":RUN1,"type":"plan"})).json()
     ok("S19a 도면 등록 Rev A", (g1.get("drawingNo"), g1.get("rev")), g1.get("rev")=="A")
@@ -642,7 +642,7 @@ with sync_playwright() as p:
        (cmds,none), cmds==["arrangement","move","delete","add","copy","dwg-view","approval"] and len(none)==2 and all(d and t for _,d,t in none))
     dis=pg.eval_on_selector_all("[data-cmd=move],[data-cmd=delete],[data-cmd=copy]","es=>es.map(e=>e.disabled)")
     ok("S41b 구획을 고르기 전에는 Move·Delete·Copy 가 잠긴다 (대상 없는 명령을 막는다)", dis, dis==[True,True,True])
-    pg.click("[data-cmd=arrangement]"); pg.wait_for_selector("[data-testid=arr-table] tbody tr",timeout=30000)
+    pg.click("[data-cmd=arrangement]"); pg.wait_for_selector("[data-testid=design-canvas][data-loaded='1']",timeout=30000); pg.wait_for_selector("[data-testid=arr-table] tbody tr",timeout=30000)
     ok("S41c Arrangement ▼ 는 Design 탭의 기존 Arrangement 편집을 연다 (두 번째 편집 화면 없음)",
        bool(pg.query_selector("[data-testid=design-canvas] [data-testid=arrangement-panel]")), bool(pg.query_selector("[data-testid=design-canvas] [data-testid=arrangement-panel]")))
     base_rows=arr_rows()
@@ -670,15 +670,20 @@ with sync_playwright() as p:
     SL={"A":"EU","B":"55","C":"2123","D":"630","E":"SS","F":"1-21-13-15"}
     g_before=ctx.request.get(ARR+"?code=EU&slots="+json.dumps(SL)).json()["sections"]
     pg.goto(NODE4,wait_until="domcontentloaded"); wait_canvas()
-    pg.click("[data-cmd=arrangement]"); pg.wait_for_selector("[data-testid=arr-table] tbody tr",timeout=30000)
+    pg.click("[data-cmd=arrangement]"); pg.wait_for_selector("[data-testid=design-canvas][data-loaded='1']",timeout=30000); pg.wait_for_selector("[data-testid=arr-table] tbody tr",timeout=30000)
     pg.click("[data-testid=canvas-sec-Fan]"); pg.wait_for_function("()=>{const b=document.querySelector('[data-cmd=copy]'); return b && !b.disabled;}",timeout=30000)
     pg.click("[data-cmd=copy]"); pg.wait_for_selector("[data-testid=arr-row-Fan-2]",timeout=30000)
-    pg.click("[data-testid=arr-save]")
-    pg.wait_for_function("()=>(document.querySelector('[data-testid=arrangement-panel]')?.innerText||'').includes('다음 BOM Run')",timeout=30000)
+    pre_save=arr_rows()   # 저장 직전 초안에 Fan-2 가 있는지(늦은 재로딩이 덮어썼다면 여기서 보인다)
+    # 저장 **응답**을 기다린다. (예전 대기 조건 '다음 BOM Run' 은 패널의 고정 안내문에도 있어 즉시 통과했고,
+    #  아래 GET 이 저장 커밋보다 먼저 읽는 경합이 Windows 에서 S41i 를 떨어뜨렸다 — 2026-09-26 실측)
+    with pg.expect_response(lambda q: q.url.endswith("/api/setup/arrangement") and q.request.method=="POST",timeout=30000) as sres:
+        pg.click("[data-testid=arr-save]")
+    sent=[x["name"] for x in json.loads(sres.value.request.post_data or "{}").get("sections",[])]
+    pg.wait_for_function("()=>(document.querySelector('[data-testid=arr-msg]')?.innerText||'').startsWith('저장 ·')",timeout=30000)
     g_after=[x["name"] for x in ctx.request.get(ARR+"?code=EU&slots="+json.dumps(SL)).json()["sections"]]
     fan=[x for x in g_before if x["name"]=="Fan"][0]
-    ok("S41i 툴바 편집은 기존 '저장' 한 곳으로 반영된다 — Fan-2 가 등록되고 Fan 의 길이·방향을 물려받는다(부품 배치는 비움)", g_after,
-       "Fan-2" in g_after and g_after.index("Fan-2")==g_after.index("Fan")+1)
+    ok("S41i 툴바 편집은 기존 '저장' 한 곳으로 반영된다 — Fan-2 가 등록되고 Fan 의 길이·방향을 물려받는다(부품 배치는 비움)", (g_after, pre_save, sent),
+       "Fan-2" in g_after and g_after.index("Fan-2")==g_after.index("Fan")+1 and "Fan-2" in pre_save and "Fan-2" in sent)
     rs=put([{"name":x["name"], **({"len":x["len"]} if x.get("len") is not None else {}), **({"dir":x["dir"]} if x.get("dir") else {}), "components":x.get("components",[])} for x in g_before])
     g_back=[x["name"] for x in ctx.request.get(ARR+"?code=EU&slots="+json.dumps(SL)).json()["sections"]]
     ok("S41j 원복(API) — 뒤 단계가 오염되지 않게 등록 구획을 되돌린다", (rs.status, g_back==[x["name"] for x in g_before]), rs.status==200 and g_back==[x["name"] for x in g_before])
@@ -1034,5 +1039,5 @@ with sync_playwright() as p:
     _miss=[w for w in _want if not os.path.exists(f"{OUT}/{w}.png") or os.path.getmtime(f"{OUT}/{w}.png")<T0]
     ok("S37 캡처 36장이 이번 실행에서 전부 나온다 (잔재 파일은 세지 않음)", _miss or len(_want), not _miss)
     b.close()
-n=sum(1 for v in R.values() if v[0]); print(f"\n[demo_e2e] {n}/{len(R)} steps passed"); json.dump(R,open(f"{OUT}/demo_e2e_result.json","w"),ensure_ascii=False,indent=1)
+n=sum(1 for v in R.values() if v[0]); print(f"\n[demo_e2e] {n}/{len(R)} steps passed"); json.dump(R,open(f"{OUT}/demo_e2e_result.json","w",encoding="utf-8"),ensure_ascii=False,indent=1)
 sys.exit(0 if n==len(R) else 1)

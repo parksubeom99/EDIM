@@ -321,13 +321,31 @@ function DesignCanvas({ code, slots, runs, nodeStable, canEdit, link }: { code: 
   const [arrMsg, setArrMsg] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
   const addRef = useRef<HTMLInputElement | null>(null);
-  const loadArr = useCallback(async () => {
+  // 늦게 도착한 서버 재로딩이 사용자의 저장 전 초안을 덮어쓰지 않게 한다(2026-09-26 Windows S41i).
+  // 마지막 요청의 응답만 받고, 초안이 마지막 저장본과 다르면(dirty) 서버 값으로 바꾸지 않는다.
+  const reqSeq = useRef(0);
+  const savedJson = useRef<string | null>(null);
+  const secsRef = useRef<ArrSection[]>(secs);
+  secsRef.current = secs;
+  const [held, setHeld] = useState(false);
+  const loadArr = useCallback(async (force = false) => {
+    const seq = ++reqSeq.current;
     try {
       const r = await fetch("/api/setup/arrangement?code=" + encodeURIComponent(slots.A ?? "") + "&slots=" + encodeURIComponent(JSON.stringify(slots)));
       const j = await r.json();
-      if (r.ok) setSecs(j.sections ?? []);
+      if (seq !== reqSeq.current) return;  // 더 새 요청이 있다 — 이 응답은 버린다
+      const dirty = savedJson.current !== null && JSON.stringify(secsRef.current) !== savedJson.current;
+      if (r.ok && dirty && !force) {
+        setHeld(true);
+        setArrMsg("코드가 바뀌어 저장본을 다시 읽지 않았습니다 — 저장하거나 되돌리기");
+      } else if (r.ok) {
+        const next: ArrSection[] = j.sections ?? [];
+        savedJson.current = JSON.stringify(next);
+        setSecs(next); setHeld(false);
+        if (force) setArrMsg(null);
+      }
     } catch { /* 등록 전엔 빈 배열 */ }
-    setLoaded(true);
+    if (seq === reqSeq.current) setLoaded(true);
   }, [slots]);
   useEffect(() => { loadArr(); }, [loadArr]);
   const visible = secs.filter((s) => s.active !== false);  // 조건부로 꺼진 구획은 개념도에 그리지 않는다(도면과 같게)
@@ -341,7 +359,7 @@ function DesignCanvas({ code, slots, runs, nodeStable, canEdit, link }: { code: 
     const r = await fetch("/api/setup/arrangement", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
     const j = await r.json().catch(() => ({}));
     setArrBusy(false);
-    if (r.ok) { setSecs(next); setArrMsg("저장 · 다음 BOM Run 부터 순서·전장·방향에 반영됩니다"); } else setArrMsg(`거부: ${j.error ?? r.status}`);
+    if (r.ok) { savedJson.current = JSON.stringify(next); setSecs(next); setHeld(false); setArrMsg("저장 · 다음 BOM Run 부터 순서·전장·방향에 반영됩니다"); } else setArrMsg(`거부: ${j.error ?? r.status}`);
   }
   const move = (i: number, d: -1 | 1) => setSecs((xs) => {
     const j = i + d; if (j < 0 || j >= xs.length) return xs;
@@ -405,7 +423,7 @@ function DesignCanvas({ code, slots, runs, nodeStable, canEdit, link }: { code: 
     setAddName(""); setArrMsg(null);
   };
   return (
-    <div data-testid="design-canvas" style={card}>
+    <div data-testid="design-canvas" data-loaded={loaded ? "1" : "0"} style={card}>
       <div style={h}>
         Design · Arrangement <span style={muted}>({code || "—"})</span>
         {sel && (
@@ -500,7 +518,13 @@ function DesignCanvas({ code, slots, runs, nodeStable, canEdit, link }: { code: 
               style={{ fontSize: "var(--fs-12)", fontWeight: 600, color: "var(--accent-contrast)", background: "var(--accent)", border: "none", borderRadius: 4, padding: "4px 12px", cursor: "pointer" }}>
               저장
             </button>
-            {arrMsg && <span style={muted}>{arrMsg}</span>}
+            {held && (
+              <button type="button" data-testid="arr-revert" disabled={arrBusy} onClick={() => loadArr(true)}
+                style={{ fontSize: "var(--fs-12)", color: "var(--ink)", background: "var(--surface-2)", border: "1px solid var(--line)", borderRadius: 4, padding: "4px 12px", cursor: "pointer" }}>
+                되돌리기
+              </button>
+            )}
+            {arrMsg && <span data-testid="arr-msg" style={muted}>{arrMsg}</span>}
           </div>
         </div>
       )}
