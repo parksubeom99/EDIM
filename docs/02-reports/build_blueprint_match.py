@@ -247,7 +247,7 @@ PAGES = {
         ["슬롯 조립 → 규칙 검증 → VALID → 개정 저장(Rev A→B)", "등록 안 된 코드는 서버가 422 로 거부", "개정에 **슬롯 F 까지 포함**(회장님 결정 2026-09-22) — F 만 다른 미저장 조합은 근거 개정이 빈 값으로 남는다(S22f)"], ["Arrangement Code · Child Component Import/Export(Excel 연동) 없음"],
         "rccs 테스트 · e2e S2 · S2b · S2c · S8b · S22f · S28e", "11_code_builder"),
  62: pg("L", "E-4 · Sub Work Place / BOM", "BOM Run → EBOM Run → Cost → Document · Drawing · Export",
-        ["BOM 11행 · 섹션별 EBOM · 원가 · 문서 · 도면 · Export 가 전부 돈다", "EBOM·Cost 는 다시 계산하지 않고 **스냅샷을 읽는다**"], ["단가는 샘플", "'Work Process 의 설계·생산·자재 Data 추출' 은 배율 가정(18%·12%)"],
+        ["BOM 11행 · 섹션별 EBOM · 원가 · 문서 · 도면 · Export 가 전부 돈다", "EBOM·Cost 는 다시 계산하지 않고 **스냅샷을 읽는다**"], ["단가는 샘플", "인건비는 제조 정보 표(F10)가 있으면 Σ 시간×임율, 없으면 배율 가정(18%) · 경비는 여전히 배율 가정(12%) — 실 값은 회사 자료가 필요"],
         "e2e S6a · S6b · S20a~S20c", "15_bom_cost"),
  63: pg("C", "간지", "Structure"),
  64: pg("P", "System Set-up 구조", "TLM Code Management · ERP Set-up",
@@ -318,7 +318,7 @@ def s_cover():
 <h1>70장 중<br><em>어디까지</em> 왔나</h1>
 <p class="sub">청사진(EDIM.pdf) 70쪽을 한 장씩 실제 화면 옆에 놓았습니다. 도는 것은 도는 대로, 없는 것은 없는 대로 적었습니다.</p>
 <div class="big4"><div class="b L"><i>{c["L"]}</i>실동</div><div class="b P"><i>{c["P"]}</i>부분</div><div class="b N"><i>{c["N"]}</i>미착수</div><div class="b C"><i>{c["C"]}</i>개념·표지</div></div>
-<div class="meta">main {MAIN} · {DATE} · 엘 재측정 확정 — typecheck 11 · 단위 203 · DB 검증 9종 · e2e 234/234 ×2(KST 새벽 조건 포함) · 회장님 조정 대상</div></div></section>'''
+<div class="meta">main {MAIN} · {DATE} · 엘 재측정 확정 — typecheck 11 · 단위 228 · DB 검증 9종 · e2e 287/287(운영 빌드 · 연결 수리본) · 회장님 조정 대상</div></div></section>'''
 
 def s_grid():
     rows = ""
@@ -372,31 +372,27 @@ def s_page(p):
 <footer class="pf">{nx}</footer></div></section>'''
 
 def s_remaining():
-    return '''<section class="slide"><div class="stage"><header><span class="no">끝1</span><h2>남은 작업 — 엘이 지시만 받으면 하는 것</h2></header>
-<div class="own"><table class="ot"><thead><tr><th>#</th><th>작업</th><th>왜 엘이 할 수 있나</th><th>선행 조건</th><th>나오는 것</th></tr></thead><tbody>
-<tr><td>E1</td><td>Arrangement 2차 — 방향(L0~R270) · Component 배치 · 2D 3각법 · 3D View</td><td>코퍼스에 MVP 범위가 있고(EDIM_ARRANGEMENT_…md), 1차 구획 길이가 이미 돈다</td><td>회장님이 범위·순서만 결정</td><td>p13·35·36·46·58 을 부분→실동으로, e2e S32~</td></tr>
-<tr><td>E2</td><td>툴바 9버튼(Move·Delete·Add·DWG·View·Free CAD) 실동</td><td>동작 대상(구획·스냅샷)이 이미 서버에 있다</td><td>E1 과 같은 결정</td><td>p58 미착수 해소</td></tr>
-<tr><td>E3</td><td>p32 자재·구매 품목 코드 등록 화면 + Supplier 속성</td><td>구매 요청(p51)이 이미 돌고, 빈 칸이 Supplier 열 하나다</td><td>없음 — 지시만</td><td>p32 미착수 해소 · p51 Supplier 채움</td></tr>
-<tr><td>E4</td><td>Schedule management(To-do · Done · 승인 요청 목록) · Data Up-Load</td><td>승인·프로젝트 테이블이 이미 있다</td><td>없음 — 지시만</td><td>p12·p18·p50 부분 보강</td></tr>
-<tr><td>E5</td><td>승인 대장 화면(DOC No · Version · Released 모아보기)</td><td>문서·도면 상태가 DB 에 다 있다</td><td>없음 — 지시만</td><td>p55 부분 보강</td></tr>
-<tr><td>E6</td><td>인계 노트 오기 정정(단위 205→189) · README "DB 검증 7종"→9종</td><td>repo 문서 수정</td><td>없음 — 지시만</td><td>문서 커밋 1건</td></tr>
-<tr><td>E7</td><td>발표 덱·진행현황 보고서를 이번 main(cb0dfd9) 반영본으로 재생성</td><td>생성기가 repo 에 있다</td><td>이 대조표 판정을 회장님이 조정한 뒤</td><td>덱 v0.5 · 진행현황 09-23판</td></tr>
-<tr><td>E8</td><td>e2e 캡처 6장(00·05·06·47·48·49) 스크립트 복원</td><td>나머지 26장은 매번 자동으로 찍힌다</td><td>없음 — 지시만</td><td>증빙 자동화 28/28</td></tr>
+    return '''<section class="slide"><div class="stage"><header><span class="no">끝1</span><h2>남은 작업 — 엘·CC 가 지시만 받으면 하는 것</h2></header>
+<div class="own"><table class="ot"><thead><tr><th>#</th><th>작업</th><th>왜 엘·CC 가 할 수 있나</th><th>선행 조건</th><th>나오는 것</th></tr></thead><tbody>
+<tr><td>E1</td><td>ERP 기준정보 등록 화면 — Department Std · Warehouse · Inventory · Bank · Employee · Nation</td><td>Company DB(F2)와 같은 틀 · 격리 패턴이 이미 있다</td><td>없음 — 지시만(값은 회사가 채움)</td><td>p64 부분 → 실동</td></tr>
+<tr><td>E2</td><td><b>배포 전 점검</b> — 운영 빌드에서 DB 연결 수 초과(HTTP 500) · 연결 풀 설정</td><td>엘이 샌드박스 운영 빌드로 재현했다(개발 모드에선 안 보임)</td><td>배포 결정 전 필수</td><td>배포 준비 · p9 선행</td></tr>
+<tr><td>E3</td><td>Sub Drawing 호출 · Detail Design · Output Data 템플릿 · 그래프 · 함수/그래프 마법사 · 인쇄 양식 편집기</td><td>도면·문서·매크로 뼈대가 돌고 있다 — 기능 확장이다</td><td>규모가 커서 여러 날 · 순서 결정</td><td>p16 · 39 · 40 · 47 · 48 · 57 보강</td></tr>
+<tr><td>E4</td><td>EDIM 안 CAD 편집기 · 설계 심볼 · 제작도 수준 도면</td><td>도면 선·치수 전파는 이미 결정론으로 돈다</td><td>E3 이후 · 회사 CAD 규칙(M4)</td><td>p58 · 38 부분 → 실동</td></tr>
+<tr><td>E5</td><td>발표 덱 · 진행현황 보고서를 이번 main 반영본으로 재생성</td><td>생성기가 repo 에 있다</td><td>이 판정을 회장님이 조정한 뒤</td><td>덱 · 진행현황 새 판</td></tr>
 </tbody></table>
-<p class="onote">엘이 <b>혼자 못 여는 것</b>: P3-b 학습 1수준(회장님 DXF 연구 결과가 입력) · P3-c Special 슬롯(사장님 D1) · 실 단가·실 표 바인딩(회사 자료). 재료가 오면 그다음은 엘 몫이다.</p>
+<p class="onote">오늘(09-27) 끝낸 것: ccmd E(단가 이력 → 원가·견적·구매) · F1~F10(담당자 · 고객 수정 · 사양 Import · 코드 승인·DWG · 도면 화면 보기 · Tech Data 목록 · 자료 업로드 · Set-Up 지도 · 제조 임율) → 11쪽 부분 → 실동.</p>
 </div></div></section>
 
-<section class="slide"><div class="stage"><header><span class="no">끝2</span><h2>남은 작업 — 회장님·사장님만 풀 수 있는 것</h2></header>
-<div class="own"><table class="ot"><thead><tr><th>#</th><th>작업</th><th>왜 엘이 못 하나</th><th>소요</th><th>주시면 되는 것</th></tr></thead><tbody>
-<tr><td>M1</td><td><b>Windows PC 에서 1회 실행</b> — <code>git pull</code> → <code>pnpm db:generate &amp;&amp; pnpm db:migrate</code> → <code>pnpm db:reset:demo</code> → <code>pnpm dev</code></td><td>엘 샌드박스는 다른 기계다. 회장님 PC 접근 경로가 없다</td><td>10분</td><td>화면 1장 또는 "됐다" 한 줄</td></tr>
-<tr><td>M2</td><td>CI 워크플로 배선 — <code>docs/ci/ci.yml</code> 을 <code>.github/workflows/ci.yml</code> 로 추가</td><td>토큰에 Workflows 권한이 없다(403 실측)</td><td>2분</td><td>GitHub 웹에서 파일 추가</td></tr>
-<tr><td>M3</td><td>API 키로 Prompt→Macro 1회</td><td>샌드박스에 키가 없다 — 실모델 호출 0회</td><td>5분</td><td>키 1개 또는 회장님 PC 에서 1회 실행</td></tr>
-<tr><td>M4</td><td>회사 실 표 — 단가 · Table1/NS · 기술 계산식</td><td>회사 자료다. 지금 수치는 전부 샘플</td><td>—</td><td>엑셀·표 파일</td></tr>
-<tr><td>M5</td><td>DXF 추출 연구 결과(→ P3-b 학습 1수준 입력)</td><td>회장님이 직접 연구 중인 자료</td><td>—</td><td>결과 파일·정리</td></tr>
-<tr><td>M6</td><td>결정 3건 — Arrangement 2차 범위 · <b>이 70장 판정 조정</b> · D5 발표 시점</td><td>결정은 회장님 권한</td><td>—</td><td>한 줄 결정</td></tr>
-<tr><td>M7</td><td><b>사장님</b> D1 — Special Tool Box 첫 시연 사례(→ P3-c)</td><td>사장님 영역(기술 문서 담당)</td><td>—</td><td>사례 1건</td></tr>
+<section class="slide"><div class="stage"><header><span class="no">끝2</span><h2>남은 작업 — 회장님·사장님 자료와 결정이 필요한 것</h2></header>
+<div class="own"><table class="ot"><thead><tr><th>#</th><th>작업</th><th>왜 엘이 못 하나</th><th>여는 쪽</th><th>주시면 되는 것</th></tr></thead><tbody>
+<tr><td>M1</td><td><b>회사 실 단가 · 표 · 계산서 양식</b></td><td>회사 자료다 — 지금 수치는 전부 샘플</td><td>p15 · 62 · 66 · 67</td><td>엑셀·표 파일</td></tr>
+<tr><td>M2</td><td>DXF 추출 연구 결과 → 학습 DB(DB①)</td><td>회장님이 직접 연구 중인 자료</td><td>p21 · 23</td><td>결과 파일·정리</td></tr>
+<tr><td>M3</td><td><b>사장님</b> D1 — Special Tool Box 첫 사례</td><td>사장님 영역</td><td>Special 슬롯</td><td>사례 1건</td></tr>
+<tr><td>M4</td><td>회사 CAD 규칙 — mm 배치 · 기준점 · KAD-□ 슬롯 문법 · 코드 Group 분류</td><td>CAD 담당 자료다</td><td>p28 · 30 · 35 · 36 · 38 · 42</td><td>규칙 문서·예시 도면</td></tr>
+<tr><td>M5</td><td>결정 — 배포 여부 · 비밀번호/SSO 방향 · AI 키</td><td>결정·비용은 회장님 권한</td><td>p9 · 11 · 25 · 26</td><td>한 줄 결정 · 키 1개</td></tr>
+<tr><td>M6</td><td>CI 워크플로 배선 — <code>docs/ci/ci.yml</code> → <code>.github/workflows/</code></td><td>토큰에 Workflows 권한이 없다</td><td>—</td><td>GitHub 웹에서 파일 추가(2분)</td></tr>
 </tbody></table>
-<p class="onote">범위 밖(회장님 확정): p43·p44 생산·MES · p69 파트너·모바일·QR · 3D DWG · 클라우드 배포 — EDIM 완료 후 확장 단계(ERP → Digital Twin → AR·XR).</p>
+<p class="onote">범위 밖(회장님 확정): p43·p44 생산·MES · p69 파트너·모바일·QR — EDIM 완료 후 확장 단계(ERP → Digital Twin → AR·XR).</p>
 </div></div></section>'''
 
 EXTRA_CSS = '''
