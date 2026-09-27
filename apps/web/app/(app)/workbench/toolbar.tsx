@@ -80,6 +80,7 @@ export function Toolbar({
   selected = null,
   moving = false,
   hasProject = false,
+  onDwgView,
 }: {
   modules: ModuleDef[];
   stage: PipelineStage;
@@ -94,6 +95,8 @@ export function Toolbar({
   selected?: string | null;
   moving?: boolean;
   hasProject?: boolean;
+  /** F6 · DWG View — 도면을 화면에 띄운다(없으면 예전처럼 내려받는다) */
+  onDwgView?: (view: string) => void;
 }) {
   const primary = modules.filter((m) => ["cpq", "plm", "toolbox", "project"].includes(m.key));
   const idx = stageIndex(stage);
@@ -224,10 +227,11 @@ export function Toolbar({
               </button>
             );
           })}
-          <select data-cmd="dwg-view" value="" disabled={!runId} title={runId ? "BOM 스냅샷에서 도면(DXF)을 받습니다" : "먼저 BOM Run 을 실행하십시오 — 도면은 BOM 스냅샷에서 나옵니다"}
+          <select data-cmd="dwg-view" value="" disabled={!runId} title={runId ? "BOM 스냅샷의 도면을 화면에 띄웁니다(뷰어 안에서 DXF 내려받기)" : "먼저 BOM Run 을 실행하십시오 — 도면은 BOM 스냅샷에서 나옵니다"}
             onChange={(e) => {
               const t = e.target.value;
               if (!t || !runId) return;
+              if (onDwgView) { onDwgView(t); return; }
               const a = document.createElement("a");
               a.href = `/api/dxf?runId=${runId}&type=${t}`;
               a.setAttribute("download", "");

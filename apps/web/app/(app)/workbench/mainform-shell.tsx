@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { DwgViewer } from "./dwg-viewer";
 import { ToolboxWindow, DEFAULT_COMMANDS, type CommandDef } from "./toolbox-window";
 import type { HierarchyTreeNode } from "@edim/core-ontology";
 import { ThemeToggle } from "@edim/ui";
@@ -95,6 +96,7 @@ export function MainFormShell({
   const [canvasCmd, setCanvasCmd] = useState<{ cmd: CanvasCmd; seq: number } | null>(null);
   const [canvasSel, setCanvasSel] = useState<string | null>(null);
   const [canvasMoving, setCanvasMoving] = useState(false);
+  const [dwgView, setDwgView] = useState<string | null>(null);   // F6 · DWG View 뷰어
   const sendCmd = (cmd: CanvasCmd) => {
     if (cmd === "approval") {
       const el = document.querySelector<HTMLElement>("[data-testid=inspector-approval]");
@@ -147,6 +149,7 @@ export function MainFormShell({
         selected={canvasSel}
         moving={canvasMoving}
         hasProject={!!project}
+        onDwgView={setDwgView}
         right={
           <>
             <button
@@ -313,6 +316,9 @@ export function MainFormShell({
         canDecide={canDecide}
         runDisabled={!canEdit || !assembled.ok}
       />
+      {dwgView && runs.find((r) => r.kind === "bom" && r.runId)?.runId && (
+        <DwgViewer runId={runs.find((r) => r.kind === "bom" && r.runId)!.runId!} view={dwgView} onView={setDwgView} onClose={() => setDwgView(null)} />
+      )}
     </div>
   );
 }

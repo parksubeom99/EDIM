@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
+import { SubItemList } from "./sub-item-list";
 import { CodeChip } from "@edim/ui";
 import type { SlotDef, SlotValues, AssembleResult } from "@/app/lib/rccs";
 import type { WorkTab, CanvasCmd } from "./toolbar";
@@ -616,6 +617,7 @@ function DesignCanvas({ code, slots, runs, nodeStable, canEdit, link }: { code: 
             : "먼저 BOM Run 을 실행하세요 — 도면은 BOM 스냅샷에서 나옵니다."}
         </span>
       </div>
+      <SubItemList runs={runs} section={link?.sel ?? null} />
     </div>
   );
 }

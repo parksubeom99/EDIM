@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getServerSession } from "@/app/lib/session";
 import { dxfSourceFromRun } from "@/app/lib/output/drawing-source";
 import { buildView, isDrawingView } from "@/app/lib/output/dxf";
+import { dxfToSvg } from "@/app/lib/output/dxf-svg";
 
 /**
  * GET ?runId=<BOM 스냅샷>&type=plan|front|right|assembly → DXF R12 파일 (3각법 · 0012).
@@ -30,6 +31,11 @@ export async function GET(req: NextRequest) {
 
   const { dxf, meta } = buildView(type, src.input);
   if (q.get("meta") === "1") return NextResponse.json({ code: src.run.code, runId, ...meta });
+  // F6 · p13 DWG View — 같은 DXF 를 SVG 로 옮겨 화면에 띄운다(새 도면 계산 없음)
+  if (q.get("format") === "svg") {
+    const { svg } = dxfToSvg(dxf);
+    return new NextResponse(svg, { headers: { "content-type": "image/svg+xml; charset=utf-8" } });
+  }
   return new NextResponse(dxf, {
     headers: {
       "content-type": "application/dxf",

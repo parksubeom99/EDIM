@@ -706,9 +706,13 @@ with sync_playwright() as p:
         pg.click("[data-testid=toolbox-toggle]"); pg.wait_for_selector("[data-testid=toolbox-toggle][aria-pressed=false]",timeout=30000)
     nuke(pg); pg.click("[data-run=bom]")   # 개발 서버 표시기(nextjs-portal)가 왼쪽 아래 BOM Run 을 덮는다 — 기존 단계와 같이 치운다
     pg.wait_for_function("()=>{const s=document.querySelector('[data-cmd=dwg-view]'); return s && !s.disabled;}",timeout=60000)
+    # F6(2026-09-27): DWG View 는 내려받는 대신 **화면에 띄운다**. 같은 DXF 는 뷰어 안 링크로 받는다 — 기대값 갱신(근거: ccmd F · p13)
+    pg.select_option("[data-cmd=dwg-view]","front")
+    pg.wait_for_selector("[data-testid=dwg-viewer][data-view=front][data-ready='1']",timeout=30000)
     with pg.expect_download(timeout=30000) as dl:
-        pg.select_option("[data-cmd=dwg-view]","front")
+        pg.click("[data-testid=dwg-viewer-download]")
     fn=dl.value.suggested_filename
+    pg.click("[data-testid=dwg-viewer-close]"); pg.wait_for_selector("[data-testid=dwg-viewer]",state="detached",timeout=10000)
     ok("S41k DWG View ▼ — BOM 스냅샷이 없으면 잠기고, 있으면 고른 뷰(정면도)의 DXF 를 받는다", (dwg_off, fn), dwg_off and fn.endswith("-front.dxf"))
     pg.click("[data-cmd=approval]")
     pg.wait_for_function("()=>document.querySelector('[data-testid=inspector-approval]')?.dataset.focused==='1'",timeout=30000)
@@ -1447,15 +1451,49 @@ with sync_playwright() as p:
     gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data={"email":"owner@globex.test"})
     g1=upa("g.dxf",b"x",c=gb); g2=gb.request.get(AT+f"?ownerKind=arrangement_code&ownerKey={adc['id']}").json()["rows"]; gb.close()
     ok("S57d viewer 403 · 다른 회사는 우리 Arrangement Code 에 못 붙이고(404) 목록도 0건", (v1.status, g1.status, len(g2)), v1.status==403 and g1.status==404 and len(g2)==0)
+    # ── S58 F6 · p13 Sub Item list · DWG View(화면에 띄우기 — 스냅샷 DXF 를 서버에서 SVG 로, 새 도면 계산 없음) ──
+    DX=BASE+"/api/dxf"
+    pg.goto(NODE4,wait_until="domcontentloaded"); hydrated(pg); nuke(pg)
+    if pg.get_attribute("[data-testid=toolbox-toggle]","aria-pressed")=="true":
+        pg.click("[data-testid=toolbox-toggle]"); pg.wait_for_selector("[data-testid=toolbox-toggle][aria-pressed=false]",timeout=30000)
+    nuke(pg); pg.click("[data-run=bom]")
+    pg.locator("button", has_text=re.compile(r"^Design$")).first.click(force=True)
+    pg.wait_for_selector("[data-testid=sub-item-list][data-rows]:not([data-rows='0'])",timeout=60000)
+    n_all=int(pg.get_attribute("[data-testid=sub-item-list]","data-rows"))
+    rid6=pg.get_attribute("[data-testid=view-3d]","href").split("runId=")[1]
+    pg.locator("button", has_text=re.compile(r"^BOM$")).first.click(force=True); pg.wait_for_selector("[data-testid=bom-table]",timeout=30000)
+    n_snap=len(pg.query_selector_all("[data-testid=bom-table] tbody tr"))   # 같은 스냅샷(runId)의 BOM 표 행 수
+    pg.locator("button", has_text=re.compile(r"^Design$")).first.click(force=True); pg.wait_for_selector("[data-testid=sub-item-list][data-section='']",timeout=30000)
+    pg.click("[data-testid=canvas-sec-Fan]"); pg.wait_for_selector("[data-testid=sub-item-list][data-section=Fan]",timeout=30000)
+    fan_rows=pg.eval_on_selector_all("[data-testid=sub-item-row]","es=>es.map(e=>e.dataset.section)")
+    ok("S58a Sub Item list — 스냅샷의 BOM 줄을 그대로 보이고(전체 줄 수 = 같은 스냅샷 BOM 표 행 수), 개념도에서 Fan 을 고르면 Fan 구획 줄만",
+       (n_all, n_snap, fan_rows), n_all>0 and n_all==n_snap and len(fan_rows)>0 and all(x=="Fan" for x in fan_rows))
+    pg.click("[data-testid=canvas-sec-Fan]")
+    pg.wait_for_function("()=>{const s=document.querySelector('[data-cmd=dwg-view]'); return s && !s.disabled;}",timeout=60000)
+    pg.select_option("[data-cmd=dwg-view]","plan"); pg.wait_for_selector("[data-testid=dwg-viewer][data-view=plan][data-ready='1']",timeout=30000)
+    nuke(pg); pg.screenshot(path=f"{OUT}/70_dwg_view.png")
+    dxf_plan=ctx.request.get(DX+f"?runId={rid6}&type=plan").text()
+    n_line=sum(1 for i,l in enumerate(dxf_plan.split("\n")[1:],1) if l.strip()=="LINE" and dxf_plan.split("\n")[i-1].strip()=="0")
+    svg_lines=pg.eval_on_selector("[data-testid=dwg-viewer-svg] svg","e=>e.querySelectorAll('line').length")
+    ok("S58b DWG View ▼ → 도면이 화면에 뜬다 — SVG 의 선 수 = 같은 스냅샷 DXF 의 LINE 수(다시 계산하지 않고 옮겼다)", (svg_lines, n_line), svg_lines==n_line and n_line>0)
+    pg.click("[data-testid=dwg-viewer-iso]"); pg.wait_for_selector("[data-testid=dwg-viewer][data-view=iso][data-ready='1']",timeout=30000)
+    iso_href=pg.get_attribute("[data-testid=dwg-viewer-download]","href")
+    pg.click("[data-testid=dwg-viewer-close]"); pg.wait_for_selector("[data-testid=dwg-viewer]",state="detached",timeout=10000)
+    ok("S58c 뷰어 안에서 뷰를 바꾸면(3D 등각) 그 뷰를 그리고, 내려받기 링크도 그 뷰의 DXF", iso_href, iso_href.endswith("type=iso"))
+    b1=ctx.request.get(DX+f"?runId={rid6}&type=nope&format=svg"); b2=ctx.request.get(DX+"?runId=00000000-0000-4000-8000-000000000000&type=plan&format=svg")
+    ok("S58d 없는 뷰 400 · 없는 스냅샷 404", (b1.status, b2.status), b1.status==400 and b2.status==404)
+    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data={"email":"viewer@acme.test"}); v1=vw.request.get(DX+f"?runId={rid6}&type=plan&format=svg"); vw.close()
+    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data={"email":"owner@globex.test"}); g1=gb.request.get(DX+f"?runId={rid6}&type=plan&format=svg"); gb.close()
+    ok("S58e 읽기 전용 — viewer 는 볼 수 있다(200 · 쓰기 없음) · 다른 회사는 우리 스냅샷 도면을 못 연다(404)", (v1.status, g1.status), v1.status==200 and g1.status==404)
     # S37 은 맨 끝에서 센다 — 중간(옛 자리)에서는 뒤에 찍히는 5장(40·41·42·52·53)이 아직 없어,
     # 빈 폴더에서는 25장이라 실패하고 이전 실행 잔재가 있을 때만 통과했다(2026-09-24 실측).
     _want=["00_login","05_project_mgmt","06_module_cpq_stub","10_project_bound","11_code_builder","11b_revisions","12_macro_tab",
            "13_macro_approved","14_edim_run","15_bom_cost","16_design_tab","20_setup_subcode","21_setup_product_table",
            "22_setup_relationship","23_codebuilder_from_subcode","30_toolbox_program","31_toolbox_ui_tool","40_company_admin",
            "41_platform_console","42_user_management","43_drawings","44_document_tab","45_purchasing","46_quotation_print",
-           "47_techdata_print","48_dxf_plan","49_dxf_assembly","51_accepted","52_register","53_schedule","54_toolbar","55_project_mgmt","56_print_setup","57_ui_design","58_material","59_arrangement_code","60_spec_input","61_drawing_purpose","62_company_db","63_input_data","64_viewer3d","65_price_to_cost","66_project_contacts","67_partner_edit","68_spec_import","69_code_approval"]
+           "47_techdata_print","48_dxf_plan","49_dxf_assembly","51_accepted","52_register","53_schedule","54_toolbar","55_project_mgmt","56_print_setup","57_ui_design","58_material","59_arrangement_code","60_spec_input","61_drawing_purpose","62_company_db","63_input_data","64_viewer3d","65_price_to_cost","66_project_contacts","67_partner_edit","68_spec_import","69_code_approval","70_dwg_view"]
     _miss=[w for w in _want if not os.path.exists(f"{OUT}/{w}.png") or os.path.getmtime(f"{OUT}/{w}.png")<T0]
-    ok("S37 캡처 46장이 이번 실행에서 전부 나온다 (잔재 파일은 세지 않음)", _miss or len(_want), not _miss)
+    ok("S37 캡처 47장이 이번 실행에서 전부 나온다 (잔재 파일은 세지 않음)", _miss or len(_want), not _miss)
     b.close()
 n=sum(1 for v in R.values() if v[0]); print(f"\n[demo_e2e] {n}/{len(R)} steps passed"); json.dump(R,open(f"{OUT}/demo_e2e_result.json","w",encoding="utf-8"),ensure_ascii=False,indent=1)
 sys.exit(0 if n==len(R) else 1)
