@@ -5,6 +5,7 @@
  * 다시 읽지 않는다. 스냅샷에 없는 것은 만들어 내지 않고 거부한다.
  * (DB·세션을 모른다 — 그래서 단위 테스트가 된다.)
  */
+import type { LaborBasis } from "./bom";
 
 export interface SnapshotLike {
   id: string;
@@ -54,7 +55,7 @@ export function noCoreOf(projectNo: string | null | undefined): string {
 
 /* ───────────── 견적 (p66) ───────────── */
 
-export interface CostLike { material: number; labor: number; overhead: number; total: number; currency?: string }
+export interface CostLike { material: number; labor: number; overhead: number; total: number; currency?: string; laborBasis?: LaborBasis }
 
 function costOf(run: SnapshotLike): CostLike | null {
   const c = run.cost as Partial<CostLike> | null;
@@ -90,6 +91,33 @@ export interface QuotationBody {
   source: SourceStamp;
   /** ccmd E · p67 — 이 스냅샷 원가의 단가 출처(줄 수). 출처가 박힌 스냅샷(단가 이력 연결 이후)에만 있다. */
   priceBasis?: { history: number; relationship: number; mismatch: number; dates: string[] };
+  /** F10 · p66 · p67 — 인건비(Manufacturing Cost)를 어떻게 셌는지. 스냅샷 cost.laborBasis 를 그대로 옮긴다. 옛 스냅샷엔 없다. */
+  laborBasis?: LaborBasis;
+  /** F10 · p67 [견적 적용 Table] — Code No · Price · Supplier · Price table(견적/구매). 스냅샷 줄 그대로, Σ 금액 = PCR Material Cost. */
+  applied?: AppliedRow[];
+}
+
+export interface AppliedRow { no: number; code: string; part: string; qty: number; unitPrice: number; amount: number; supplier: string; table: "견적" | "구매"; note: string }
+
+/**
+ * p67 견적 적용 Table — 스냅샷 줄의 단가와 출처. 단가 이력(구매 이력 Table)에서 왔으면 "구매",
+ * 코드 관계값(견적 Table)이면 "견적". 다시 계산하지 않는다 — 줄에 박힌 unitCost · priceSource 만 읽는다.
+ */
+function appliedOf(run: SnapshotLike): AppliedRow[] | null {
+  type L = { no?: number; childCode?: string; part?: string; qty?: number; unitCost?: number; supplier?: string | null;
+    priceSource?: { kind?: string; effectiveFrom?: string; supplier?: string } };
+  const raw = Array.isArray(run.lines) ? (run.lines as L[]) : [];
+  if (!raw.length || !raw.every((l) => typeof l.childCode === "string" && typeof l.qty === "number" && typeof l.unitCost === "number")) return null;
+  return raw.map((l, i) => {
+    const ps = l.priceSource;
+    const fromHistory = ps?.kind === "history";
+    return {
+      no: l.no ?? i + 1, code: l.childCode!, part: l.part ?? "", qty: l.qty!, unitPrice: l.unitCost!, amount: l.qty! * l.unitCost!,
+      supplier: (fromHistory && ps?.supplier) || l.supplier || "",
+      table: fromHistory ? "구매" : "견적",
+      note: fromHistory ? `구매 이력 ${ps?.effectiveFrom ?? ""}` : ps?.kind === "currency-mismatch" ? "통화 불일치 — 관계값" : "코드 관계값",
+    };
+  });
 }
 
 /** 스냅샷 줄에 박힌 단가 출처를 센다 — 다시 계산하지 않는다. 출처가 없는 옛 스냅샷이면 null. */
@@ -128,6 +156,8 @@ export function buildQuotationBody(
       },
       source: stampOf(run),
       ...(priceBasisOf(run) ? { priceBasis: priceBasisOf(run)! } : {}),
+      ...(cost.laborBasis ? { laborBasis: cost.laborBasis } : {}),
+      ...(appliedOf(run) ? { applied: appliedOf(run)! } : {}),
     },
   };
 }
@@ -307,7 +337,21 @@ function quotationHtml(b: QuotationBody): string {
 ${b.items.map((i) => `<tr><td>${i.no}</td><td class="mono">${esc(i.equipment)}</td><td class="n">${i.qty}</td><td class="n">${won(i.unitPrice)}</td><td class="n">${won(i.amount)}</td><td></td></tr>`).join("")}
 <tr><th colspan="2">합계</th><td class="n">${b.totalQty}</td><td></td><td class="n"><b>${won(b.total)}</b></td><td></td></tr>
 </table>
-${b.priceBasis ? `<p data-testid="price-basis" style="font-size:11px;color:#555">단가 기준: 스냅샷 시점 유효 단가 — 단가 이력 ${b.priceBasis.history}줄${b.priceBasis.dates.length ? `(유효일 ${esc(b.priceBasis.dates.join(", "))})` : ""} · 코드 관계값 ${b.priceBasis.relationship}줄${b.priceBasis.mismatch ? ` · 통화 불일치로 관계값 ${b.priceBasis.mismatch}줄` : ""}</p>` : ""}`;
+${b.priceBasis ? `<p data-testid="price-basis" style="font-size:11px;color:#555">단가 기준: 스냅샷 시점 유효 단가 — 단가 이력 ${b.priceBasis.history}줄${b.priceBasis.dates.length ? `(유효일 ${esc(b.priceBasis.dates.join(", "))})` : ""} · 코드 관계값 ${b.priceBasis.relationship}줄${b.priceBasis.mismatch ? ` · 통화 불일치로 관계값 ${b.priceBasis.mismatch}줄` : ""}</p>` : ""}
+${b.laborBasis ? `<p data-testid="labor-basis" style="font-size:11px;color:#555">${laborBasisText(b.laborBasis)}</p>` : ""}
+${b.applied ? `<h2>견적 적용 Table</h2>
+<table data-testid="applied-table">
+<tr><th>No</th><th>Code No.</th><th>품목</th><th class="n">수량</th><th class="n">Price</th><th class="n">금액</th><th>Supplier</th><th>Price table</th><th>비고</th></tr>
+${b.applied.map((a) => `<tr><td>${a.no}</td><td class="mono">${esc(a.code)}</td><td>${esc(a.part)}</td><td class="n">${a.qty}</td><td class="n">${won(a.unitPrice)}</td><td class="n">${won(a.amount)}</td><td>${esc(a.supplier || "—")}</td><td>${a.table}</td><td>${esc(a.note)}</td></tr>`).join("")}
+<tr><th colspan="5">합계 = PCR Material Cost</th><td class="n"><b>${won(b.applied.reduce((x, a) => x + a.amount, 0))}</b></td><td colspan="3"></td></tr>
+</table>` : ""}`;
+}
+
+/** 인쇄본의 인건비 기준 한 줄(HTML 이스케이프됨) — 스냅샷에 박힌 laborBasis 를 글로 옮긴다. */
+export function laborBasisText(lb: LaborBasis): string {
+  if (lb.kind === "ratio") return `인건비 기준: 재료비 × ${Math.round(lb.ratio * 100)}% (제조 정보 표 미등록)`;
+  const parts = lb.rows.map((r) => `${esc(r.process)}${r.equipment ? `(${esc(r.equipment)})` : ""} ${r.hours}h × ${won(r.rate)}`);
+  return `인건비 기준: 제조 정보 표(${esc(lb.productCode)}) — ${parts.join(" · ")} = ${won(lb.rows.reduce((a, r) => a + r.amount, 0))}`;
 }
 
 function techDataHtml(b: TechDataBody): string {

@@ -51,7 +51,18 @@ export interface CostSummary {
   total: number;
   lines: number;
   currency: "KRW";
+  /** F10 · p66 · p67 — 인건비를 어떻게 셌는지. 스냅샷에 박혀서, 표를 나중에 고쳐도 뜬 원가·견적은 그대로다. */
+  laborBasis?: LaborBasis;
 }
+
+/** p66 Manufacturing Cost Table 한 행(0026 mfg_rate). amount = round(hours × rate). */
+export interface MfgRateLine { process: string; equipment: string | null; hours: number; rate: number; amount: number }
+export type LaborBasis =
+  | { kind: "ratio"; ratio: number }
+  | { kind: "mfg-table"; productCode: string; rows: MfgRateLine[] };
+
+export const LABOR_RATIO = 0.18;
+export const OVERHEAD_RATIO = 0.12;
 
 const MATERIAL_LABEL: Record<string, string> = { "": "GI", SS: "SUS304", AL: "AL" };
 const MATERIAL_FACTOR: Record<string, number> = { "": 1, SS: 1.6, AL: 1.35 };
@@ -113,9 +124,17 @@ export function buildEbom(lines: BomLine[], slots: SlotValues, sections?: string
   });
 }
 
-export function buildCost(lines: BomLine[]): CostSummary {
+/**
+ * 원가 = 재료비 + 인건비 + 경비. 인건비는 제조 정보 표(p66 · 0026)가 그 제품에 있으면 Σ 시간 × 임율,
+ * 없으면 재료비 × 18%(기존). 경비는 어느 쪽이든 (재료비 + 인건비) × 12%. 어느 쪽으로 셌는지 laborBasis 에 남긴다.
+ */
+export function buildCost(lines: BomLine[], mfg?: { productCode: string; rows: Omit<MfgRateLine, "amount">[] }): CostSummary {
   const material = lines.reduce((a, l) => a + l.qty * l.unitCost, 0);
-  const labor = Math.round(material * 0.18);
-  const overhead = Math.round((material + labor) * 0.12);
-  return { material, labor, overhead, total: material + labor + overhead, lines: lines.length, currency: "KRW" };
+  const rows = (mfg?.rows ?? []).map((r) => ({ ...r, amount: Math.round(r.hours * r.rate) }));
+  const laborBasis: LaborBasis = mfg && rows.length
+    ? { kind: "mfg-table", productCode: mfg.productCode, rows }
+    : { kind: "ratio", ratio: LABOR_RATIO };
+  const labor = laborBasis.kind === "mfg-table" ? rows.reduce((a, r) => a + r.amount, 0) : Math.round(material * LABOR_RATIO);
+  const overhead = Math.round((material + labor) * OVERHEAD_RATIO);
+  return { material, labor, overhead, total: material + labor + overhead, lines: lines.length, currency: "KRW", laborBasis };
 }

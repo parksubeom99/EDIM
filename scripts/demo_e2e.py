@@ -1566,15 +1566,59 @@ with sync_playwright() as p:
        len(nones)==3 and all("아직 없음" in t and "필요한 입력" in t for t in nones))
     vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data={"email":"viewer@acme.test"}); vm=vw.request.get(BASE+"/setup/map"); vw.close()
     ok("S61d 지도는 읽기 화면 — viewer 도 연다(200)", vm.status, vm.status==200)
+    # ── S62 F10 · p66 · p67 제조 정보 표(공정별 시간 × 임율 · 장비) → 인건비 · 견적 적용(스냅샷 단가·출처) ──
+    MR=BASE+"/api/setup/mfg-rates"; RUNB=BASE+"/api/run/bom"; DOCS=BASE+"/api/documents"; N4="a0000000-0000-4000-8000-000000000004"
+    def run10():
+        r=ctx.request.post(RUNB,headers=J0,data=json.dumps({"slots":S55_0,"code":"EU-55-2123-630SS-1-21-13-15","node":N4})).json()
+        return r, ctx.request.post(BASE+"/api/run/cost",headers=J0,data=json.dumps({"runId":r["runId"]})).json()["cost"]
+    r0,c0=run10()
+    ok("S62a 제조 정보 표가 비면 인건비 = 재료비 × 18% (기존 그대로 · 근거 ratio 가 스냅샷에)", (c0["labor"], c0.get("laborBasis")),
+       c0["labor"]==round(c0["material"]*0.18) and (c0.get("laborBasis") or {}).get("kind")=="ratio")
+    pg.goto(BASE+"/setup",wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=setup-link-mfg]",timeout=30000); nuke(pg)
+    pg.click("[data-testid=setup-link-mfg]"); pg.wait_for_selector("[data-testid=mfg-rates][data-ready='1'][data-product=EU]",timeout=60000); nuke(pg)
+    for proc,eq,h,rt in (("조립","",12,45000),("도장","도장 부스",6,38000)):
+        pg.fill("[data-testid=mfg-process]",proc); pg.fill("[data-testid=mfg-equipment]",eq); pg.fill("[data-testid=mfg-hours]",str(h)); pg.fill("[data-testid=mfg-rate]",str(rt))
+        pg.click("[data-testid=mfg-add]"); wait_sel(pg,f"[data-testid='mfg-row-{proc}']")
+    wait_text(pg,"[data-testid=mfg-total]","768,000")
+    nuke(pg); pg.screenshot(path=f"{OUT}/72_mfg_rate.png",full_page=True)
+    r1,c1=run10(); lb1=c1.get("laborBasis") or {}
+    ok("S62b 제조 정보 표(조립 12h×45,000 · 도장 6h×38,000 도장 부스)를 등록하면 다음 BOM Run 인건비 = Σ 시간×임율 = 768,000 · 경비는 (재료+인건)×12% · 근거 행이 스냅샷에",
+       (c1["labor"], c1["overhead"], lb1.get("kind"), [(x["process"],x["equipment"],x["amount"]) for x in lb1.get("rows",[])]),
+       c1["labor"]==768000 and c1["overhead"]==round((c1["material"]+768000)*0.12) and c1["total"]==c1["material"]+768000+c1["overhead"]
+       and lb1.get("kind")=="mfg-table" and [(x["process"],x["equipment"],x["amount"]) for x in lb1.get("rows",[])]==[("조립",None,540000),("도장","도장 부스",228000)])
+    q1=ctx.request.post(DOCS,headers=J0,data=json.dumps({"runId":r1["runId"],"type":"quotation"})).json(); qh=ctx.request.get(DOCS+f"/{q1.get('id')}/print").text()
+    qb=ctx.request.get(DOCS+f"/{q1.get('id')}").json().get("body",{}); ap=qb.get("applied") or []
+    ok("S62c 견적 적용 — 견적 합계 = 스냅샷 원가 · PCR Manufacturing = 768,000 · 인쇄본에 인건비 기준 줄 · 견적 적용 Table 금액 합 = Material Cost",
+       (qb.get("total"), c1["total"], qb.get("pcr",{}).get("manufacturing"), len(ap), sum(a["amount"] for a in ap), c1["material"], "labor-basis" in qh, "applied-table" in qh),
+       qb.get("total")==c1["total"] and qb.get("pcr",{}).get("manufacturing")==768000 and len(ap)>0 and sum(a["amount"] for a in ap)==c1["material"]
+       and all(a["table"] in ("견적","구매") for a in ap) and 'data-testid="labor-basis"' in qh and "제조 정보 표(EU)" in qh and 'data-testid="applied-table"' in qh and 'data-testid="price-basis"' in qh)
+    pg.click("[data-testid='mfg-del-도장']"); wait_sel(pg,"[data-testid=mfg-msg][data-ok='1']"); wait_text(pg,"[data-testid=mfg-total]","540,000")
+    c1b=ctx.request.post(BASE+"/api/run/cost",headers=J0,data=json.dumps({"runId":r1["runId"]})).json()["cost"]
+    qh1b=ctx.request.get(DOCS+f"/{q1.get('id')}/print").text()
+    r2,c2=run10()
+    ok("S62d 표를 고쳐도(도장 삭제) 뜬 스냅샷·견적의 인건비는 768,000 그대로 · 새로 Run 하면 540,000", (c1b["labor"], "768,000" in qh1b, c2["labor"]),
+       c1b["labor"]==768000 and "768,000" in qh1b and c2["labor"]==540000)
+    z=ctx.request.post(MR,headers=J0,data=json.dumps({"productCode":"EU","process":"x","hours":0,"rate":1000}))
+    nf=ctx.request.post(MR,headers=J0,data=json.dumps({"productCode":"ZZ","process":"x","hours":1,"rate":1000}))
+    dup=ctx.request.post(MR,headers=J0,data=json.dumps({"productCode":"EU","process":"조립","hours":1,"rate":1000}))
+    ok("S62e 시간 0 은 400 · 없는 제품 404 · 같은 공정 409", (z.status, nf.status, dup.status), z.status==400 and nf.status==404 and dup.status==409)
+    rows=ctx.request.get(MR+"?product=EU").json()["rows"]
+    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data={"email":"viewer@acme.test"})
+    v0=vw.request.get(MR+"?product=EU"); v1=vw.request.post(MR,headers=J0,data=json.dumps({"productCode":"EU","process":"v","hours":1,"rate":1})); v2=vw.request.delete(MR+f"/{rows[0]['id']}"); vw.close()
+    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data={"email":"owner@globex.test"})
+    g1=gb.request.get(MR+"?product=EU").json()["rows"]; g2=gb.request.delete(MR+f"/{rows[0]['id']}"); gb.close()
+    left=ctx.request.get(MR+"?product=EU").json()["rows"]
+    ok("S62f viewer 는 보지만(200) 못 넣고·못 지운다(403) · 다른 회사는 우리 표를 못 보고(0건) 못 지운다(404) · 우리 표는 그대로",
+       (v0.status, v1.status, v2.status, len(g1), g2.status, len(left)), v0.status==200 and v1.status==403 and v2.status==403 and len(g1)==0 and g2.status==404 and len(left)==1)
     # S37 은 맨 끝에서 센다 — 중간(옛 자리)에서는 뒤에 찍히는 5장(40·41·42·52·53)이 아직 없어,
     # 빈 폴더에서는 25장이라 실패하고 이전 실행 잔재가 있을 때만 통과했다(2026-09-24 실측).
     _want=["00_login","05_project_mgmt","06_module_cpq_stub","10_project_bound","11_code_builder","11b_revisions","12_macro_tab",
            "13_macro_approved","14_edim_run","15_bom_cost","16_design_tab","20_setup_subcode","21_setup_product_table",
            "22_setup_relationship","23_codebuilder_from_subcode","30_toolbox_program","31_toolbox_ui_tool","40_company_admin",
            "41_platform_console","42_user_management","43_drawings","44_document_tab","45_purchasing","46_quotation_print",
-           "47_techdata_print","48_dxf_plan","49_dxf_assembly","51_accepted","52_register","53_schedule","54_toolbar","55_project_mgmt","56_print_setup","57_ui_design","58_material","59_arrangement_code","60_spec_input","61_drawing_purpose","62_company_db","63_input_data","64_viewer3d","65_price_to_cost","66_project_contacts","67_partner_edit","68_spec_import","69_code_approval","70_dwg_view","71_techdata_list"]
+           "47_techdata_print","48_dxf_plan","49_dxf_assembly","51_accepted","52_register","53_schedule","54_toolbar","55_project_mgmt","56_print_setup","57_ui_design","58_material","59_arrangement_code","60_spec_input","61_drawing_purpose","62_company_db","63_input_data","64_viewer3d","65_price_to_cost","66_project_contacts","67_partner_edit","68_spec_import","69_code_approval","70_dwg_view","71_techdata_list","72_mfg_rate"]
     _miss=[w for w in _want if not os.path.exists(f"{OUT}/{w}.png") or os.path.getmtime(f"{OUT}/{w}.png")<T0]
-    ok("S37 캡처 48장이 이번 실행에서 전부 나온다 (잔재 파일은 세지 않음)", _miss or len(_want), not _miss)
+    ok("S37 캡처 49장이 이번 실행에서 전부 나온다 (잔재 파일은 세지 않음)", _miss or len(_want), not _miss)
     b.close()
 n=sum(1 for v in R.values() if v[0]); print(f"\n[demo_e2e] {n}/{len(R)} steps passed"); json.dump(R,open(f"{OUT}/demo_e2e_result.json","w",encoding="utf-8"),ensure_ascii=False,indent=1)
 sys.exit(0 if n==len(R) else 1)

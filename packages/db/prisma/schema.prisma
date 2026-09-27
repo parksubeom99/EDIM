@@ -51,6 +51,7 @@ model Tenant {
   projectContacts ProjectContact[]
   projectActivities ProjectActivity[]
   attachments2    Attachment[]
+  mfgRates        MfgRate[]
 
   @@map("tenant")
 }
@@ -735,4 +736,23 @@ model Attachment {
 
   @@index([tenantId, ownerKind, ownerKey], map: "attachment_owner_idx")
   @@map("attachment")
+}
+
+/// 0026 · p66 Manufacturing Cost Table · p67 제조 정보(시간 · 임율 · 장비). 인건비 = Σ 시간 × 임율(없으면 재료비 × 18%).
+model MfgRate {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  productCode String   @map("product_code")
+  seq         Int      @default(0)
+  process     String
+  equipment   String?
+  hours       Decimal  @db.Decimal(8, 2)
+  rate        Decimal  @db.Decimal(12, 2)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdBy   String   @map("created_by") @db.Uuid
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, productCode, process])
+  @@map("mfg_rate")
 }

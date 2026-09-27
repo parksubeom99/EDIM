@@ -104,7 +104,11 @@ export async function POST(
   const catalogFp = catalogFingerprint(catalog);   // 단가 이력은 카탈로그가 아니다 — 지문에 넣지 않는다(단가 한 줄로 옛 스냅샷이 막히지 않게)
   // p67 단가 이력 → 원가(ccmd E): BOM Run 순간 "현재 단가"를 줄에 입히고 출처를 박는다. 이후 스냅샷은 바뀌지 않는다.
   const codes = [...new Set(result.lines.map((l) => l.childCode))];
-  const priceRows = await withTenant(session.tenantId, (tx) => tx.priceHistory.findMany({ where: { code: { in: codes } } }));
+  // F10 · p66 · p67: 제조 정보 표(공정별 시간 × 임율)도 같은 순간에 읽는다 — 있으면 인건비 = Σ, 없으면 재료비 × 18%. 근거는 cost.laborBasis 로 스냅샷에.
+  const [priceRows, mfgRows] = await withTenant(session.tenantId, async (tx) => [
+    await tx.priceHistory.findMany({ where: { code: { in: codes } } }),
+    await tx.mfgRate.findMany({ where: { productCode: result.parent }, orderBy: [{ seq: "asc" }, { createdAt: "asc" }] }),
+  ] as const);
   const byCode = new Map<string, PriceRowLike[]>();
   for (const r of priceRows)
     byCode.set(r.code, [...(byCode.get(r.code) ?? []), { id: r.id, item: r.item, price: Number(r.price), currency: r.currency, supplier: r.supplier, effectiveFrom: dateOnly(r.effectiveFrom), createdAt: r.createdAt }]);
@@ -113,7 +117,7 @@ export async function POST(
   const lines = priced.map((l) => ({ ...toBomLine(l), priceSource: l.priceSource }));
   const trace = priced.map((l) => ({ no: l.no, childCode: l.childCode, resolvedCode: l.resolvedCode, relSeq: l.relSeq, remarks: l.remarks }));
   if (kind === "bom") {
-    const cost = buildCost(lines);
+    const cost = buildCost(lines, { productCode: result.parent, rows: mfgRows.map((r) => ({ process: r.process, equipment: r.equipment, hours: Number(r.hours), rate: Number(r.rate) })) });
     const clean: Record<string, string> = {};
     for (const [k, v] of Object.entries(slots)) if (typeof v === "string" && v) clean[k] = v;
     // 0011: 치수는 스냅샷을 뜨는 이 순간의 등록 표 값으로 함께 박는다 — 도면은 이후 이 값만 읽는다.
