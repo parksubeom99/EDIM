@@ -91,12 +91,13 @@ PAGES = {
          "**Import**(F7) — Input Data 값을 CSV(key,value)로 채운다 · 템플릿 밖 key · 수 아닌 값 · 중복은 줄 번호와 함께 거부"],
         ["매크로 결과 1값뿐 — 기술 계산서 수준이 아니다(필요한 입력: 회사 계산서 양식·성능 데이터)"],
         "e2e S23a · S23b · S59a~d · document:test", "71_techdata_list", "회사 실 기술 계산식이 들어와야 깊어진다(회장님·사장님 자료)"),
- 16: pg("P", "C-2 · Document Template", "Document Template · Edit Table",
+ 16: pg("L", "C-2 · Document Template", "Document Template · Edit Table",
         ["Edit Table = Set-Up 의 제품 코드 표 편집 ✓ — 한 칸을 고치면 BOM·매크로·도면이 따라 바뀐다", "Output Data 인쇄 ✓",
-         "**Input Data 템플릿**(⑨) — 회사가 항목(Temperature °C · Humidity % …)의 단위·기본값·범위를 정하고, Tech Data 를 만들 때 값을 받아 문서에 **스냅샷**으로 남긴다(범위 밖 400)",
+         "**Input Data 템플릿**(⑨) — 항목의 단위·기본값·범위를 회사가 정하고, Tech Data 에 **스냅샷**으로 남긴다(범위 밖 400)",
+         "**Output Data 템플릿**(H6) — 출처는 승인 매크로 결과 · 스냅샷 값(원가·치수)뿐 · 새 계산식은 받지 않는다 · **그래프**(그래프 전용 data + 표시선) · **Table List**(Department · Table Type Variant·Tech·Material)",
          "**Data Up-Load**(F8) — 작업대 노드에 자료를 올리고 Inspector 에 목록 · 내려받기"],
-        ["Output Data 계산(청사진의 밀도 kg/m³) 없음 — 매크로 연결이 필요하다", "그래프 · Table Type Variant·Material 없음"],
-        "e2e S10b · S10d · S18b · S50a~d · S60a~c", "63_input_data"),
+        ["밀도(kg/m³) 같은 Output 계산 — 필요한 입력: 그 값을 내는 회사 계산식(승인 매크로) · 팬 곡선 — 필요한 입력: 제조사 성능표"],
+        "e2e S10b · S10d · S18b · S50a~d · S60a~c · S65a~e", "75_output_template"),
  17: pg("L", "CPQ / Document", "네 가지 산출물 — BOM · Quotation · Document · Drawing",
         ["네 가지 모두 화면에서 나오고, **모두 같은 BOM 스냅샷 하나**를 입력으로 받는다", "문서·도면은 번호·개정(A→B)·상태 4단계·발행 잠금",
          "도면 **용도별 구분**(⑦) — 승인도(-APV)·제작도(-MFG)·견적도(-QTN) 로 번호·개정이 따로 가고, 발행 뒤에는 용도도 못 바꾼다"],
@@ -179,11 +180,14 @@ PAGES = {
         ["도면은 아직 **선과 글자** 수준 — 제작도가 아니다", "Detail Dimension · 부품도 · KAD-□ 슬롯 문법 없음", "구획별 치수는 길이 한 축(p36)"],
         "e2e S18a~S18f · S19a~S19e · S30a~g · S31 · S40(설계 검증 422) · drawing:test 23", "43_drawings", "DXF 연구 결과와 CAD 담당의 Drawing Set-Up 입력이 필요"),
  39: pg("P", "Set-Up / PLM / Work Process / Design", "도면 Templet 호출 설정 6단계",
-        ["1) Product Item 호출 ✓ · 도면 치수 ✓ · 사용 승인 절차(상태 4단계) ✓", "**용도별 구분**(⑦) — 등록할 때 승인도·제작도·견적도를 고르고 목록에서 거른다 · 발행 전까지만 용도 변경"],
-        ["하부 도면(Sub Drawing) 호출 · 설계 우선순위 없음", "설계 검증은 규칙 표로 돈다(p36) — Macro 로 쓰는 검증은 아직"],
-        "e2e S7 · S18a · S48a~d", "61_drawing_purpose"),
- 40: pg("P", "Work Process / Design", "Call Sub Drawing · Assembling · Detail Design",
-        ["조립도 1장에 Item 표 + 풍선번호", "**분해도(Exploded)** 가 구획을 띄우고 조립 순서 번호를 붙인다 — 순서는 Arrangement 구획 순서 그대로(0013)"], ["Sub Drawing 호출 · Detail Design · 주의사항 없음"], "e2e S18f", "49_dxf_assembly"),
+        ["1) Product Item 호출 ✓ · 도면 치수 ✓ · 사용 승인 절차(상태 4단계) ✓", "**용도별 구분**(⑦) — 승인도·제작도·견적도 · 발행 전까지만 용도 변경",
+         "**도면 템플릿**(H5) — 제품마다 **하부 도면(Sub Drawing) 호출** · **설계 우선순위**(작을수록 먼저, 같으면 코드 순) · 도면을 뜨는 순간 스냅샷에 있는 하위 코드만 도면에 박힌다"],
+        ["설계 검증은 규칙 표로 돈다(p36) — **Macro 로 쓰는 검증**은 아직(소프트웨어 몫)"],
+        "e2e S7 · S18a · S48a~d · S64a~e", "74_sub_drawing"),
+ 40: pg("L", "Work Process / Design", "Call Sub Drawing · Assembling · Detail Design",
+        ["조립도 1장에 Item 표 + 풍선번호", "**분해도(Exploded)** — 조립 순서 번호(Arrangement 구획 순서 그대로 · 0013)",
+         "**Call Sub Drawing**(H5) — 도면 시트에 하부 도면 표(Item · Description · Q'ty · Remarks · 코드에 첨부한 DWG) · **Detail Design 주의사항** 목록 · 템플릿을 고쳐도 뜬 도면은 그대로"],
+        ["하부 도면을 조립도 안에 mm 로 배치(Detail Dimension A~K) — 필요한 입력: 회사 CAD 규칙(M4)"], "e2e S18f · S64a~e", "74_sub_drawing"),
  41: pg("C", "간지", "EDIM Drawing Management — Data Set-Up"),
  42: pg("N", "Data Set-Up", "설계 우선순위 · 기준점 · 오류 체크 · Material management", [], ["없음 (CAD Mapping · Variant List · Inventory 포함)"], "", None, "CAD 담당 영역(역할 분담 확정)"),
  43: pg("N", "S-4-1-2 · Work Process Management", "전 부서 Work Process — 창고·공정·인원·스킬·시간", [], ["없음"], "", None, "ERP 확장 — 80% 범위 밖"),
@@ -196,14 +200,17 @@ PAGES = {
          "Arrangement 형식(구획 구성·순서·길이·방향·부품 배치)이 화면에서 정의된다 — p35·36 과 같은 편집 패널"],
         ["Option 정의(Item Image 선택 항목 화면) — 필요한 입력: 회사 선택 항목 이미지"],
         "e2e S31 · S32 · S38 · S47a~e · S55a~e", "68_spec_import"),
- 47: pg("P", "S-3-2,3 · Tech. Data & Document Set-Up", "Coding + Run + Table",
-        ["Coding(매크로) + Run + 참조 Table ✓", "Input Data 템플릿(⑨) — Tech Data 의 입력 항목·단위·범위를 회사가 정한다"],
-        ["Output Data 템플릿 · 그래프 전용 data · Coding List(노드당 승인 매크로 1개) 없음"], "e2e S5 · S10d · S50", "13_macro_approved"),
+ 47: pg("L", "S-3-2,3 · Tech. Data & Document Set-Up", "Coding + Run + Table",
+        ["Coding(매크로) + Run + 참조 Table ✓", "Input Data 템플릿(⑨)",
+         "**Output Data 템플릿 · 그래프 전용 data · 그래프 · Table List**(H6) — Tech Data 를 만들 때 값·그래프가 문서에 박힌다",
+         "**Coding List**(H7) — 노드마다 승인 매크로 1개 · 마지막 BOM 이 쓴 개정 · Inspector 에서 이동"],
+        ["Output 계산식(밀도 등) — 필요한 입력: 회사 계산식"], "e2e S5 · S10d · S50 · S65a~e · S66a~d", "76_coding_list"),
  48: pg("P", "S-3-4 · Print Set-up", "인쇄",
         ["견적서·Tech Data **인쇄본(흰 A4)** ✓ — 브라우저에서 PDF 저장",
-         "**Print Set-up Form**(③) — 문서 종류마다 인쇄 양식 하나: 용지 · 여백 · 글꼴 · 머리글/바닥글 · 워터마크. 모양만 바뀌고 숫자는 그대로(스냅샷 body 를 다시 계산하지 않는다)"],
-        ["양식 안 요소를 끌어 배치하는 편집기 없음 — 정해진 칸의 값만 고친다"],
-        "e2e S22c · S43", "56_print_setup"),
+         "**Print Set-up Form**(③) — 용지 · 여백 · 글꼴 · 머리글/바닥글 · 워터마크(숫자는 그대로)",
+         "**인쇄 양식 편집기**(H9) — 제목 · 필드 · 표 · 도면 · 그래프 · 서명칸 · 로고 · 글상자를 끌어 배치·크기 조절 → 새 버전 · 인쇄본이 배치를 따르고 **발행본은 발행 순간 버전에 고정**"],
+        ["File 내보내기(Office .docx · .xlsx) 없음 — 인쇄본은 브라우저 PDF 저장뿐(소프트웨어 몫)"],
+        "e2e S22c · S43 · S68a~e", "78_print_layout"),
  49: pg("C", "간지", "User Set-Up"),
  50: pg("L", "Set-Up / User ERP / Sale / Project Management", "프로젝트 관리(사용자 ERP)",
         ["p12 와 같은 화면(②) — 등록 · 헤더 · 담당자 · 영업 단계 전이 · 접수 자료(File)", "Client = Company DB 고객(⑧)",
@@ -226,17 +233,19 @@ PAGES = {
         "project:test · rls:test · e2e S27a~d · S29b~d · S11 · S17", "51_accepted"),
  56: pg("L", "E-1 · EDIM System Structure", "작업대 — 다섯 구역",
         ["Tool bar · Work Hierarchy · Main Work Place · Sub Work Place · Key Work Place 가 청사진 그대로 떠 있다"], ["EDIM Toolbar 의 업무 목록(고객 관리 … 시운전 요청) 없음"], "e2e S1", "10_project_bound"),
- 57: pg("P", "E-2 · EDIM System Toolbar", "Toolbox Macro — 다섯 갈래 상호 연동",
-        ["Prompt · Macro · Flowchart · Description · Coding 이 같은 매크로를 본다"], ["Data Management(Directory · Type of source: Table/Chart/Formula drawing) 없음", "함수 마법사 · 그래프 마법사 없음"],
-        "e2e S13b · S13c · S13e", "30_toolbox_program"),
+ 57: pg("L", "E-2 · EDIM System Toolbar", "Toolbox Macro — 다섯 갈래 상호 연동",
+        ["Prompt · Macro · Flowchart · Description · Coding 이 같은 매크로를 본다",
+         "**함수 마법사**(H8) — v1 함수셋 13개를 골라 인자를 채우면 식 글자 → 기존 파서·Verify 그대로(Macro 탭 안에서 넣기) · **그래프 마법사** — 단계로 H6 그래프",
+         "**Data Management**(H8) — Directory · Type of source(Table · Chart · Formula) 목록"],
+        ["Enterprise DB(AI 학습 자료) — 필요한 입력: 회사 자료(M2) · AI 연결 결정(M5)"],
+        "e2e S13b · S13c · S13e · S67a~e", "77_wizards"),
  58: pg("P", "E-2 · Toolbar Module", "Main Work place Toolbar",
         ["**명령 버튼이 돈다**: Arrangement ▼ · Move · Delete · Add · Copy · DWG View ▼ · 승인(Module)",
-         "개념도에서 구획을 고르면 Move·Delete·Copy 가 풀리고, 편집은 Design 초안 → 기존 '저장' 한 곳으로만 반영된다(두 번째 편집 길 없음)",
-         "BOM 관계가 걸린 구획은 툴바로도 못 지운다 · DWG View 는 BOM 스냅샷이 없으면 잠긴다 · 승인은 Inspector Approval 로 데려간다"],
-        ["그림 제작 Module(도면 그리기 도구) 없음",
-         "Free CAD · 설계 심볼은 잠긴 자리 — 누를 수 없고 이유가 적혀 있다(EDIM 안 CAD 편집기·심볼 배치는 아직 없다)",
-         "Delete 는 선택이 잠긴 구획이어도 눌리고 거부 문구로 막는다(표 쪽 Delete 는 미리 잠김)"],
-        "e2e S41a~l", "54_toolbar", "그림 제작 Module · Free CAD 는 실제 CAD 편집기 결정 후"),
+         "개념도에서 구획을 고르면 Move·Delete·Copy 가 풀리고, 편집은 Design 초안 → 기존 '저장' 한 곳으로만 반영된다",
+         "**그림 제작 Module 1단계**(H10) — 도면 위 주석(선 · 사각형 · 글자 · 치수선) 추가·이동·삭제 · 원 도면 불변 · DXF 내보내기에 ANNOT 레이어 · 발행 도면은 잠김"],
+        ["Free CAD · 설계 심볼은 잠긴 자리 — 필요한 결정: EDIM 안 CAD 편집기(M4 · M5)",
+         "Delete 는 선택이 잠긴 구획이어도 눌리고 거부 문구로 막는다(표 쪽 Delete 는 미리 잠김) — 소프트웨어 몫"],
+        "e2e S41a~l · S69a~f", "79_draw_module", "Free CAD 는 실제 CAD 편집기 결정 후"),
  59: pg("L", "E-3 · Key Work Place", "Hierarchy 와 Run 심볼",
         ["Work Hierarchy 트리에서 노드를 고르면 작업 대상이 호출된다", "EDIM Run · BOM Run · EBOM Run · Cost · Approval Request ✓"], ["Hierarchy(Edit) · Data Up-Load · DWG 폴더 없음"],
         "hierarchy:test · e2e S1 · S3", "10_project_bound"),
@@ -250,12 +259,12 @@ PAGES = {
         ["BOM 11행 · 섹션별 EBOM · 원가 · 문서 · 도면 · Export 가 전부 돈다", "EBOM·Cost 는 다시 계산하지 않고 **스냅샷을 읽는다**"], ["단가는 샘플", "인건비는 제조 정보 표(F10)가 있으면 Σ 시간×임율, 없으면 배율 가정(18%) · 경비는 여전히 배율 가정(12%) — 실 값은 회사 자료가 필요"],
         "e2e S6a · S6b · S20a~S20c", "15_bom_cost"),
  63: pg("C", "간지", "Structure"),
- 64: pg("P", "System Set-up 구조", "TLM Code Management · ERP Set-up",
+ 64: pg("L", "System Set-up 구조", "TLM Code Management · ERP Set-up",
         ["Sub Code · Product Code · Code relationship(BOM) Hierarchy ✓ · Approval management ✓", "3계층(플랫폼 → 회사 관리자 → 사용자) ✓",
-         "**Company DB — Customer · Supplier**(⑧) — /setup/company 두 목록 · 프로젝트 Client 와 단가 공급처가 가리킨다(id + 글자 함께 · 다른 회사 id 는 400)",
-         "고객·공급처 **수정 · 사용 중지 · 삭제**(F2) — 가리키는 행이 있으면 삭제 409 + 건수, 대신 사용 중지(새 연결에서 빠짐)"],
-        ["Department Std. · Warehouse · Inventory · Bank · Employee · Nation 없음"],
-        "platform:test 25 · e2e S16 · S17 · S49a~e · S54a~e", "67_partner_edit"),
+         "**Company DB — Customer · Supplier**(⑧) · 수정 · 사용 중지 · 삭제(가리키면 409)(F2)",
+         "**ERP 기준정보 6종**(H4) — Department Std. · Warehouse · Inventory · Bank · Employee · Nation · 서로 가리키는 관계(직원→부서 · 재고→창고 · 은행→국가 · 고객 Nation→국가) · 가리키면 삭제 409 · 값은 회사가 채움"],
+        ["재고 입출고 흐름(Inventory Management) — 필요한 입력: 회사 재고 데이터"],
+        "platform:test 25 · e2e S16 · S17 · S49a~e · S54a~e · S63a~e", "73_erp_master"),
  65: pg("L", "EDIM RUN", "Work Process — 한 번의 Run 에서 나오는 것들",
         ["Main Code → BOM → 도면 · 원가 · Tech Data · PCR·견적 · 구매 요청, **모두 한 BOM 스냅샷**에서", "구매 요청에서 거꾸로 **추적**: BOM → 코드 개정 → 카탈로그 지문 → 매크로 개정 → 승인"],
         ["Non-Standard Option(X Code) → R&D → New Code 흐름 없음", "Project 폴더 저장 구조 없음"],
@@ -374,13 +383,14 @@ def s_page(p):
 def s_remaining():
     return '''<section class="slide"><div class="stage"><header><span class="no">끝1</span><h2>남은 작업 — 엘·CC 가 지시만 받으면 하는 것</h2></header>
 <div class="own"><table class="ot"><thead><tr><th>#</th><th>작업</th><th>왜 엘·CC 가 할 수 있나</th><th>선행 조건</th><th>나오는 것</th></tr></thead><tbody>
-<tr><td>E1</td><td>ERP 기준정보 등록 화면 — Department Std · Warehouse · Inventory · Bank · Employee · Nation</td><td>Company DB(F2)와 같은 틀 · 격리 패턴이 이미 있다</td><td>없음 — 지시만(값은 회사가 채움)</td><td>p64 부분 → 실동</td></tr>
-<tr><td>E2</td><td><b>배포 전 점검</b> — 운영 빌드 DB 연결 고갈(HTTP 500) 수리본 <code>fix/prisma-client-cache</code>(d0f6cb0) 머지 · 배포 환경 점검</td><td>엘이 운영 빌드로 재현·수리했다 — 수리 후 e2e 287/287 · 동시 연결 14(개발 모드에선 안 보임)</td><td>CC 머지 게이트 · 배포 결정 전 필수</td><td>배포 준비 · p9 선행</td></tr>
-<tr><td>E3</td><td>Sub Drawing 호출 · Detail Design · Output Data 템플릿 · 그래프 · 함수/그래프 마법사 · 인쇄 양식 편집기</td><td>도면·문서·매크로 뼈대가 돌고 있다 — 기능 확장이다</td><td>규모가 커서 여러 날 · 순서 결정</td><td>p16 · 39 · 40 · 47 · 48 · 57 보강</td></tr>
-<tr><td>E4</td><td>EDIM 안 CAD 편집기 · 설계 심볼 · 제작도 수준 도면</td><td>도면 선·치수 전파는 이미 결정론으로 돈다</td><td>E3 이후 · 회사 CAD 규칙(M4)</td><td>p58 · 38 부분 → 실동</td></tr>
+<tr><td>E2</td><td><b>배포 환경 점검</b> — 연결 고갈 수리본은 main 에 들어갔다(09-27 밤 · 운영 모드 e2e 연결 15~16). 남은 것: 배포 대상 환경의 DB·비밀값·도메인 점검</td><td>머지 게이트에 운영 모드 e2e 가 상시로 들어갔다</td><td>배포 결정(M5) 뒤</td><td>p9 선행</td></tr>
+<tr><td>E4</td><td>EDIM 안 CAD 편집기 · 설계 심볼 · 제작도 수준 도면 — 주석 레이어 1단계(H10)는 끝, 실제 도형 편집은 아직</td><td>도면 선·치수 전파는 결정론으로 돈다</td><td>회사 CAD 규칙(M4) · 편집기 결정(M5)</td><td>p58 · 38</td></tr>
 <tr><td>E5</td><td>발표 덱 · 진행현황 보고서를 이번 main 반영본으로 재생성</td><td>생성기가 repo 에 있다</td><td>이 판정을 회장님이 조정한 뒤</td><td>덱 · 진행현황 새 판</td></tr>
+<tr><td>E6</td><td>Macro 로 쓰는 설계 검증(p39) — 지금은 규칙 표(p36)</td><td>매크로 실행기·검증 규칙 표가 이미 돈다</td><td>없음 — 지시만</td><td>p39 부분 → 실동</td></tr>
+<tr><td>E7</td><td>인쇄본 Office 내보내기(.docx · .xlsx) — 지금은 브라우저 PDF</td><td>인쇄본은 스냅샷 body 에서만 나온다(그대로 옮기면 된다)</td><td>없음 — 지시만</td><td>p48 부분 → 실동</td></tr>
+<tr><td>E8</td><td>툴바 Delete — 잠긴 구획이면 미리 잠그기(표 쪽과 같게)</td><td>작은 화면 일관성 수정</td><td>없음 — 지시만</td><td>p58 gap 하나</td></tr>
 </tbody></table>
-<p class="onote">오늘(09-27) 끝낸 것: ccmd E(단가 이력 → 원가·견적·구매) · F1~F10(담당자 · 고객 수정 · 사양 Import · 코드 승인·DWG · 도면 화면 보기 · Tech Data 목록 · 자료 업로드 · Set-Up 지도 · 제조 임율) → 11쪽 부분 → 실동.</p>
+<p class="onote">09-27 밤(ccmd H) 끝낸 것: 연결 고갈 수리 머지 · 시연 안전판 태그 · H4 ERP 기준정보 6종 · H5 Sub Drawing·주의사항 · H6 Output·그래프·Table List · H7 Coding List · H8 함수·그래프 마법사·Data Management · H9 인쇄 양식 편집기 · H10 도면 주석 → 5쪽 부분 → 실동(초안 — 엘 재측정 후 확정).</p>
 </div></div></section>
 
 <section class="slide"><div class="stage"><header><span class="no">끝2</span><h2>남은 작업 — 회장님·사장님 자료와 결정이 필요한 것</h2></header>
