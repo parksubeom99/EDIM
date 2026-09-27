@@ -51,7 +51,11 @@ with sync_playwright() as p:
     nuke(pg); pg.locator("button", has_text=re.compile(r"^Macro$")).first.click(force=True); wait_sel(pg,"[data-testid=macro-verify]"); pg.screenshot(path=f"{OUT}/12_macro_tab.png")
     pg.click("[data-testid=macro-verify]"); time.sleep(2); body=pg.inner_text("body"); ok("S4a verify passes", "diagnostics" in body or "통과" in body or "0" in body, True)
     pg.click("[data-testid=macro-draft]"); wait_sel(pg,"[data-testid=macro-approve]"); ap=pg.query_selector("[data-testid=macro-approve]"); ok("S4b draft saved (approve button present)", bool(ap), ap)
-    if ap: ap.click(); wait_text(pg,"body","approved")
+    # 승인 **응답**을 기다린다 — "approved" 글자는 시드로 이미 승인된 매크로 목록에도 있어 즉시 통과했고,
+    # 승인 요청이 끝나기 전에 S5·S6 이 시작돼 BOM Run 클릭이 새로 고침에 묻혔다(2026-09-27 F 게이트 실측 · S6a/b)
+    if ap:
+        with pg.expect_response(lambda q: "/api/macros/" in q.url and q.request.method=="POST", timeout=30000):
+            ap.click()
     body=pg.inner_text("body"); ok("S4c approved", "approved" in body, "approved" in body); pg.screenshot(path=f"{OUT}/13_macro_approved.png")
     # S5 EDIM Run with macro
     pg.click("button:has-text('EDIM Run')"); wait_text(pg,"body","455.4"); body=pg.inner_text("body"); m=re.search(r"455\.4",body); ok("S5 EDIM Run = 455.4", m.group(0) if m else body[-300:], m); pg.screenshot(path=f"{OUT}/14_edim_run.png")
