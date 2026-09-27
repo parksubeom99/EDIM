@@ -1368,7 +1368,7 @@ with sync_playwright() as p:
     pg.goto(BASE+"/setup/spec",wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=spec-items][data-ready='1']",timeout=60000); nuke(pg)
     pg.select_option("[data-testid=spec-product]","EU"); pg.wait_for_selector("[data-testid=spec-items][data-ready='1'][data-product=EU]",timeout=30000)
     n0=len(ctx.request.get(SI+"?product=EU").json()["rows"])
-    BAD_CSV="key,label,unit,slot,kind,op,scale,table,col\nfan_power,팬 동력,kW,B,table,ge,,cap,A\ncoil_rows,코일 열수,,B,table,ge,,cap,B\nairflow,중복 키,,B,item,ge,1000,,\nbad_tbl,슬롯 틀림,,E,table,ge,,cap,M\n"
+    BAD_CSV="key,label,unit,slot,kind,op,scale,table,col\nmacro_result,팬 동력,kW,B,table,ge,,cap,A\ncoil_rows,코일 열수,,B,table,ge,,cap,B\nairflow,중복 키,,B,item,ge,1000,,\nbad_tbl,슬롯 틀림,,E,table,ge,,cap,M\n"
     pg.set_input_files("[data-testid=spec-import-file]",files=[{"name":"spec.csv","mimeType":"text/csv","buffer":BAD_CSV.encode("utf-8")}])
     pg.wait_for_function("()=>!document.querySelector('[data-testid=spec-import-preview]').disabled",timeout=10000)
     pg.click("[data-testid=spec-import-preview]"); pg.wait_for_selector("[data-testid=spec-import-preview-table]",timeout=30000)
@@ -1386,9 +1386,9 @@ with sync_playwright() as p:
        (forced.status, n1-n0, len(ctx.request.get(SI+"?product=EU").json()["rows"])-n0), forced.status==400 and n1==n0 and len(ctx.request.get(SI+"?product=EU").json()["rows"])==n0+2)
     pg.click("[data-testid=se-edit-coil_rows]"); pg.fill("[data-testid=se-label]","코일 열 수"); pg.fill("[data-testid=se-unit]","열"); pg.click("[data-testid=se-save]")
     wait_text(pg,"[data-testid=spec-row-coil_rows]","코일 열 수")
-    pg.click("[data-testid=se-del-fan_power]"); pg.wait_for_selector("[data-testid=spec-row-fan_power]",state="detached",timeout=30000)
+    pg.click("[data-testid=se-del-macro_result]"); pg.wait_for_selector("[data-testid=spec-row-macro_result]",state="detached",timeout=30000)
     rows=ctx.request.get(SI+"?product=EU").json()["rows"]; cr=[x for x in rows if x["key"]=="coil_rows"][0]
-    ok("S55c 화면에서 이름·단위 수정과 삭제가 된다", (cr["label"], cr["unit"], any(x["key"]=="fan_power" for x in rows)), cr["label"]=="코일 열 수" and cr["unit"]=="열" and not any(x["key"]=="fan_power" for x in rows))
+    ok("S55c 화면에서 이름·단위 수정과 삭제가 된다", (cr["label"], cr["unit"], any(x["key"]=="macro_result" for x in rows)), cr["label"]=="코일 열 수" and cr["unit"]=="열" and not any(x["key"]=="macro_result" for x in rows))
     k400=ctx.request.patch(SI+f"/{cr['id']}",headers=J0,data=json.dumps({"key":"x"}))
     s400=ctx.request.patch(SI+f"/{cr['id']}",headers=J0,data=json.dumps({"source":{"kind":"table","table":"nope","col":"A","op":"ge"}}))
     ok("S55d key 바꾸기 400 · 카탈로그에 없는 표로 바꾸기 400(수정도 등록과 같은 대조)", (k400.status, s400.status), k400.status==400 and s400.status==400)
@@ -1713,15 +1713,64 @@ with sync_playwright() as p:
     ok("S64e viewer 는 보지만(200) 못 넣고·못 뺀다(403) · 다른 회사는 우리 템플릿 0건 · 빼기 404 · 우리 도면 시트 404",
        (v0.status,v1.status,v2.status,len(g0.get("subs",[]))+len(g0.get("notes",[])),g1.status,g2.status),
        (v0.status,v1.status,v2.status)==(200,403,403) and len(g0.get("subs",[]))+len(g0.get("notes",[]))==0 and (g1.status,g2.status)==(404,404))
+    # ── S65 H6 · p16 · p47 Output Data 템플릿 · 그래프 전용 data · 그래프 · Table List(Table Type) ──
+    OI=BASE+"/api/setup/output-items"; GR=BASE+"/api/setup/graphs"; TM=BASE+"/api/setup/table-meta"
+    pg.goto(BASE+"/setup",wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=setup-link-document]",timeout=30000); nuke(pg)
+    pg.click("[data-testid=setup-link-document]"); pg.wait_for_selector("[data-testid=doc-setup][data-ready='1']",timeout=60000); nuke(pg)
+    for key,label,unit,src,ref in (("macro_result","Macro result","","macro",""),("width","Width W","mm","snapshot","dims.W"),("total_cost","Full cost","원","snapshot","cost.total")):
+        pg.fill("[data-testid=out-new-key]",key); pg.fill("[data-testid=out-new-label]",label); pg.fill("[data-testid=out-new-unit]",unit)
+        pg.select_option("[data-testid=out-new-source]",src)
+        if ref: pg.select_option("[data-testid=out-new-ref]",ref)
+        pg.click("[data-testid=out-add]"); wait_sel(pg,f"[data-testid=out-row-{key}]")
+    pg.fill("[data-testid=graph-new-name]","Fan curve"); pg.select_option("[data-testid=graph-new-chart]","line")
+    pg.fill("[data-testid=graph-new-x]","Airflow (CMH)"); pg.fill("[data-testid=graph-new-y]","Static (Pa)")
+    pg.fill("[data-testid=graph-new-points]","20000,900\n40000,820\n55000,700\n70000,480"); pg.select_option("[data-testid=graph-new-marker]","macro_result")
+    pg.wait_for_selector("[data-testid=graph-preview] svg[data-points='4']",timeout=30000)
+    pg.click("[data-testid=graph-add]"); wait_sel(pg,"[data-testid='graph-row-Fan curve']")
+    pg.wait_for_selector("[data-testid=table-list][data-ready='1'][data-product=EU]",timeout=30000)
+    pg.select_option("[data-testid=tl-type-mat]","material"); pg.fill("[data-testid=tl-dept-mat]","Engineering"); pg.fill("[data-testid=tl-desc-mat]","재질 배율(SUS·AL)")
+    pg.click("[data-testid=tl-save-mat]"); pg.wait_for_selector("[data-testid=tl-row-mat][data-type=material]",timeout=30000)
+    pg.select_option("[data-testid=tl-type-opt]","variant"); pg.select_option("[data-testid=tl-variant-opt]","cap"); pg.click("[data-testid=tl-save-opt]"); pg.wait_for_selector("[data-testid=tl-row-opt][data-type=variant]",timeout=30000)
+    nuke(pg); pg.screenshot(path=f"{OUT}/75_output_template.png",full_page=True)
+    tl={t["name"]:t["meta"] for t in ctx.request.get(TM+"?product=EU").json()["tables"]}
+    ok("S65a Set-Up ▸ Document — Output 항목 3(승인 매크로 결과 · 스냅샷 W · 원가) · 그래프 전용 data 4점 + 표시선 · Table List(mat=Material · opt=Variant of cap)",
+       (len(ctx.request.get(OI).json()["rows"]), [(g["name"],len(g["points"]),g["markerKey"]) for g in ctx.request.get(GR).json()["rows"]], (tl.get("mat") or {}).get("tableType"), (tl.get("opt") or {}).get("variantOf")),
+       len(ctx.request.get(OI).json()["rows"])==3 and (tl.get("mat") or {}).get("department")=="Engineering" and (tl.get("opt") or {}).get("tableType")=="variant" and (tl.get("opt") or {}).get("variantOf")=="cap")
+    r65,c65=run10()
+    t65=ctx.request.post(DOCS,headers=J0,data=json.dumps({"runId":r65["runId"],"type":"techdata"})).json()
+    b65=ctx.request.get(DOCS+f"/{t65.get('id')}").json().get("body",{}); od={o["key"]:o["value"] for o in b65.get("outputData",[])}
+    ph=ctx.request.get(DOCS+f"/{t65.get('id')}/print").text()
+    ok("S65b Tech Data 에 Output 값이 스냅샷에서 박힌다 — 매크로 결과 455.4 · W(스냅샷 치수) · 원가 합계 = 그 스냅샷 원가 · 인쇄본에 Output 표와 그래프(표시선 455.4)",
+       (od, c65["total"], "techdata-outputdata" in ph, 'data-marker="455.4"' in ph),
+       od.get("macro_result")==455.4 and isinstance(od.get("width"),(int,float)) and od.get("total_cost")==c65["total"] and 'data-testid="techdata-outputdata"' in ph and 'data-testid="techdata-graph"' in ph and 'data-marker="455.4"' in ph)
+    gid=[g for g in ctx.request.get(GR).json()["rows"] if g["name"]=="Fan curve"][0]["id"]
+    busy=ctx.request.delete(OI+f"/{[o for o in ctx.request.get(OI).json()['rows'] if o['key']=='macro_result'][0]['id']}")
+    ctx.request.delete(GR+f"/{gid}")
+    ph2=ctx.request.get(DOCS+f"/{t65.get('id')}/print").text()
+    ok("S65c 표시선으로 쓰이는 Output 항목은 못 뺀다(409) · 그래프를 빼도 이미 만든 Tech Data 인쇄본의 그래프는 그대로", (busy.status, 'data-testid="techdata-graph"' in ph2),
+       busy.status==409 and 'data-testid="techdata-graph"' in ph2 and 'data-marker="455.4"' in ph2)
+    q=lambda u,body: ctx.request.post(u,headers=J0,data=json.dumps(body))
+    e1=q(OI,{"key":"Bad Key","label":"x","source":"macro"}); e2=q(OI,{"key":"x1","label":"x","source":"snapshot","ref":"cost.profit"}); e3=q(OI,{"key":"width","label":"dup","source":"macro"})
+    e4=q(GR,{"name":"g","chart":"pie","points":[{"x":"a","y":1}]}); e5=q(GR,{"name":"g","chart":"bar","points":[{"x":"a","y":"b"}]}); e6=q(GR,{"name":"g","chart":"bar","points":[{"x":"a","y":1}],"markerKey":"nope"})
+    e7=ctx.request.put(TM,headers=J0,data=json.dumps({"productCode":"EU","tableName":"zzz","tableType":"tech"})); e8=ctx.request.put(TM,headers=J0,data=json.dumps({"productCode":"EU","tableName":"cap","tableType":"tech","variantOf":"opt"}))
+    ok("S65d 잘못된 key 400 · 스냅샷 경로 밖(새 계산) 400 · 중복 409 · 그래프 모양·점·표시선 400 · 없는 표 400 · Variant 가 아닌데 변형 원본 400",
+       tuple(x.status for x in (e1,e2,e3,e4,e5,e6,e7,e8)), tuple(x.status for x in (e1,e2,e3,e4,e5,e6,e7,e8))==(400,400,409,400,400,400,400,400))
+    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data={"email":"viewer@acme.test"})
+    v0=vw.request.get(OI); v1=vw.request.post(OI,headers=J0,data=json.dumps({"key":"v","label":"v","source":"macro"})); v2=vw.request.put(TM,headers=J0,data=json.dumps({"productCode":"EU","tableName":"cap","tableType":"tech"})); vw.close()
+    wid=[o for o in ctx.request.get(OI).json()["rows"] if o["key"]=="width"][0]["id"]
+    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data={"email":"owner@globex.test"})
+    g0=len(gb.request.get(OI).json().get("rows",[])); g1=len(gb.request.get(GR).json().get("rows",[])); g2=gb.request.delete(OI+f"/{wid}"); gb.close()
+    ok("S65e viewer 는 보지만(200) 못 넣고·못 고친다(403) · 다른 회사는 우리 Output·그래프 0건 · 지우기 404",
+       (v0.status,v1.status,v2.status,g0,g1,g2.status), v0.status==200 and (v1.status,v2.status)==(403,403) and g0==0 and g1==0 and g2.status==404)
     # S37 은 맨 끝에서 센다 — 중간(옛 자리)에서는 뒤에 찍히는 5장(40·41·42·52·53)이 아직 없어,
     # 빈 폴더에서는 25장이라 실패하고 이전 실행 잔재가 있을 때만 통과했다(2026-09-24 실측).
     _want=["00_login","05_project_mgmt","06_module_cpq_stub","10_project_bound","11_code_builder","11b_revisions","12_macro_tab",
            "13_macro_approved","14_edim_run","15_bom_cost","16_design_tab","20_setup_subcode","21_setup_product_table",
            "22_setup_relationship","23_codebuilder_from_subcode","30_toolbox_program","31_toolbox_ui_tool","40_company_admin",
            "41_platform_console","42_user_management","43_drawings","44_document_tab","45_purchasing","46_quotation_print",
-           "47_techdata_print","48_dxf_plan","49_dxf_assembly","51_accepted","52_register","53_schedule","54_toolbar","55_project_mgmt","56_print_setup","57_ui_design","58_material","59_arrangement_code","60_spec_input","61_drawing_purpose","62_company_db","63_input_data","64_viewer3d","65_price_to_cost","66_project_contacts","67_partner_edit","68_spec_import","69_code_approval","70_dwg_view","71_techdata_list","72_mfg_rate","73_erp_master","74_sub_drawing"]
+           "47_techdata_print","48_dxf_plan","49_dxf_assembly","51_accepted","52_register","53_schedule","54_toolbar","55_project_mgmt","56_print_setup","57_ui_design","58_material","59_arrangement_code","60_spec_input","61_drawing_purpose","62_company_db","63_input_data","64_viewer3d","65_price_to_cost","66_project_contacts","67_partner_edit","68_spec_import","69_code_approval","70_dwg_view","71_techdata_list","72_mfg_rate","73_erp_master","74_sub_drawing","75_output_template"]
     _miss=[w for w in _want if not os.path.exists(f"{OUT}/{w}.png") or os.path.getmtime(f"{OUT}/{w}.png")<T0]
-    ok("S37 캡처 51장이 이번 실행에서 전부 나온다 (잔재 파일은 세지 않음)", _miss or len(_want), not _miss)
+    ok("S37 캡처 52장이 이번 실행에서 전부 나온다 (잔재 파일은 세지 않음)", _miss or len(_want), not _miss)
     b.close()
 n=sum(1 for v in R.values() if v[0]); print(f"\n[demo_e2e] {n}/{len(R)} steps passed"); json.dump(R,open(f"{OUT}/demo_e2e_result.json","w",encoding="utf-8"),ensure_ascii=False,indent=1)
 sys.exit(0 if n==len(R) else 1)

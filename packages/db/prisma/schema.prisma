@@ -54,6 +54,9 @@ model Tenant {
   mfgRates        MfgRate[]
   erpMasters      ErpMaster[]
   drawingTemplateItems DrawingTemplateItem[]
+  outputItems     OutputItem[]
+  graphDefs       GraphDef[]
+  tableMetas      TableMeta[]
 
   @@map("tenant")
 }
@@ -794,4 +797,64 @@ model DrawingTemplateItem {
 
   @@index([tenantId, productCode], map: "drawing_template_item_product_idx")
   @@map("drawing_template_item")
+}
+
+/// 0029 · p16 · p47 Output Data 템플릿 — 출처 macro(승인 매크로 결과) | snapshot(ref = 원가·치수·줄 수 경로)
+model OutputItem {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  docType   String   @default("techdata") @map("doc_type")
+  seq       Int      @default(0)
+  key       String
+  label     String
+  unit      String   @default("")
+  source    String
+  ref       String?
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdBy String   @map("created_by") @db.Uuid
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, docType, key])
+  @@map("output_item")
+}
+
+/// 0029 · p47 그래프 전용 data(점) + 그래프(막대/선) · 선택: Output 항목 값 표시선
+model GraphDef {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  docType   String   @default("techdata") @map("doc_type")
+  seq       Int      @default(0)
+  name      String
+  chart     String
+  xLabel    String   @default("") @map("x_label")
+  yLabel    String   @default("") @map("y_label")
+  points    Json
+  markerKey String?  @map("marker_key")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdBy String   @map("created_by") @db.Uuid
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, docType, name])
+  @@map("graph_def")
+}
+
+/// 0029 · p16 · p47 Table List — 등록 표마다 부서 · Table Type(variant|tech|material) · 설명 · 변형 원본
+model TableMeta {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  productCode String   @map("product_code")
+  tableName   String   @map("table_name")
+  tableType   String   @map("table_type")
+  department  String   @default("")
+  description String   @default("")
+  variantOf   String?  @map("variant_of")
+  updatedAt   DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+  updatedBy   String   @map("updated_by") @db.Uuid
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, productCode, tableName])
+  @@map("table_meta")
 }

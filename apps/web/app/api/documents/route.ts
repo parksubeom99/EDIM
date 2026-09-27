@@ -5,6 +5,7 @@ import { businessToday } from "@/app/lib/today";
 import { canEditProject } from "@/app/lib/project-perms";
 import { documentSourceFromRun } from "@/app/lib/output/document-source";
 import { buildQuotationBody, buildTechDataBody, noCoreOf, resolveInputData, type InputDataValue } from "@/app/lib/output/document";
+import { resolveOutputs, snapshotGraphs, type OutputDataValue, type GraphSnap } from "@/app/lib/output-template";
 
 /** GET = 문서 목록 · POST = BOM 스냅샷에서 견적(p66)·Tech Data(p15~16)를 떠서 남긴다. */
 export async function GET(req: NextRequest) {
@@ -42,6 +43,16 @@ export async function POST(req: NextRequest) {
     if (!r.ok) return NextResponse.json({ error: r.error }, { status: r.status });
     inputData = r.values;
   }
+  // H6 · 0029 Output Data 템플릿 · 그래프 — 스냅샷에서 값을 읽어 body 에 박는다(새 계산 없음 · 승인 매크로 결과 또는 스냅샷 값만).
+  let extra: { outputData?: OutputDataValue[]; graphs?: GraphSnap[] } = {};
+  if (type === "techdata") {
+    const [odefs, gdefs] = await withTenant(session.tenantId, async (tx) => [
+      await tx.outputItem.findMany({ where: { docType: "techdata" }, orderBy: [{ seq: "asc" }, { createdAt: "asc" }] }),
+      await tx.graphDef.findMany({ where: { docType: "techdata" }, orderBy: [{ seq: "asc" }, { createdAt: "asc" }] }),
+    ] as const);
+    const outputData = resolveOutputs(odefs.map((d) => ({ key: d.key, label: d.label, unit: d.unit, source: d.source, ref: d.ref })), src.run);
+    extra = { outputData, graphs: snapshotGraphs(gdefs.map((g) => ({ name: g.name, chart: g.chart, xLabel: g.xLabel, yLabel: g.yLabel, points: g.points, markerKey: g.markerKey })), outputData) };
+  }
 
   // 본문을 먼저 한 번 만들어 본다 — 거부할 스냅샷이면 번호를 쓰기 전에 돌려보낸다.
   const date = businessToday();   // 문서 날짜 = 회사 시간대의 오늘
@@ -53,7 +64,7 @@ export async function POST(req: NextRequest) {
   const make = (docNo: string, rev: string) =>
     type === "quotation"
       ? buildQuotationBody(src.run, src.project, opts, docNo, rev, date)
-      : buildTechDataBody(src.run, src.project, docNo, rev, date, inputData);
+      : buildTechDataBody(src.run, src.project, docNo, rev, date, inputData, extra);
   const probe = make("-", "-");
   if (!probe.ok) return NextResponse.json({ error: probe.error }, { status: probe.status });
 

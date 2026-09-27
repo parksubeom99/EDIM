@@ -68,6 +68,10 @@ async function resetDemo(): Promise<void> {
   await adminPrisma.erpMaster.deleteMany({ where: { tenantId: t } });
   // 0028: 리허설이 만든 도면 템플릿(Sub Drawing 호출 · 주의사항, p39 · p40).
   await adminPrisma.drawingTemplateItem.deleteMany({ where: { tenantId: t } });
+  // 0029: 리허설이 만든 Output Data 템플릿 · 그래프 · Table List 칸(p16 · p47).
+  await adminPrisma.outputItem.deleteMany({ where: { tenantId: t } });
+  await adminPrisma.graphDef.deleteMany({ where: { tenantId: t } });
+  await adminPrisma.tableMeta.deleteMany({ where: { tenantId: t } });
   // 리허설이 역할을 바꿔 놓았을 수 있다(User Management 시연) → 시드 역할로 되돌린다.
   await adminPrisma.membership.updateMany({ where: { tenantId: t, userId: IDS.viewerA }, data: { role: "viewer" } });
   await adminPrisma.membership.updateMany({ where: { tenantId: t, userId: IDS.ownerA }, data: { role: "owner" } });

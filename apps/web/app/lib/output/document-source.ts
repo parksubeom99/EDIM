@@ -20,7 +20,7 @@ export async function documentSourceFromRun(
       run: {
         id: snap.id, code: snap.code, slots: snap.slots, macroValue: snap.macroValue,
         macroId: snap.macroId, macroRevision: snap.macroRevision, macroDsl: snap.macroDsl,
-        catalogFp: snap.catalogFp, codeRevisionId: snap.codeRevisionId,
+        catalogFp: snap.catalogFp, codeRevisionId: snap.codeRevisionId, dims: snap.dims,
         lines: snap.lines, cost: snap.cost, stableId: snap.hierarchyStable,
       },
       project: p ? { projectNo: p.projectNo, name: p.name, clientName: p.clientName } : null,

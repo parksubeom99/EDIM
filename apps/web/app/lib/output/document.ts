@@ -6,6 +6,7 @@
  * (DB·세션을 모른다 — 그래서 단위 테스트가 된다.)
  */
 import type { LaborBasis } from "./bom";
+import { graphSvg, type OutputDataValue, type GraphSnap } from "../output-template";
 
 export interface SnapshotLike {
   id: string;
@@ -19,6 +20,8 @@ export interface SnapshotLike {
   codeRevisionId: string | null;
   lines: unknown;
   cost: unknown;
+  /** 0011 스냅샷 치수(W·H·L) — H6 Output 항목이 읽는다 */
+  dims?: unknown;
 }
 
 export interface ProjectLike {
@@ -179,6 +182,10 @@ export interface TechDataBody {
   macro: { id: string; revision: number; dsl: string };
   /** p16 Output Data */
   output: { name: string; value: number };
+  /** H6 · 0029 Output Data 템플릿 값 — 만들 때의 스냅샷(출처: 승인 매크로 결과 · 스냅샷 값). 템플릿이 없으면 없다. */
+  outputData?: OutputDataValue[];
+  /** H6 · 그래프(그래프 전용 data 점 + 표시선 값) — 만들 때의 스냅샷 */
+  graphs?: GraphSnap[];
   source: SourceStamp;
 }
 
@@ -209,6 +216,7 @@ export function resolveInputData(defs: InputItemDef[], raw: unknown): { ok: true
 
 export function buildTechDataBody(
   run: SnapshotLike, project: ProjectLike | null, docNo: string, rev: string, date: string, inputData: InputDataValue[] = [],
+  extra: { outputData?: OutputDataValue[]; graphs?: GraphSnap[] } = {},
 ): { ok: true; body: TechDataBody } | Refusal {
   if (run.macroValue === null || !Number.isFinite(run.macroValue))
     return { ok: false, status: 422, error: "이 BOM 스냅샷은 승인 매크로 없이 실행됐습니다 — Tech Data 로 낼 결과값이 없습니다." };
@@ -225,6 +233,8 @@ export function buildTechDataBody(
       ...(inputData.length > 0 ? { inputData } : {}),
       macro: { id: run.macroId, revision: run.macroRevision, dsl: run.macroDsl },
       output: { name: "Macro result", value: run.macroValue },
+      ...(extra.outputData && extra.outputData.length > 0 ? { outputData: extra.outputData } : {}),
+      ...(extra.graphs && extra.graphs.length > 0 ? { graphs: extra.graphs } : {}),
       source: stampOf(run),
     },
   };
@@ -362,7 +372,9 @@ ${b.inputData && b.inputData.length > 0 ? `<table data-testid="techdata-inputdat
 <h2>Macro · 승인 개정 r${b.macro.revision}</h2>
 <table><tr><th>Macro id</th><td class="mono">${esc(b.macro.id)}</td></tr><tr><th>Coding</th><td><pre data-testid="techdata-dsl">${esc(b.macro.dsl)}</pre></td></tr></table>
 <h2>Output Data</h2>
-<table><tr><th>${esc(b.output.name)}</th><td class="n"><span class="amount" data-testid="techdata-value">${esc(Math.round(b.output.value * 1000) / 1000)}</span></td></tr></table>`;
+<table><tr><th>${esc(b.output.name)}</th><td class="n"><span class="amount" data-testid="techdata-value">${esc(Math.round(b.output.value * 1000) / 1000)}</span></td></tr></table>
+${b.outputData && b.outputData.length > 0 ? `<table data-testid="techdata-outputdata"><tr>${b.outputData.map((o) => `<th>${esc(o.label)}</th>`).join("")}</tr><tr>${b.outputData.map((o) => `<td class="mono" data-key="${esc(o.key)}">${o.value === null ? `<span style="color:#b45309">${esc(o.note ?? "없음")}</span>` : `${esc(Math.round(o.value * 1000) / 1000)} ${esc(o.unit)}`}</td>`).join("")}</tr></table>` : ""}
+${b.graphs && b.graphs.length > 0 ? `<h2>Graph</h2>${b.graphs.map((g) => `<figure data-testid="techdata-graph" data-name="${esc(g.name)}" style="margin:6px 0"><figcaption style="font-size:12px;font-weight:600">${esc(g.name)}</figcaption>${graphSvg(g)}</figure>`).join("")}` : ""}`;
 }
 
 /** p48 Print Set-up — 모양만 바꾸는 CSS. 숫자·내용은 그대로다(스냅샷에서 옮긴 body 를 다시 계산하지 않는다). */
