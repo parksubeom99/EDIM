@@ -284,6 +284,7 @@ export function MainFormShell({
               canEdit={canEdit}
               canDecide={canDecide}
               runId={runs.find((r) => r.kind === "bom" && r.runId)?.runId ?? null}
+              nodeStable={selectedNode}
             />
           </div>
         </aside>

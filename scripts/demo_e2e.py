@@ -1524,6 +1524,29 @@ with sync_playwright() as p:
     gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data={"email":"owner@globex.test"}); g1=gb.request.get(TD).json()["rows"]; gb.close()
     ok("S59d 잘못된 상태 400 · 읽기 전용이라 viewer 는 볼 수 있다(200) · 다른 회사는 우리 Tech Data 를 못 본다(0건)", (bs.status, v1.status, len(g1)),
        bs.status==400 and v1.status==200 and len(g1)==0)
+    # ── S60 F8 · p18 · p16 Data Up-Load — 작업대 노드에 자료를 올리고 Inspector 에 목록(F4 첨부·0014 저장소 재사용) ──
+    AT=BASE+"/api/attachments"; NP="a0000000-0000-4000-8000-000000000004"; NI="a0000000-0000-4000-8000-000000000003"
+    CSV8="item,value\nairflow,55000\n"
+    pg.goto(NODE4,wait_until="domcontentloaded"); hydrated(pg); nuke(pg)
+    pg.wait_for_selector("[data-testid=node-upload][data-ready='1']",timeout=30000)
+    pg.set_input_files("[data-testid=node-upload-file]",files=[{"name":"site_survey.csv","mimeType":"text/csv","buffer":CSV8.encode("utf-8")}])
+    pg.click("[data-testid=node-upload-upload]"); pg.wait_for_selector("[data-testid=node-upload-row][data-kind=data]",timeout=30000)
+    pg.goto(BASE+f"/workbench?node={NI}",wait_until="domcontentloaded"); hydrated(pg); nuke(pg)
+    pg.wait_for_selector("[data-testid=node-upload][data-ready='1']",timeout=30000)
+    pg.set_input_files("[data-testid=node-upload-file]",files=[{"name":"coil_datasheet.pdf","mimeType":"application/pdf","buffer":b"%PDF-1.4\n% e2e\n"}])
+    pg.click("[data-testid=node-upload-upload]"); pg.wait_for_selector("[data-testid=node-upload-row][data-kind=data]",timeout=30000)
+    lp=ctx.request.get(AT+f"?ownerKind=node&ownerKey={NP}").json()["rows"]; li=ctx.request.get(AT+f"?ownerKind=node&ownerKey={NI}").json()["rows"]
+    got=ctx.request.get(AT+f"/{lp[0]['id']}/file").text()
+    ok("S60a 작업대 노드마다 자료를 올린다 — 프로젝트 노드(CSV)와 프로젝트가 아닌 Item 노드(PDF) 각각 Inspector 목록에 뜨고, 내려받으면 그대로",
+       (len(lp), len(li), got==CSV8), len(lp)==1 and len(li)==1 and got==CSV8)
+    def upn(key, name, data, c=ctx):
+        return c.request.post(AT, multipart={"ownerKind":"node","ownerKey":key,"kind":"data","file":{"name":name,"mimeType":"application/octet-stream","buffer":data}})
+    e1=upn(NP,"run.exe",b"MZ"); e2=upn("00000000-0000-4000-8000-000000000000","a.csv",b"x")
+    ok("S60b 허용 밖 확장자 415 · 없는 노드 404", (e1.status, e2.status), e1.status==415 and e2.status==404)
+    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data={"email":"viewer@acme.test"}); v1=upn(NP,"v.csv",b"x",c=vw); v2=vw.request.get(AT+f"?ownerKind=node&ownerKey={NP}"); vw.close()
+    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data={"email":"owner@globex.test"}); g1=upn(NP,"g.csv",b"x",c=gb); g2=gb.request.get(AT+f"?ownerKind=node&ownerKey={NP}").json()["rows"]; gb.close()
+    ok("S60c viewer 는 볼 수 있지만(200) 못 올린다(403) · 다른 회사는 우리 노드에 못 올리고(404) 목록도 0건", (v2.status, v1.status, g1.status, len(g2)),
+       v2.status==200 and v1.status==403 and g1.status==404 and len(g2)==0)
     # S37 은 맨 끝에서 센다 — 중간(옛 자리)에서는 뒤에 찍히는 5장(40·41·42·52·53)이 아직 없어,
     # 빈 폴더에서는 25장이라 실패하고 이전 실행 잔재가 있을 때만 통과했다(2026-09-24 실측).
     _want=["00_login","05_project_mgmt","06_module_cpq_stub","10_project_bound","11_code_builder","11b_revisions","12_macro_tab",

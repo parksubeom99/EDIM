@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type CSSProperties, type ReactNode } from "react";
+import { AttachmentPanel } from "../attachment-panel";
 import { localToday } from "@/app/lib/today";
 import { useRouter } from "next/navigation";
 import { CodeChip } from "@edim/ui";
@@ -45,6 +46,7 @@ export function Inspector({
   canEdit,
   canDecide,
   runId = null,
+  nodeStable = null,
 }: {
   project: WorkbenchProject | null;
   code: string;
@@ -54,6 +56,8 @@ export function Inspector({
   canDecide: boolean;
   /** P6 — 방금 돌린 BOM 스냅샷. 승인은 이것에 대해 요청한다. */
   runId?: string | null;
+  /** F8 · p18 Data Up-Load — 지금 고른 작업대 노드(프로젝트가 아니어도 된다) */
+  nodeStable?: string | null;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -120,6 +124,11 @@ export function Inspector({
           <CodeChip code={code || "—"} />{rev ? <span data-testid="code-rev" style={{ marginLeft: 6, fontFamily: "var(--font-mono)", fontSize: "var(--fs-12)", color: "var(--accent)" }}>Rev {rev}</span> : null}
         </Section>
         <p style={{ margin: 0 }}>프로젝트 노드를 선택하면 Spec · Data Up-Load · Schedule · Approval · Description이 바인딩됩니다.</p>
+        {nodeStable && (
+          <Section name="Data Up-Load">
+            <AttachmentPanel ownerKind="node" ownerKey={nodeStable} kinds={["data", "dwg2d", "dwg3d"]} canEdit={canEdit} title="이 노드의 자료 (p18)" testid="node-upload" />
+          </Section>
+        )}
       </div>
     );
   }
@@ -154,6 +163,9 @@ export function Inspector({
       </Section>
 
       <Section name="Data Up-Load">
+        {/* F8 · p18 — 작업대 노드에 자료를 올린다(0025 공용 첨부 · 0014 저장소 재사용). 아래는 프로젝트 접수 자료(p12) */}
+        {nodeStable && <AttachmentPanel ownerKind="node" ownerKey={nodeStable} kinds={["data", "dwg2d", "dwg3d"]} canEdit={canEdit} title="이 노드의 자료 (p18)" testid="node-upload" />}
+        <div style={{ fontSize: 11, color: "var(--ink-muted)", marginTop: 6 }}>프로젝트 접수 자료(p12)</div>
         {project.attachments.length === 0 ? (
           <span style={{ fontSize: "var(--fs-12)", color: "var(--ink-muted)" }}>첨부 없음</span>
         ) : (
