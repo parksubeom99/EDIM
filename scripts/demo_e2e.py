@@ -1796,7 +1796,7 @@ with sync_playwright() as p:
     ftypes=pg.eval_on_selector_all("[data-testid=dm-row]","es=>es.map(e=>e.dataset.type)")
     allsrc=ctx.request.get(DS).json()["rows"]; kinds={k:len([r for r in allsrc if r["type"]==k]) for k in ("table","chart","formula")}
     ok("S67a Data Management — Type of source(Table · Chart · Formula) · Directory 목록 · Formula 로 거르면 승인 매크로만(프로젝트 노드의 식이 보인다)",
-       (kinds, len(ftypes), set(ftypes)), kinds["table"]>=5 and kinds["formula"]>=1 and len(ftypes)>=1 and set(ftypes)=={"formula"} and any(r["href"].endswith(N4) for r in allsrc if r["type"]=="formula"))
+       (kinds, len(ftypes), sorted(set(ftypes))), kinds["table"]>=5 and kinds["formula"]>=1 and len(ftypes)>=1 and set(ftypes)=={"formula"} and any(r["href"].endswith(N4) for r in allsrc if r["type"]=="formula"))
     pg.select_option("[data-testid=fn-pick]","ROUND"); pg.wait_for_selector("[data-testid=fn-wizard][data-fn=ROUND]",timeout=10000)
     pg.fill("[data-testid=fn-arg-value]","SUM(Table1(A,1:4))"); pg.fill("[data-testid=fn-arg-digits]","1")
     pg.wait_for_selector("[data-testid=fn-check][data-ok='1']",timeout=30000); d1=pg.inner_text("[data-testid=fn-dsl]").strip()
