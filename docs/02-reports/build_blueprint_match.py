@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""EDIM 청사진 70장 대조 보고서 (점검 초안) — 생성기
+"""EDIM 청사진 70장 대조 보고서 (엘 확정판) — 생성기
 
 왼쪽: 청사진(EDIM.pdf) 원본 쪽  /  오른쪽: 지금 실제로 도는 화면(demo_e2e 산출 스크린샷)
 판정 데이터 PAGES 하나에서 세 가지가 나온다: 다크 HTML(화면용) · 흰 HTML(→ A4 가로 PDF) · docs/00-corpus/page-map.md
@@ -32,7 +32,7 @@ ST = {"L": "실동", "P": "부분", "N": "미착수", "C": "개념·표지"}
 def pg(st, tag, title, have=(), gap=(), ev="", shot=None, nx=""):
     return dict(st=st, tag=tag, title=title, have=list(have), gap=list(gap), ev=ev, shot=shot, nx=nx)
 
-# ── 판정 데이터 (청사진 70쪽 전수 정독 2026-09-21 · 2026-09-23 재실측 갱신 · 2026-09-27 ②~⑩ 반영 **초안**(CC · 엘 재측정 전) · repo main 실측 · 화면은 스크린샷을 눈으로 확인) ──
+# ── 판정 데이터 (청사진 70쪽 전수 정독 2026-09-21 · 2026-09-23 재실측 갱신 · 2026-09-27 ②~⑩ 반영 — CC 초안을 엘이 재측정·확정(main 2d5db0f · e2e 234/234 ×2, KST 새벽 조건 포함) · repo main 실측 · 화면은 스크린샷을 눈으로 확인) ──
 PAGES = {
  1: pg("C", "표지", "CTO Business Platform — EDIM", ["CPQ + PLM + ERP + D.T 통합이라는 정체성은 repo README 첫 문장과 발표 덱의 출발점이다"]),
  2: pg("C", "간지", "System concept"),
@@ -292,11 +292,11 @@ def counts(a=1, b=70):
 def s_cover():
     c = counts()
     return f'''<section class="slide title"><div class="stage">
-<div class="kick">EDIM · 청사진 70장 대조 · 점검 초안</div>
+<div class="kick">EDIM · 청사진 70장 대조 · 엘 확정판</div>
 <h1>70장 중<br><em>어디까지</em> 왔나</h1>
 <p class="sub">청사진(EDIM.pdf) 70쪽을 한 장씩 실제 화면 옆에 놓았습니다. 도는 것은 도는 대로, 없는 것은 없는 대로 적었습니다.</p>
 <div class="big4"><div class="b L"><i>{c["L"]}</i>실동</div><div class="b P"><i>{c["P"]}</i>부분</div><div class="b N"><i>{c["N"]}</i>미착수</div><div class="b C"><i>{c["C"]}</i>개념·표지</div></div>
-<div class="meta">main {MAIN} · {DATE} · 판정은 엘의 것 — 회장님 조정 대상</div></div></section>'''
+<div class="meta">main {MAIN} · {DATE} · 엘 재측정 확정 — typecheck 11 · 단위 203 · DB 검증 9종 · e2e 234/234 ×2(KST 새벽 조건 포함) · 회장님 조정 대상</div></div></section>'''
 
 def s_grid():
     rows = ""
