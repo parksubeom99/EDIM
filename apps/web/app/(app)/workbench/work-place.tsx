@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
+import { importInputCsv } from "@/app/lib/input-csv";
 import { SubItemList } from "./sub-item-list";
 import { CodeChip } from "@edim/ui";
 import type { SlotDef, SlotValues, AssembleResult } from "@/app/lib/rccs";
@@ -642,6 +643,7 @@ function DocumentPanel({ project, code, runs, nodeStable, canEdit }: { project: 
   const [inItems, setInItems] = useState<{ key: string; label: string; unit: string; defaultValue: number | null; minValue: number | null; maxValue: number | null }[]>([]);
   const [inVals, setInVals] = useState<Record<string, string>>({});
   const [inReady, setInReady] = useState(false);
+  const [inMsg, setInMsg] = useState<{ ok: boolean; text: string } | null>(null);   // F7 · CSV 로 입력값 채우기
   useEffect(() => {
     // 늦게 온 응답(StrictMode 이중 effect)이 사용자가 이미 적은 값을 기본값으로 되돌리지 않게: 지난 요청은 버리고, 적힌 값은 남긴다.
     let live = true;
@@ -716,7 +718,14 @@ function DocumentPanel({ project, code, runs, nodeStable, canEdit }: { project: 
                 style={{ width: 90, fontFamily: "var(--font-mono)", fontSize: "var(--fs-12)", padding: "3px 6px", border: "1px solid var(--line)", borderRadius: 4, background: "var(--surface-0)", color: "var(--ink)" }} />
             </label>
           ))}
+          <label style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <span>CSV 에서 채우기 (key,value)</span>
+            <input data-testid="doc-in-import" type="file" accept=".csv,text/csv" style={{ fontSize: 11, width: 190 }}
+              onChange={(e) => { const el = e.target; const f = el.files?.[0]; if (f) void f.text().then((t) => { const r = importInputCsv(t, inItems.map((x) => x.key)); if ("error" in r) setInMsg({ ok: false, text: r.error }); else { setInVals((v) => ({ ...v, ...r.values })); setInMsg({ ok: true, text: `CSV 에서 ${Object.keys(r.values).length}개 값을 채웠습니다 — 범위는 등록할 때 서버가 다시 봅니다` }); } el.value = ""; }); }} />
+          </label>
           <a href="/setup/input-data" style={{ color: "var(--accent)" }}>템플릿 →</a>
+          <a data-testid="doc-techdata-list" href="/techdata" style={{ color: "var(--accent)" }}>Tech Data 목록 →</a>
+          {inMsg && <span data-testid="doc-in-msg" data-ok={inMsg.ok ? "1" : "0"} style={{ color: inMsg.ok ? "var(--accent)" : "var(--warn)" }}>{inMsg.text}</span>}
           <span>아직 없음: Output Data 계산(밀도 등) · 그래프 · Coding List</span>
         </div>
       )}

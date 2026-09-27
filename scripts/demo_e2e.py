@@ -1485,15 +1485,54 @@ with sync_playwright() as p:
     vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data={"email":"viewer@acme.test"}); v1=vw.request.get(DX+f"?runId={rid6}&type=plan&format=svg"); vw.close()
     gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data={"email":"owner@globex.test"}); g1=gb.request.get(DX+f"?runId={rid6}&type=plan&format=svg"); gb.close()
     ok("S58e 읽기 전용 — viewer 는 볼 수 있다(200 · 쓰기 없음) · 다른 회사는 우리 스냅샷 도면을 못 연다(404)", (v1.status, g1.status), v1.status==200 and g1.status==404)
+    # ── S59 F7 · p15 Technical data 목록(모아보기·거르기) · 입력값 CSV Import ──
+    TD=BASE+"/api/techdata"; DOCS=BASE+"/api/documents"; N4="a0000000-0000-4000-8000-000000000004"
+    rid7=ctx.request.post(BASE+"/api/run/bom",headers=J0,data=json.dumps({"slots":S55_0,"code":"EU-55-2123-630SS-1-21-13-15","node":N4})).json().get("runId")
+    t1=ctx.request.post(DOCS,headers=J0,data=json.dumps({"runId":rid7,"type":"techdata","inputData":{"temperature":22}})).json()
+    t2=ctx.request.post(DOCS,headers=J0,data=json.dumps({"runId":rid7,"type":"techdata","inputData":{"temperature":31,"humidity":40}})).json()
+    ctx.request.patch(DOCS+f"/{t2['id']}",headers=J0,data=json.dumps({"status":"review"}))
+    pg.goto(BASE+"/techdata",wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=techdata-list][data-ready='1']",timeout=60000); nuke(pg)
+    n_all=len(pg.query_selector_all("[data-testid=td-row]"))
+    pg.select_option("[data-testid=td-status]","review"); pg.fill("[data-testid=td-q]",t2["docNo"]); pg.click("[data-testid=td-apply]")
+    pg.wait_for_selector(f"[data-testid=techdata-list][data-ready='1'][data-filter='review|{t2['docNo']}']",timeout=30000)
+    frows=pg.eval_on_selector_all("[data-testid=td-row]","es=>es.map(e=>[e.dataset.doc,e.dataset.status,e.querySelector('[data-key=temperature]')?.innerText])")
+    ok("S59a Tech Data 목록 — 스냅샷별 문서를 모아 보이고(2건 이상), 상태(검토)·문서번호로 거르면 그 문서 하나와 그때 받은 입력값(31)",
+       (n_all, frows), n_all>=2 and frows==[[t2["docNo"],"review","31"]])
+    nuke(pg); pg.screenshot(path=f"{OUT}/71_techdata_list.png",full_page=True)
+    pg.goto(NODE4,wait_until="domcontentloaded"); hydrated(pg); nuke(pg)
+    if pg.get_attribute("[data-testid=toolbox-toggle]","aria-pressed")=="true":
+        pg.click("[data-testid=toolbox-toggle]"); pg.wait_for_selector("[data-testid=toolbox-toggle][aria-pressed=false]",timeout=30000)
+    nuke(pg); pg.click("[data-run=bom]")
+    pg.locator("button", has_text=re.compile(r"^Document$")).first.click(force=True)
+    pg.wait_for_selector("[data-testid=doc-inputdata][data-ready='1']",timeout=30000)
+    pg.set_input_files("[data-testid=doc-in-import]",files=[{"name":"bad.csv","mimeType":"text/csv","buffer":"key,value\ntemperature,27\npressure2,1\n".encode("utf-8")}])
+    pg.wait_for_selector("[data-testid=doc-in-msg][data-ok='0']",timeout=10000); badmsg=pg.inner_text("[data-testid=doc-in-msg]")
+    kept=pg.input_value("[data-testid=doc-in-temperature]")
+    pg.set_input_files("[data-testid=doc-in-import]",files=[{"name":"in.csv","mimeType":"text/csv","buffer":"key,value\ntemperature,27\nhumidity,55\n".encode("utf-8")}])
+    pg.wait_for_selector("[data-testid=doc-in-msg][data-ok='1']",timeout=10000)
+    filled=(pg.input_value("[data-testid=doc-in-temperature]"), pg.input_value("[data-testid=doc-in-humidity]"))
+    ok("S59b 입력값 CSV Import — 템플릿에 없는 항목이 있으면 줄 번호와 함께 거부하고 아무것도 안 채운다 · 맞는 CSV 는 칸을 채운다",
+       (badmsg[:40], kept, filled), "3번째 줄" in badmsg and "pressure2" in badmsg and kept=="20" and filled==("27","55"))
+    pg.wait_for_function("()=>{const b=document.querySelector('[data-testid=doc-make-techdata]'); return b && !b.disabled;}",timeout=60000)
+    with pg.expect_response(lambda q: q.url.endswith("/api/documents") and q.request.method=="POST",timeout=30000) as dres:
+        pg.click("[data-testid=doc-make-techdata]")
+    d7=dres.value.json(); hp=ctx.request.get(DOCS+f"/{d7.get('id')}/print").text()
+    ok("S59c CSV 로 채운 값으로 Tech Data 를 만들면 문서에 그 값(27 °C · 55 %)이 스냅샷으로 남는다", d7.get("docNo"),
+       'data-key="temperature">27 °C' in hp and 'data-key="humidity">55 %' in hp)
+    bs=ctx.request.get(TD+"?status=bogus")
+    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data={"email":"viewer@acme.test"}); v1=vw.request.get(TD); vw.close()
+    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data={"email":"owner@globex.test"}); g1=gb.request.get(TD).json()["rows"]; gb.close()
+    ok("S59d 잘못된 상태 400 · 읽기 전용이라 viewer 는 볼 수 있다(200) · 다른 회사는 우리 Tech Data 를 못 본다(0건)", (bs.status, v1.status, len(g1)),
+       bs.status==400 and v1.status==200 and len(g1)==0)
     # S37 은 맨 끝에서 센다 — 중간(옛 자리)에서는 뒤에 찍히는 5장(40·41·42·52·53)이 아직 없어,
     # 빈 폴더에서는 25장이라 실패하고 이전 실행 잔재가 있을 때만 통과했다(2026-09-24 실측).
     _want=["00_login","05_project_mgmt","06_module_cpq_stub","10_project_bound","11_code_builder","11b_revisions","12_macro_tab",
            "13_macro_approved","14_edim_run","15_bom_cost","16_design_tab","20_setup_subcode","21_setup_product_table",
            "22_setup_relationship","23_codebuilder_from_subcode","30_toolbox_program","31_toolbox_ui_tool","40_company_admin",
            "41_platform_console","42_user_management","43_drawings","44_document_tab","45_purchasing","46_quotation_print",
-           "47_techdata_print","48_dxf_plan","49_dxf_assembly","51_accepted","52_register","53_schedule","54_toolbar","55_project_mgmt","56_print_setup","57_ui_design","58_material","59_arrangement_code","60_spec_input","61_drawing_purpose","62_company_db","63_input_data","64_viewer3d","65_price_to_cost","66_project_contacts","67_partner_edit","68_spec_import","69_code_approval","70_dwg_view"]
+           "47_techdata_print","48_dxf_plan","49_dxf_assembly","51_accepted","52_register","53_schedule","54_toolbar","55_project_mgmt","56_print_setup","57_ui_design","58_material","59_arrangement_code","60_spec_input","61_drawing_purpose","62_company_db","63_input_data","64_viewer3d","65_price_to_cost","66_project_contacts","67_partner_edit","68_spec_import","69_code_approval","70_dwg_view","71_techdata_list"]
     _miss=[w for w in _want if not os.path.exists(f"{OUT}/{w}.png") or os.path.getmtime(f"{OUT}/{w}.png")<T0]
-    ok("S37 캡처 47장이 이번 실행에서 전부 나온다 (잔재 파일은 세지 않음)", _miss or len(_want), not _miss)
+    ok("S37 캡처 48장이 이번 실행에서 전부 나온다 (잔재 파일은 세지 않음)", _miss or len(_want), not _miss)
     b.close()
 n=sum(1 for v in R.values() if v[0]); print(f"\n[demo_e2e] {n}/{len(R)} steps passed"); json.dump(R,open(f"{OUT}/demo_e2e_result.json","w",encoding="utf-8"),ensure_ascii=False,indent=1)
 sys.exit(0 if n==len(R) else 1)
