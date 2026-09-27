@@ -1277,15 +1277,53 @@ with sync_playwright() as p:
     ok("S52g 화면 BOM 표가 줄마다 단가 출처(이력 · 관계값 · 통화 불일치)를 스냅샷 그대로 보인다",
        sorted(set(srcs)), "history" in srcs and "relationship" in srcs and "currency-mismatch" in srcs)
     nuke(pg); pg.screenshot(path=f"{OUT}/65_price_to_cost.png",full_page=True)
+    # ── S53 F1 · p12 · p50 Client 담당자 여러 명(주담당 1) · 영업 활동 이력(쌓기만) — 0023 ──
+    PJ=BASE+"/api/projects"
+    pid=[x for x in ctx.request.get(PJ).json()["rows"] if x["projectNo"]=="PS-61313-5"][0]["id"]
+    pg.goto(BASE+"/m/project",wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=pm-detail][data-project='PS-61313-5']",timeout=30000)
+    pg.wait_for_selector("[data-testid=pm-crm][data-ready='1']",timeout=30000); nuke(pg)
+    pg.fill("[data-testid=pm-c-name]","김설비"); pg.fill("[data-testid=pm-c-dept]","FAB 설비팀"); pg.fill("[data-testid=pm-c-contact]","010-1111-2222")
+    pg.click("[data-testid=pm-c-add]"); pg.wait_for_selector("[data-testid='pm-contact-김설비']",timeout=30000)
+    pg.fill("[data-testid=pm-c-name]","이구매"); pg.fill("[data-testid=pm-c-dept]","구매팀"); pg.check("[data-testid=pm-c-isprimary]")
+    pg.click("[data-testid=pm-c-add]"); pg.wait_for_selector("[data-testid='pm-contact-이구매'][data-primary='1']",timeout=30000)
+    prim=pg.eval_on_selector_all("[data-testid^=pm-contact-]","es=>es.map(e=>[e.dataset.testid.replace('pm-contact-',''),e.dataset.primary])")
+    ok("S53a Client 담당자 여러 명 — 첫 담당자는 주담당, 새 담당자를 주담당으로 추가하면 주담당이 옮겨 간다(프로젝트당 1명)", prim,
+       sorted(prim)==[["김설비","0"],["이구매","1"]])
+    pg.click("[data-testid='pm-c-edit-김설비']"); pg.fill("[data-testid=pm-ce-dept]","FAB 설비2팀"); pg.click("[data-testid=pm-ce-save]")
+    wait_text(pg,"[data-testid='pm-contact-김설비']","설비2팀")
+    pg.click("[data-testid='pm-c-primary-김설비']"); pg.wait_for_selector("[data-testid='pm-contact-김설비'][data-primary='1']",timeout=30000)
+    pg.click("[data-testid='pm-c-del-이구매']"); pg.wait_for_selector("[data-testid='pm-contact-이구매']",state="detached",timeout=30000)
+    cs=ctx.request.get(PJ+f"/{pid}/contacts").json()["rows"]
+    ok("S53b 수정(부서) · 주담당 바꾸기 · 삭제가 화면에서 된다", [(c["name"],c["department"],c["isPrimary"]) for c in cs],
+       [(c["name"],c["department"],c["isPrimary"]) for c in cs]==[("김설비","FAB 설비2팀",True)])
+    pg.fill("[data-testid=pm-a-content]","사양 회의 — 풍량 55,000 CMH · SS 외판 확정"); pg.select_option("[data-testid=pm-a-kind]","meeting")
+    pg.click("[data-testid=pm-a-add]"); pg.wait_for_selector("[data-testid=pm-activity-row][data-kind=meeting]",timeout=30000)
+    pg.fill("[data-testid=pm-a-content]","견적 송부 후 통화"); pg.select_option("[data-testid=pm-a-kind]","call"); pg.click("[data-testid=pm-a-add]")
+    pg.wait_for_function("()=>document.querySelectorAll('[data-testid=pm-activity-row]').length>=2",timeout=30000)
+    nuke(pg); pg.screenshot(path=f"{OUT}/66_project_contacts.png",full_page=True)
+    acts=ctx.request.get(PJ+f"/{pid}/activities").json()["rows"]
+    pa=ctx.request.patch(PJ+f"/{pid}/activities",headers=J0,data=json.dumps({"content":"x"})); da=ctx.request.delete(PJ+f"/{pid}/activities")
+    ok("S53c 영업 활동 이력 — 날짜·종류·내용이 쌓이고(2건), 수정·삭제 요청은 405 (DB 도 앱 역할의 UPDATE/DELETE 권한이 없다)",
+       (len(acts), [a["kind"] for a in acts], pa.status, da.status), len(acts)==2 and set(a["kind"] for a in acts)=={"meeting","call"} and pa.status==405 and da.status==405)
+    e1=ctx.request.post(PJ+f"/{pid}/contacts",headers=J0,data=json.dumps({"name":"  "}))
+    e2=ctx.request.post(PJ+f"/{pid}/activities",headers=J0,data=json.dumps({"date":"2026-13-40","kind":"call","content":"x"}))
+    e3=ctx.request.post(PJ+f"/{pid}/activities",headers=J0,data=json.dumps({"date":"2026-09-27","kind":"sms","content":"x"}))
+    ok("S53d 이름 없는 담당자 · 잘못된 날짜 · 없는 종류는 400", (e1.status, e2.status, e3.status), e1.status==400 and e2.status==400 and e3.status==400)
+    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data={"email":"viewer@acme.test"})
+    v1=vw.request.post(PJ+f"/{pid}/contacts",headers=J0,data=json.dumps({"name":"v"})); v2=vw.request.post(PJ+f"/{pid}/activities",headers=J0,data=json.dumps({"date":"2026-09-27","kind":"call","content":"v"})); vw.close()
+    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data={"email":"owner@globex.test"})
+    g1=gb.request.get(PJ+f"/{pid}/contacts"); g2=gb.request.get(PJ+f"/{pid}/activities"); g3=gb.request.delete(BASE+f"/api/project-contacts/{cs[0]['id']}"); gb.close()
+    ok("S53e viewer 는 담당자·활동을 못 쌓는다(403·403) · 다른 회사는 우리 프로젝트의 담당자·활동을 못 보고 못 지운다(404·404·404)",
+       (v1.status, v2.status, g1.status, g2.status, g3.status), v1.status==403 and v2.status==403 and g1.status==404 and g2.status==404 and g3.status==404)
     # S37 은 맨 끝에서 센다 — 중간(옛 자리)에서는 뒤에 찍히는 5장(40·41·42·52·53)이 아직 없어,
     # 빈 폴더에서는 25장이라 실패하고 이전 실행 잔재가 있을 때만 통과했다(2026-09-24 실측).
     _want=["00_login","05_project_mgmt","06_module_cpq_stub","10_project_bound","11_code_builder","11b_revisions","12_macro_tab",
            "13_macro_approved","14_edim_run","15_bom_cost","16_design_tab","20_setup_subcode","21_setup_product_table",
            "22_setup_relationship","23_codebuilder_from_subcode","30_toolbox_program","31_toolbox_ui_tool","40_company_admin",
            "41_platform_console","42_user_management","43_drawings","44_document_tab","45_purchasing","46_quotation_print",
-           "47_techdata_print","48_dxf_plan","49_dxf_assembly","51_accepted","52_register","53_schedule","54_toolbar","55_project_mgmt","56_print_setup","57_ui_design","58_material","59_arrangement_code","60_spec_input","61_drawing_purpose","62_company_db","63_input_data","64_viewer3d","65_price_to_cost"]
+           "47_techdata_print","48_dxf_plan","49_dxf_assembly","51_accepted","52_register","53_schedule","54_toolbar","55_project_mgmt","56_print_setup","57_ui_design","58_material","59_arrangement_code","60_spec_input","61_drawing_purpose","62_company_db","63_input_data","64_viewer3d","65_price_to_cost","66_project_contacts"]
     _miss=[w for w in _want if not os.path.exists(f"{OUT}/{w}.png") or os.path.getmtime(f"{OUT}/{w}.png")<T0]
-    ok("S37 캡처 42장이 이번 실행에서 전부 나온다 (잔재 파일은 세지 않음)", _miss or len(_want), not _miss)
+    ok("S37 캡처 43장이 이번 실행에서 전부 나온다 (잔재 파일은 세지 않음)", _miss or len(_want), not _miss)
     b.close()
 n=sum(1 for v in R.values() if v[0]); print(f"\n[demo_e2e] {n}/{len(R)} steps passed"); json.dump(R,open(f"{OUT}/demo_e2e_result.json","w",encoding="utf-8"),ensure_ascii=False,indent=1)
 sys.exit(0 if n==len(R) else 1)

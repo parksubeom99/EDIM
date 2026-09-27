@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import { ProjectContacts } from "./project-contacts";
 
 /**
  * p12 [ERP / Sale / Project Management] · p50 같은 화면의 User ERP 판.
@@ -224,6 +225,7 @@ export function ProjectManagement({ canEdit }: { canEdit: boolean }) {
             )}
           </div>
 
+          <ProjectContacts projectId={sel.id} canEdit={canEdit} />
           <div style={card} data-testid="pm-files">
             <div style={{ ...lab, marginBottom: 6 }}>접수 자료 등록 (File) · Data Up-Load — {atts.length}건</div>
             <table data-testid="pm-att-table" style={{ width: "100%", borderCollapse: "collapse" }}>

@@ -48,6 +48,8 @@ model Tenant {
   specItems       SpecItem[]
   partners        Partner[]
   inputItems      InputItem[]
+  projectContacts ProjectContact[]
+  projectActivities ProjectActivity[]
 
   @@map("tenant")
 }
@@ -191,6 +193,8 @@ model Project {
   attachments ProjectAttachment[]
   tasks       ProjectTask[]
   approvals   ProjectApproval[]
+  contacts    ProjectContact[]
+  activities  ProjectActivity[]
 
   @@unique([tenantId, projectNo])
   @@index([tenantId, hierarchyStable])
@@ -668,4 +672,41 @@ model InputItem {
 
   @@unique([tenantId, docType, key], map: "input_item_tenant_id_doc_type_key_key")
   @@map("input_item")
+}
+
+/// 0023 · p12 · p50 — Client 담당자 여러 명(주담당 최대 1명 · 부분 unique)
+model ProjectContact {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  projectId  String   @map("project_id") @db.Uuid
+  name       String
+  department String   @default("")
+  contact    String   @default("")
+  isPrimary  Boolean  @default(false) @map("is_primary")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdBy  String   @map("created_by") @db.Uuid
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, projectId], map: "project_contact_project_idx")
+  @@map("project_contact")
+}
+
+/// 0023 · p12 · p50 — 영업 활동 이력. 쌓기만(앱 역할에 UPDATE/DELETE 권한 없음)
+model ProjectActivity {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  projectId    String   @map("project_id") @db.Uuid
+  activityDate DateTime @map("activity_date") @db.Date
+  kind         String
+  content      String
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdBy    String   @map("created_by") @db.Uuid
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, projectId, activityDate], map: "project_activity_project_idx")
+  @@map("project_activity")
 }
