@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import { FunctionWizard } from "../setup/toolbox/function-wizard";
 import type { WorkbenchProject } from "./mainform-shell";
 import type { RunResult } from "./action-bar";
 
@@ -23,6 +24,7 @@ export function MacroPanel({
   project, nodeStable, canEdit, canDecide, runs,
 }: { project: WorkbenchProject | null; nodeStable: string | null; canEdit: boolean; canDecide: boolean; runs: RunResult[] }) {
   const [dsl, setDsl] = useState(SAMPLE_DSL);
+  const [wizard, setWizard] = useState(false);
   const [diags, setDiags] = useState<Diag[] | null>(null);
   const [rows, setRows] = useState<MacroRow[]>([]);
   const [msg, setMsg] = useState<string | null>(null);
@@ -72,8 +74,11 @@ export function MacroPanel({
         <button type="button" data-testid="macro-verify" disabled={busy || !nodeStable} style={btn()} onClick={() => post("verify")}>Verify</button>
         {canEdit && <button type="button" data-testid="macro-draft" disabled={busy || !nodeStable} style={btn(true)} onClick={() => post("draft")}>Save draft</button>}
         <span style={muted}>코드참조 A B C D E F CAP CMH · SUM(Table1(A|B|C, r:r)) · Var(NS, 10|15|20)</span>
+        <button type="button" data-testid="macro-fn-wizard-toggle" onClick={() => setWizard((w) => !w)} style={btn()}>{wizard ? "함수 마법사 닫기" : "함수 마법사"}</button>
         {msg && <span data-testid="macro-msg" style={{ marginLeft: "auto", fontSize: "var(--fs-12)", color: "var(--ink-muted)" }}>{msg}</span>}
       </div>
+      {/* H8 · p57 함수 마법사 — 식 글자만 만든다. 넣은 뒤 Verify → Save draft → 승인은 이 탭 그대로 */}
+      {wizard && <div style={{ marginTop: 8 }}><FunctionWizard onInsert={(t) => { setDsl(t); setWizard(false); }} /></div>}
       {diags && diags.length > 0 && (
         <ul style={{ margin: "6px 0 0", paddingLeft: 18, fontSize: "var(--fs-12)" }}>
           {diags.map((d, i) => <li key={i} style={{ color: d.severity === "error" ? "var(--warn)" : "var(--ink-muted)" }}>[{d.severity}] {d.message}</li>)}

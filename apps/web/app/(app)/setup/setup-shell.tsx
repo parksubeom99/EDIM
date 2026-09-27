@@ -49,6 +49,7 @@ export function SetupShell({ initialTab }: { initialTab: Tab }) {
         <Link href="/workbench" style={{ color: "var(--accent)", fontSize: "var(--fs-13)" }}>← MainForm</Link>
         <Link href="/setup/map" data-testid="setup-link-map" style={{ color: "var(--accent)", fontSize: "var(--fs-13)", fontWeight: 700 }}>Set-Up 지도 (p54) →</Link>
         <Link href="/setup/arrangement-code" data-testid="setup-link-arrangement-code" style={{ color: "var(--accent)", fontSize: "var(--fs-13)" }}>Arrangement Code (p35) →</Link>
+        <Link href="/setup/toolbox" data-testid="setup-link-toolbox" style={{ color: "var(--accent)", fontSize: "var(--fs-13)" }}>Toolbox Macro · 마법사 (p57) →</Link>
         <Link href="/setup/coding-list" data-testid="setup-link-coding-list" style={{ color: "var(--accent)", fontSize: "var(--fs-13)" }}>Coding List (p47) →</Link>
         <Link href="/setup/document" data-testid="setup-link-document" style={{ color: "var(--accent)", fontSize: "var(--fs-13)" }}>Output · 그래프 · Table List (p47) →</Link>
         <Link href="/setup/input-data" data-testid="setup-link-input-data" style={{ color: "var(--accent)", fontSize: "var(--fs-13)" }}>Input Data (p16) →</Link>

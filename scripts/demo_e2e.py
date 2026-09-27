@@ -1788,15 +1788,57 @@ with sync_playwright() as p:
     gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data={"email":"owner@globex.test"}); g0=gb.request.get(CL).json().get("rows",[]); gb.close()
     ok("S66d 읽기 목록 — viewer 도 본다(200) · 다른 회사 목록에는 우리 노드가 없다", (v0.status, len(g0), any(r["stableId"]==N4 for r in g0)),
        v0.status==200 and not any(r["stableId"] in (N4, ahu["stableId"]) for r in g0))
+    # ── S67 H8 · p57 Toolbox Macro — Data Management(목록) · 함수 마법사(식 글자 → 기존 파서·Verify) · 그래프 마법사(H6 그래프를 단계로) ──
+    DS=BASE+"/api/setup/data-sources"
+    pg.goto(BASE+"/setup",wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=setup-link-toolbox]",timeout=30000); nuke(pg)
+    pg.click("[data-testid=setup-link-toolbox]"); pg.wait_for_selector("[data-testid=data-mgmt][data-ready='1']",timeout=60000); nuke(pg)
+    pg.select_option("[data-testid=dm-type]","formula"); pg.wait_for_selector("[data-testid=data-mgmt][data-ready='1'][data-type=formula]",timeout=30000)
+    ftypes=pg.eval_on_selector_all("[data-testid=dm-row]","es=>es.map(e=>e.dataset.type)")
+    allsrc=ctx.request.get(DS).json()["rows"]; kinds={k:len([r for r in allsrc if r["type"]==k]) for k in ("table","chart","formula")}
+    ok("S67a Data Management — Type of source(Table · Chart · Formula) · Directory 목록 · Formula 로 거르면 승인 매크로만(프로젝트 노드의 식이 보인다)",
+       (kinds, len(ftypes), set(ftypes)), kinds["table"]>=5 and kinds["formula"]>=1 and len(ftypes)>=1 and set(ftypes)=={"formula"} and any(r["href"].endswith(N4) for r in allsrc if r["type"]=="formula"))
+    pg.select_option("[data-testid=fn-pick]","ROUND"); pg.wait_for_selector("[data-testid=fn-wizard][data-fn=ROUND]",timeout=10000)
+    pg.fill("[data-testid=fn-arg-value]","SUM(Table1(A,1:4))"); pg.fill("[data-testid=fn-arg-digits]","1")
+    pg.wait_for_selector("[data-testid=fn-check][data-ok='1']",timeout=30000); d1=pg.inner_text("[data-testid=fn-dsl]").strip()
+    pg.select_option("[data-testid=fn-pick]","Table"); pg.wait_for_selector("[data-testid=fn-wizard][data-fn=Table]",timeout=10000)
+    pg.fill("[data-testid=fn-arg-r0]","5"); pg.fill("[data-testid=fn-arg-r1]","1"); wait_text(pg,"[data-testid=fn-dsl]","시작 행"); bad=pg.inner_text("[data-testid=fn-dsl]")
+    pg.select_option("[data-testid=fn-pick]","PreC"); pg.wait_for_selector("[data-testid=fn-note]",timeout=10000); note=pg.inner_text("[data-testid=fn-note]")
+    ok("S67b 함수 마법사 — ROUND 를 고르고 인자를 채우면 =ROUND(SUM(Table1(A,1:4)), 1) · 기존 파서 통과 · 잘못된 행 범위는 식을 만들지 않고 이유 · PreC 는 예약(실행 안 됨) 경고",
+       (d1, bad[:20], note[:20]), d1=="=ROUND(SUM(Table1(A,1:4)), 1)" and "시작 행" in bad and "RESERVED" in note)
+    pg.click("[data-testid=gw-chart-bar]"); pg.click("[data-testid=gw-next]")
+    pg.fill("[data-testid=gw-points]","1월,12\n2월,18\n3월,9"); pg.wait_for_selector("[data-testid=gw-preview] svg[data-points='3']",timeout=10000); pg.click("[data-testid=gw-next]")
+    pg.click("[data-testid=gw-next]"); pg.fill("[data-testid=gw-name]","Monthly orders"); pg.fill("[data-testid=gw-x]","월"); pg.fill("[data-testid=gw-y]","대수")
+    nuke(pg); pg.screenshot(path=f"{OUT}/77_wizards.png",full_page=True)
+    pg.click("[data-testid=gw-create]"); pg.wait_for_selector("[data-testid=gw-msg][data-ok='1']",timeout=30000)
+    gs=[g for g in ctx.request.get(BASE+"/api/setup/graphs").json()["rows"] if g["name"]=="Monthly orders"]
+    ok("S67c 그래프 마법사 — 모양(막대) → 그래프 전용 data 3점 → 표시선(없음) → 이름·축 → 만들기 = H6 그래프 한 곳에 저장 · Data Management 의 Chart 에 보인다",
+       ([(g["chart"],len(g["points"])) for g in gs], any(r["name"]=="Monthly orders" for r in ctx.request.get(DS+"?type=chart").json()["rows"])),
+       len(gs)==1 and gs[0]["chart"]=="bar" and len(gs[0]["points"])==3 and any(r["name"]=="Monthly orders" for r in ctx.request.get(DS+"?type=chart").json()["rows"]))
+    pg.goto(BASE+f"/workbench?node={N4}",wait_until="domcontentloaded"); hydrated(pg); nuke(pg)
+    pg.locator("button", has_text=re.compile(r"^Macro$")).first.click(); pg.wait_for_selector("[data-testid=macro-fn-wizard-toggle]",timeout=30000)
+    pg.click("[data-testid=macro-fn-wizard-toggle]"); pg.wait_for_selector("[data-testid=fn-wizard]",timeout=10000)
+    pg.select_option("[data-testid=fn-pick]","SUM"); pg.wait_for_selector("[data-testid=fn-wizard][data-fn=SUM]",timeout=10000)
+    pg.fill("[data-testid=fn-arg-table]","Table1(A,4:4)"); pg.wait_for_selector("[data-testid=fn-insert]:not([disabled])",timeout=30000); pg.click("[data-testid=fn-insert]")
+    dv=pg.input_value("[data-testid=macro-dsl]")
+    with pg.expect_response(lambda r: r.url.endswith("/api/macros") and r.request.method=="POST", timeout=30000) as vr:
+        pg.click("[data-testid=macro-verify]")
+    vj=vr.value.json()
+    ok("S67d 작업대 Macro 탭의 함수 마법사 → Macro 칸에 넣기 → 기존 Verify 가 그대로 검사한다(저장·승인은 그 탭 한 곳)", (dv, vr.value.status, [d.get("severity") for d in vj.get("diagnostics",[])]),
+       dv=="=SUM(Table1(A,4:4))" and vr.value.status==200 and not any(d.get("severity")=="error" for d in vj.get("diagnostics",[])))
+    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data={"email":"viewer@acme.test"}); v0=vw.request.get(DS); vw.close()
+    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data={"email":"owner@globex.test"}); g0=gb.request.get(DS).json().get("rows",[]); gb.close()
+    bq=ctx.request.get(DS+"?type=zzz")
+    ok("S67e Data Management 는 읽기 목록 — viewer 200 · 다른 회사 목록에는 우리 식·그래프가 없다 · 모르는 type 400",
+       (v0.status, len(g0), bq.status), v0.status==200 and not any(r["type"] in ("formula","chart") and (r["href"].endswith(N4) or r["name"]=="Monthly orders") for r in g0) and bq.status==400)
     # S37 은 맨 끝에서 센다 — 중간(옛 자리)에서는 뒤에 찍히는 5장(40·41·42·52·53)이 아직 없어,
     # 빈 폴더에서는 25장이라 실패하고 이전 실행 잔재가 있을 때만 통과했다(2026-09-24 실측).
     _want=["00_login","05_project_mgmt","06_module_cpq_stub","10_project_bound","11_code_builder","11b_revisions","12_macro_tab",
            "13_macro_approved","14_edim_run","15_bom_cost","16_design_tab","20_setup_subcode","21_setup_product_table",
            "22_setup_relationship","23_codebuilder_from_subcode","30_toolbox_program","31_toolbox_ui_tool","40_company_admin",
            "41_platform_console","42_user_management","43_drawings","44_document_tab","45_purchasing","46_quotation_print",
-           "47_techdata_print","48_dxf_plan","49_dxf_assembly","51_accepted","52_register","53_schedule","54_toolbar","55_project_mgmt","56_print_setup","57_ui_design","58_material","59_arrangement_code","60_spec_input","61_drawing_purpose","62_company_db","63_input_data","64_viewer3d","65_price_to_cost","66_project_contacts","67_partner_edit","68_spec_import","69_code_approval","70_dwg_view","71_techdata_list","72_mfg_rate","73_erp_master","74_sub_drawing","75_output_template","76_coding_list"]
+           "47_techdata_print","48_dxf_plan","49_dxf_assembly","51_accepted","52_register","53_schedule","54_toolbar","55_project_mgmt","56_print_setup","57_ui_design","58_material","59_arrangement_code","60_spec_input","61_drawing_purpose","62_company_db","63_input_data","64_viewer3d","65_price_to_cost","66_project_contacts","67_partner_edit","68_spec_import","69_code_approval","70_dwg_view","71_techdata_list","72_mfg_rate","73_erp_master","74_sub_drawing","75_output_template","76_coding_list","77_wizards"]
     _miss=[w for w in _want if not os.path.exists(f"{OUT}/{w}.png") or os.path.getmtime(f"{OUT}/{w}.png")<T0]
-    ok("S37 캡처 53장이 이번 실행에서 전부 나온다 (잔재 파일은 세지 않음)", _miss or len(_want), not _miss)
+    ok("S37 캡처 54장이 이번 실행에서 전부 나온다 (잔재 파일은 세지 않음)", _miss or len(_want), not _miss)
     b.close()
 n=sum(1 for v in R.values() if v[0]); print(f"\n[demo_e2e] {n}/{len(R)} steps passed"); json.dump(R,open(f"{OUT}/demo_e2e_result.json","w",encoding="utf-8"),ensure_ascii=False,indent=1)
 sys.exit(0 if n==len(R) else 1)
