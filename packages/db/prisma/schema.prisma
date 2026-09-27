@@ -58,6 +58,7 @@ model Tenant {
   graphDefs       GraphDef[]
   tableMetas      TableMeta[]
   printLayouts    PrintLayout[]
+  drawingAnnotations DrawingAnnotation[]
 
   @@map("tenant")
 }
@@ -876,4 +877,25 @@ model PrintLayout {
 
   @@unique([tenantId, docType, version])
   @@map("print_layout")
+}
+
+/// 0031 · p58 그림 제작 Module 1단계 — 도면 주석(선 · 사각형 · 글자 · 치수선, 도면 좌표 mm). 원 도면과 따로 · DXF 내보낼 때 ANNOT 레이어
+model DrawingAnnotation {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  drawingId String   @map("drawing_id") @db.Uuid
+  kind      String
+  x1        Float
+  y1        Float
+  x2        Float
+  y2        Float
+  text      String?
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+  createdBy String   @map("created_by") @db.Uuid
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, drawingId], map: "drawing_annotation_drawing_idx")
+  @@map("drawing_annotation")
 }

@@ -914,6 +914,8 @@ function DrawingRegister({ runId, nodeStable, canEdit, verify }: { runId: string
                   </a>
                 );
               })()}
+              {/* H10 · p58 그림 제작 Module — 도면 위 주석(원 도면 불변) */}
+              <a href={`/drawings/${d.id}/annotate`} data-testid="drawing-annotate" style={{ color: "var(--accent)" }}>주석</a>
               {canEdit && DRAW_NEXT[d.status] && (
                 <button type="button" data-testid={`drawing-advance-${d.drawingNo}-${d.currentRev}`} onClick={() => void advance(d.id, DRAW_NEXT[d.status]!)}
                   style={{ fontSize: "var(--fs-12)", padding: "2px 8px", background: "transparent", color: "var(--ink)", border: "1px solid var(--line)", borderRadius: "var(--radius-sm)" }}>

@@ -5,18 +5,30 @@ import {
 } from "@edim/db";
 import { getServerSession } from "@/app/lib/session";
 import { canEditProject } from "@/app/lib/project-perms";
+import { withAnnotations, type Annot } from "@/app/lib/annotation";
 
-/** GET = 도면 DXF 내려받기 · PATCH = 상태 전이(작성중→검토→승인→발행) 또는 { purpose } 용도 바꾸기(발행 전까지만 · 0020). */
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+/**
+ * GET = 도면 DXF 내려받기(?annot=1 이면 H10 주석을 ANNOT 레이어로 덧붙인 사본 — 원 DXF 는 그대로)
+ * PATCH = 상태 전이(작성중→검토→승인→발행) 또는 { purpose } 용도 바꾸기(발행 전까지만 · 0020).
+ */
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession();
   if (!session) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   const { id } = await params;
-  const row = await withTenant(session.tenantId, (tx) => getDrawing(tx, id));
-  if (!row) return NextResponse.json({ error: "not found" }, { status: 404 });
-  return new NextResponse(row.dxf, {
+  const annot = req.nextUrl.searchParams.get("annot") === "1";
+  const out = await withTenant(session.tenantId, async (tx) => {
+    const row = await getDrawing(tx, id);
+    if (!row) return null;
+    const notes = annot ? await tx.drawingAnnotation.findMany({ where: { drawingId: row.id }, orderBy: { createdAt: "asc" } }) : [];
+    return { row, notes };
+  });
+  if (!out) return NextResponse.json({ error: "not found" }, { status: 404 });
+  const { row, notes } = out;
+  const body = annot ? withAnnotations(row.dxf, notes.map((n) => ({ kind: n.kind as Annot["kind"], x1: n.x1, y1: n.y1, x2: n.x2, y2: n.y2, text: n.text }))) : row.dxf;
+  return new NextResponse(body, {
     headers: {
       "content-type": "application/dxf",
-      "content-disposition": `attachment; filename="${row.drawingNo}-Rev${row.currentRev}.dxf"`,
+      "content-disposition": `attachment; filename="${row.drawingNo}-Rev${row.currentRev}${annot ? "-annot" : ""}.dxf"`,
     },
   });
 }

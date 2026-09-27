@@ -1872,15 +1872,64 @@ with sync_playwright() as p:
     g0=gb.request.get(PL+"?docType=techdata").json(); g2=gb.request.get(DOCS+f"/{tdA.get('id')}/print"); gb.close()
     ok("S68e viewer 는 보지만(200) 저장 못 한다(403) · 다른 회사는 우리 양식 버전 0 · 우리 발행본 인쇄 404",
        (v0.status, v1.status, len(g0.get("versions",[])), g2.status), v0.status==200 and v1.status==403 and len(g0.get("versions",[]))==0 and g0.get("latest") is None and g2.status==404)
+    # ── S69 H10 · p58 그림 제작 Module 1단계 — 도면 위 주석(선 · 사각형 · 글자 · 치수선) 추가·이동·삭제 · 원 도면 불변 · DXF 에 ANNOT 레이어 ──
+    DRW=BASE+"/api/drawings"
+    r69,_c69=run10(); d69=ctx.request.post(DRW,headers=J0,data=json.dumps({"runId":r69["runId"],"type":"plan"})).json(); DID=d69.get("id")
+    orig0=ctx.request.get(DRW+f"/{DID}").text()
+    pg.goto(BASE+f"/drawings/{DID}/annotate",wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=annot-editor][data-ready='1']",timeout=60000); nuke(pg)
+    ob=pg.locator("[data-testid=annot-overlay]").bounding_box()
+    P=lambda fx,fy: (ob["x"]+ob["width"]*fx, ob["y"]+ob["height"]*fy)
+    def drag_on(a,b_):
+        pg.mouse.move(*a); pg.mouse.down(); pg.mouse.move(*b_, steps=6); pg.mouse.up()
+    def want_count(n): pg.wait_for_selector(f"[data-testid=annot-editor][data-count='{n}']",timeout=30000)
+    pg.click("[data-testid=annot-tool-line]"); drag_on(P(.2,.7),P(.6,.7)); want_count(1)
+    pg.click("[data-testid=annot-tool-rect]"); drag_on(P(.3,.2),P(.5,.4)); want_count(2)
+    pg.click("[data-testid=annot-tool-text]"); pg.fill("[data-testid=annot-text-input]","용접 주의"); pg.mouse.click(*P(.7,.3)); want_count(3)
+    pg.click("[data-testid=annot-tool-dim]"); drag_on(P(.1,.85),P(.8,.85)); want_count(4)
+    nuke(pg); pg.screenshot(path=f"{OUT}/79_draw_module.png",full_page=True)
+    AN=DRW+f"/{DID}/annotations"; rows=ctx.request.get(AN).json()["rows"]
+    ok("S69a 도면 위에 선 · 사각형 · 글자 · 치수선을 끌어/눌러 더한다 — 도면 좌표(mm)로 저장",
+       sorted((r["kind"], r.get("text")) for r in rows), sorted(r["kind"] for r in rows)==["dim","line","rect","text"] and [r["text"] for r in rows if r["kind"]=="text"]==["용접 주의"])
+    ln0=[r for r in rows if r["kind"]=="line"][0]
+    pg.click("[data-testid=annot-tool-select]")
+    lb=pg.locator(f"[data-testid=annot-{ln0['id']}]").bounding_box(); drag_on((lb["x"]+lb["width"]/2, lb["y"]+lb["height"]/2),(lb["x"]+lb["width"]/2+80, lb["y"]+lb["height"]/2))
+    wait_text(pg,"[data-testid=annot-msg]","옮겼습니다")
+    tx0=[r for r in rows if r["kind"]=="text"][0]; tb=pg.locator(f"[data-testid=annot-{tx0['id']}]").bounding_box()
+    pg.mouse.click(tb["x"]+tb["width"]/2, tb["y"]+tb["height"]/2); pg.click("[data-testid=annot-del]"); want_count(3)
+    rows2=ctx.request.get(AN).json()["rows"]; ln1=[r for r in rows2 if r["kind"]=="line"][0]
+    ok("S69b 고르기로 선을 끌어 옮기고(x 가 커짐 · 길이 그대로) · 글자 주석을 골라 지운다", (ln0["x1"], ln1["x1"], round(ln0["x2"]-ln0["x1"],1), round(ln1["x2"]-ln1["x1"],1), sorted(r["kind"] for r in rows2)),
+       ln1["x1"]>ln0["x1"] and abs((ln1["x2"]-ln1["x1"])-(ln0["x2"]-ln0["x1"]))<0.2 and sorted(r["kind"] for r in rows2)==["dim","line","rect"])
+    orig1=ctx.request.get(DRW+f"/{DID}").text(); ann=ctx.request.get(DRW+f"/{DID}?annot=1")
+    ad=ezdxf.read(io.StringIO(ann.text())); ae=[e for e in ad.modelspace()]; od=[e for e in ezdxf.read(io.StringIO(orig1)).modelspace()]
+    al=[e for e in ae if e.dxf.layer=="ANNOT"]
+    ok("S69c 원 도면 DXF 는 한 글자도 안 바뀐다 · 주석 포함 DXF(?annot=1)는 ANNOT 레이어에 선 1 + 사각형 4 + 치수선(선 3 · 글자 1) = 선 8 · 글자 1 · 나머지 엔티티 = 원 도면",
+       (orig0==orig1, len([e for e in al if e.dxftype()=="LINE"]), len([e for e in al if e.dxftype()=="TEXT"]), len(ae)-len(al), len(od), "annot.dxf" in (ann.headers.get("content-disposition") or "")),
+       orig0==orig1 and len([e for e in al if e.dxftype()=="LINE"])==8 and len([e for e in al if e.dxftype()=="TEXT"])==1 and len(ae)-len(al)==len(od))
+    dI=ctx.request.post(DRW,headers=J0,data=json.dumps({"runId":RUN1,"type":"plan"})).json()
+    for st in ("review","approved","issued"): ist=ctx.request.patch(DRW+f"/{dI.get('id')}",headers=J0,data=json.dumps({"status":st}))
+    lk=ctx.request.post(DRW+f"/{dI.get('id')}/annotations",headers=J0,data=json.dumps({"kind":"line","x1":0,"y1":0,"x2":100,"y2":0}))
+    pg.goto(BASE+f"/drawings/{dI.get('id')}/annotate",wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=annot-editor][data-locked='1']",timeout=60000)
+    ok("S69d 발행된 도면에는 주석을 더하지 못한다(409) · 편집기는 잠김 표시 · Free CAD · 설계 심볼은 잠긴 자리(이유)", (ist.status, lk.status, bool(pg.query_selector("[data-testid=annot-locked]")), len(pg.query_selector_all("[data-testid=annot-locked-tool]"))),
+       ist.status==200 and lk.status==409 and bool(pg.query_selector("[data-testid=annot-locked]")) and len(pg.query_selector_all("[data-testid=annot-locked-tool]"))==2)
+    q=lambda body: ctx.request.post(AN,headers=J0,data=json.dumps(body))
+    e1=q({"kind":"text","x1":0,"y1":0}); e2=q({"kind":"circle","x1":0,"y1":0,"x2":10,"y2":10}); e3=q({"kind":"line","x1":5,"y1":5,"x2":5,"y2":5})
+    e4=ctx.request.patch(BASE+f"/api/drawing-annotations/{ln1['id']}",headers=J0,data=json.dumps({"kind":"rect"}))
+    ok("S69e 글자 없는 글자 주석 400 · 모르는 종류 400 · 두 점이 같은 선 400 · 종류 바꾸기 400", (e1.status,e2.status,e3.status,e4.status), (e1.status,e2.status,e3.status,e4.status)==(400,400,400,400))
+    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data={"email":"viewer@acme.test"})
+    v0=vw.request.get(AN); v1=vw.request.post(AN,headers=J0,data=json.dumps({"kind":"line","x1":0,"y1":0,"x2":100,"y2":0})); v2=vw.request.delete(BASE+f"/api/drawing-annotations/{ln1['id']}"); vw.close()
+    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data={"email":"owner@globex.test"})
+    g0=gb.request.get(AN); g1=gb.request.patch(BASE+f"/api/drawing-annotations/{ln1['id']}",headers=J0,data=json.dumps({"dx":10,"dy":0})); g2=gb.request.get(DRW+f"/{DID}?annot=1"); gb.close()
+    ok("S69f viewer 는 보지만(200) 못 더하고·못 지운다(403) · 다른 회사는 우리 도면 주석을 못 보고 못 옮긴다(404) · 주석 DXF 도 404",
+       (v0.status,v1.status,v2.status,g0.status,g1.status,g2.status), (v0.status,v1.status,v2.status,g0.status,g1.status,g2.status)==(200,403,403,404,404,404))
     # S37 은 맨 끝에서 센다 — 중간(옛 자리)에서는 뒤에 찍히는 5장(40·41·42·52·53)이 아직 없어,
     # 빈 폴더에서는 25장이라 실패하고 이전 실행 잔재가 있을 때만 통과했다(2026-09-24 실측).
     _want=["00_login","05_project_mgmt","06_module_cpq_stub","10_project_bound","11_code_builder","11b_revisions","12_macro_tab",
            "13_macro_approved","14_edim_run","15_bom_cost","16_design_tab","20_setup_subcode","21_setup_product_table",
            "22_setup_relationship","23_codebuilder_from_subcode","30_toolbox_program","31_toolbox_ui_tool","40_company_admin",
            "41_platform_console","42_user_management","43_drawings","44_document_tab","45_purchasing","46_quotation_print",
-           "47_techdata_print","48_dxf_plan","49_dxf_assembly","51_accepted","52_register","53_schedule","54_toolbar","55_project_mgmt","56_print_setup","57_ui_design","58_material","59_arrangement_code","60_spec_input","61_drawing_purpose","62_company_db","63_input_data","64_viewer3d","65_price_to_cost","66_project_contacts","67_partner_edit","68_spec_import","69_code_approval","70_dwg_view","71_techdata_list","72_mfg_rate","73_erp_master","74_sub_drawing","75_output_template","76_coding_list","77_wizards","78_print_layout"]
+           "47_techdata_print","48_dxf_plan","49_dxf_assembly","51_accepted","52_register","53_schedule","54_toolbar","55_project_mgmt","56_print_setup","57_ui_design","58_material","59_arrangement_code","60_spec_input","61_drawing_purpose","62_company_db","63_input_data","64_viewer3d","65_price_to_cost","66_project_contacts","67_partner_edit","68_spec_import","69_code_approval","70_dwg_view","71_techdata_list","72_mfg_rate","73_erp_master","74_sub_drawing","75_output_template","76_coding_list","77_wizards","78_print_layout","79_draw_module"]
     _miss=[w for w in _want if not os.path.exists(f"{OUT}/{w}.png") or os.path.getmtime(f"{OUT}/{w}.png")<T0]
-    ok("S37 캡처 55장이 이번 실행에서 전부 나온다 (잔재 파일은 세지 않음)", _miss or len(_want), not _miss)
+    ok("S37 캡처 56장이 이번 실행에서 전부 나온다 (잔재 파일은 세지 않음)", _miss or len(_want), not _miss)
     b.close()
 n=sum(1 for v in R.values() if v[0]); print(f"\n[demo_e2e] {n}/{len(R)} steps passed"); json.dump(R,open(f"{OUT}/demo_e2e_result.json","w",encoding="utf-8"),ensure_ascii=False,indent=1)
 sys.exit(0 if n==len(R) else 1)

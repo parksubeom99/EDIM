@@ -39,15 +39,22 @@ export function readDxfEntities(dxf: string): DxfEntities {
   return out;
 }
 
-export function dxfToSvg(dxf: string): { svg: string; counts: { lines: number; circles: number; texts: number; skipped: number } } {
-  const e = readDxfEntities(dxf);
+/** H10 · DXF 모델 좌표(mm) ↔ SVG 좌표의 틀. 주석 편집기가 같은 틀로 겹쳐 그린다. svgX = x − minX + pad · svgY = maxY − y + pad */
+export interface DxfFrame { minX: number; maxY: number; pad: number; W: number; H: number }
+export function dxfFrame(e: DxfEntities): DxfFrame {
   const xs: number[] = [], ys: number[] = [];
   for (const l of e.lines) { xs.push(l.x1, l.x2); ys.push(l.y1, l.y2); }
   for (const c of e.circles) { xs.push(c.x - c.r, c.x + c.r); ys.push(c.y - c.r, c.y + c.r); }
   for (const t of e.texts) { xs.push(t.x, t.x + t.h * Math.max(t.value.length, 1) * 0.6); ys.push(t.y, t.y + t.h); }
   const minX = Math.min(...xs, 0), maxX = Math.max(...xs, 1), minY = Math.min(...ys, 0), maxY = Math.max(...ys, 1);
   const pad = Math.max(maxX - minX, maxY - minY) * 0.03;
-  const W = maxX - minX + pad * 2, H = maxY - minY + pad * 2;
+  return { minX, maxY, pad, W: maxX - minX + pad * 2, H: maxY - minY + pad * 2 };
+}
+
+export function dxfToSvg(dxf: string): { svg: string; counts: { lines: number; circles: number; texts: number; skipped: number }; frame: DxfFrame } {
+  const e = readDxfEntities(dxf);
+  const frame = dxfFrame(e);
+  const { minX, maxY, pad, W, H } = frame;
   const X = (x: number) => (x - minX + pad).toFixed(1), Y = (y: number) => (maxY - y + pad).toFixed(1);
   const sw = (Math.max(W, H) / 900).toFixed(2);
   const body = [
@@ -56,5 +63,5 @@ export function dxfToSvg(dxf: string): { svg: string; counts: { lines: number; c
     ...e.texts.map((t) => `<text x="${X(t.x)}" y="${Y(t.y)}" font-size="${t.h.toFixed(1)}" fill="${COLOR[t.layer] ?? "#1f4e8c"}" font-family="monospace">${esc(t.value)}</text>`),
   ].join("");
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W.toFixed(1)} ${H.toFixed(1)}" stroke-width="${sw}" data-lines="${e.lines.length}" data-circles="${e.circles.length}" data-texts="${e.texts.length}"><rect width="100%" height="100%" fill="#ffffff"/>${body}</svg>`;
-  return { svg, counts: { lines: e.lines.length, circles: e.circles.length, texts: e.texts.length, skipped: e.skipped } };
+  return { svg, counts: { lines: e.lines.length, circles: e.circles.length, texts: e.texts.length, skipped: e.skipped }, frame };
 }

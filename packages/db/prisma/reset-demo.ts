@@ -27,6 +27,7 @@ async function resetDemo(): Promise<void> {
   // 도면이 BOM 스냅샷을 참조하므로 **도면을 먼저** 지운다(FK RESTRICT).
   // 발행된 도면은 트리거가 삭제를 막으므로(운영에서는 그게 맞다) 리셋 동안만 내린다.
   await adminPrisma.$executeRawUnsafe(`ALTER TABLE "drawing" DISABLE TRIGGER USER`);
+  await adminPrisma.drawingAnnotation.deleteMany({ where: { tenantId: t } });   // 0031 · 도면 주석(도면보다 먼저 — cascade 지만 명시)
   const dwg = await adminPrisma.drawing.deleteMany({ where: { tenantId: t } });
   await adminPrisma.$executeRawUnsafe(`ALTER TABLE "drawing" ENABLE TRIGGER USER`);
   // P4-b: 문서·구매 요청도 BOM 스냅샷을 참조한다 → 스냅샷보다 **먼저** 지운다.
