@@ -375,7 +375,7 @@ def s_remaining():
     return '''<section class="slide"><div class="stage"><header><span class="no">끝1</span><h2>남은 작업 — 엘·CC 가 지시만 받으면 하는 것</h2></header>
 <div class="own"><table class="ot"><thead><tr><th>#</th><th>작업</th><th>왜 엘·CC 가 할 수 있나</th><th>선행 조건</th><th>나오는 것</th></tr></thead><tbody>
 <tr><td>E1</td><td>ERP 기준정보 등록 화면 — Department Std · Warehouse · Inventory · Bank · Employee · Nation</td><td>Company DB(F2)와 같은 틀 · 격리 패턴이 이미 있다</td><td>없음 — 지시만(값은 회사가 채움)</td><td>p64 부분 → 실동</td></tr>
-<tr><td>E2</td><td><b>배포 전 점검</b> — 운영 빌드에서 DB 연결 수 초과(HTTP 500) · 연결 풀 설정</td><td>엘이 샌드박스 운영 빌드로 재현했다(개발 모드에선 안 보임)</td><td>배포 결정 전 필수</td><td>배포 준비 · p9 선행</td></tr>
+<tr><td>E2</td><td><b>배포 전 점검</b> — 운영 빌드 DB 연결 고갈(HTTP 500) 수리본 <code>fix/prisma-client-cache</code>(d0f6cb0) 머지 · 배포 환경 점검</td><td>엘이 운영 빌드로 재현·수리했다 — 수리 후 e2e 287/287 · 동시 연결 14(개발 모드에선 안 보임)</td><td>CC 머지 게이트 · 배포 결정 전 필수</td><td>배포 준비 · p9 선행</td></tr>
 <tr><td>E3</td><td>Sub Drawing 호출 · Detail Design · Output Data 템플릿 · 그래프 · 함수/그래프 마법사 · 인쇄 양식 편집기</td><td>도면·문서·매크로 뼈대가 돌고 있다 — 기능 확장이다</td><td>규모가 커서 여러 날 · 순서 결정</td><td>p16 · 39 · 40 · 47 · 48 · 57 보강</td></tr>
 <tr><td>E4</td><td>EDIM 안 CAD 편집기 · 설계 심볼 · 제작도 수준 도면</td><td>도면 선·치수 전파는 이미 결정론으로 돈다</td><td>E3 이후 · 회사 CAD 규칙(M4)</td><td>p58 · 38 부분 → 실동</td></tr>
 <tr><td>E5</td><td>발표 덱 · 진행현황 보고서를 이번 main 반영본으로 재생성</td><td>생성기가 repo 에 있다</td><td>이 판정을 회장님이 조정한 뒤</td><td>덱 · 진행현황 새 판</td></tr>
