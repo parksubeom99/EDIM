@@ -88,6 +88,17 @@ export interface QuotationBody {
   vat: "별도";
   terms: { delivery: string; payment: string; validity: string; warranty: string };
   source: SourceStamp;
+  /** ccmd E · p67 — 이 스냅샷 원가의 단가 출처(줄 수). 출처가 박힌 스냅샷(단가 이력 연결 이후)에만 있다. */
+  priceBasis?: { history: number; relationship: number; mismatch: number; dates: string[] };
+}
+
+/** 스냅샷 줄에 박힌 단가 출처를 센다 — 다시 계산하지 않는다. 출처가 없는 옛 스냅샷이면 null. */
+function priceBasisOf(run: SnapshotLike): QuotationBody["priceBasis"] | null {
+  const raw = Array.isArray(run.lines) ? (run.lines as { priceSource?: { kind?: string; effectiveFrom?: string } }[]) : [];
+  if (!raw.some((l) => l.priceSource)) return null;
+  const k = (x: string) => raw.filter((l) => l.priceSource?.kind === x).length;
+  const dates = [...new Set(raw.map((l) => l.priceSource?.effectiveFrom).filter((d): d is string => !!d))].sort();
+  return { history: k("history"), relationship: k("relationship"), mismatch: k("currency-mismatch"), dates };
 }
 
 export function buildQuotationBody(
@@ -116,6 +127,7 @@ export function buildQuotationBody(
         validity: opts.validity ?? "", warranty: opts.warranty ?? "",
       },
       source: stampOf(run),
+      ...(priceBasisOf(run) ? { priceBasis: priceBasisOf(run)! } : {}),
     },
   };
 }
@@ -294,7 +306,8 @@ function quotationHtml(b: QuotationBody): string {
 <tr><th>No</th><th>장비 번호</th><th class="n">수량</th><th class="n">단가</th><th class="n">합계</th><th>비고</th></tr>
 ${b.items.map((i) => `<tr><td>${i.no}</td><td class="mono">${esc(i.equipment)}</td><td class="n">${i.qty}</td><td class="n">${won(i.unitPrice)}</td><td class="n">${won(i.amount)}</td><td></td></tr>`).join("")}
 <tr><th colspan="2">합계</th><td class="n">${b.totalQty}</td><td></td><td class="n"><b>${won(b.total)}</b></td><td></td></tr>
-</table>`;
+</table>
+${b.priceBasis ? `<p data-testid="price-basis" style="font-size:11px;color:#555">단가 기준: 스냅샷 시점 유효 단가 — 단가 이력 ${b.priceBasis.history}줄${b.priceBasis.dates.length ? `(유효일 ${esc(b.priceBasis.dates.join(", "))})` : ""} · 코드 관계값 ${b.priceBasis.relationship}줄${b.priceBasis.mismatch ? ` · 통화 불일치로 관계값 ${b.priceBasis.mismatch}줄` : ""}</p>` : ""}`;
 }
 
 function techDataHtml(b: TechDataBody): string {

@@ -2,7 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { withTenant, writeAudit, requireTenant } from "@edim/db";
 import { guard, str } from "../_guard";
 import { partnerOk } from "@/app/lib/partner";
-import { businessToday } from "@/app/lib/today";
+import { businessToday, dateOnly } from "@/app/lib/today";
+import { currentByItem } from "@/app/lib/price";
 
 /**
  * p32 G:Price · p67 단가 이력. GET ?code= → 그 코드의 이력(최근 유효일 먼저) + 품목별 현재 단가.
@@ -22,9 +23,8 @@ export async function GET(req: NextRequest) {
     tx.priceHistory.findMany({ where: { code }, orderBy: [{ effectiveFrom: "desc" }, { createdAt: "desc" }] }));
   const t = today();
   const view = rows.map((r) => ({ id: r.id, item: r.item, price: Number(r.price), currency: r.currency, supplier: r.supplier, supplierId: r.supplierId,
-    effectiveFrom: r.effectiveFrom.toISOString().slice(0, 10), note: r.note, createdAt: r.createdAt }));
-  const current: Record<string, (typeof view)[number]> = {};
-  for (const r of view) if (r.effectiveFrom <= t && !current[r.item]) current[r.item] = r;   // 정렬상 첫 번째가 가장 최근
+    effectiveFrom: dateOnly(r.effectiveFrom), note: r.note, createdAt: r.createdAt }));
+  const current = currentByItem(view, t);   // "현재 단가" 판정 한 곳 — BOM Run 도 같은 함수(app/lib/price.ts)
   return NextResponse.json({ rows: view.map((r) => ({ ...r, state: r.effectiveFrom > t ? "예정" : current[r.item]?.id === r.id ? "현재" : "지난" })), current });
 }
 

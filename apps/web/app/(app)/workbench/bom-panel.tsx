@@ -4,6 +4,7 @@ import type { CSSProperties } from "react";
 import { CodeChip } from "@edim/ui";
 import type { RunResult } from "./action-bar";
 import type { BomLine, EbomGroup, CostSummary } from "@/app/lib/output/bom";
+import { priceSourceLabel, type PriceSource } from "@/app/lib/price";
 
 const card: CSSProperties = { background: "var(--surface-2)", border: "1px solid var(--line)", borderRadius: "var(--radius)", padding: 14 };
 const h: CSSProperties = { fontFamily: "var(--font-display)", fontSize: "var(--fs-14)", fontWeight: 600, margin: "0 0 8px" };
@@ -16,7 +17,7 @@ export function BomPanel({ code, runs }: { code: string; runs: RunResult[] }) {
   const bom = runs.find((r) => r.kind === "bom" && r.status === "ran") as (RunResult & { lines?: BomLine[] }) | undefined;
   const ebom = runs.find((r) => r.kind === "ebom" && r.status === "ran") as (RunResult & { groups?: EbomGroup[] }) | undefined;
   const cost = runs.find((r) => r.kind === "cost" && r.status === "ran") as (RunResult & { cost?: CostSummary }) | undefined;
-  const lines = bom?.lines ?? [];
+  const lines = (bom?.lines ?? []) as (BomLine & { priceSource?: PriceSource })[];
 
   return (
     <div style={{ display: "grid", gap: 12 }}>
@@ -30,7 +31,7 @@ export function BomPanel({ code, runs }: { code: string; runs: RunResult[] }) {
           <p style={{ ...muted, margin: 0 }}>아직 실행 결과 없음</p>
         ) : (
           <table data-testid="bom-table" style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead><tr><th style={th}>#</th><th style={th}>Code</th><th style={th}>Section</th><th style={th}>Part</th><th style={th}>Spec</th><th style={{ ...th, textAlign: "right" }}>Qty</th><th style={th}>Mat.</th><th style={{ ...th, textAlign: "right" }}>Unit ₩</th><th style={{ ...th, textAlign: "right" }}>Amount ₩</th></tr></thead>
+            <thead><tr><th style={th}>#</th><th style={th}>Code</th><th style={th}>Section</th><th style={th}>Part</th><th style={th}>Spec</th><th style={{ ...th, textAlign: "right" }}>Qty</th><th style={th}>Mat.</th><th style={{ ...th, textAlign: "right" }}>Unit ₩</th><th style={th}>단가 출처</th><th style={{ ...th, textAlign: "right" }}>Amount ₩</th></tr></thead>
             <tbody>
               {lines.map((l) => (
                 <tr key={l.no} data-bom-row={l.no}>
@@ -41,6 +42,7 @@ export function BomPanel({ code, runs }: { code: string; runs: RunResult[] }) {
                   <td style={{ ...td, textAlign: "right", fontFamily: "var(--font-mono)" }}>{l.qty} {l.unit}</td>
                   <td style={td}>{l.material}</td>
                   <td style={{ ...td, textAlign: "right", fontFamily: "var(--font-mono)" }}>{l.unitCost.toLocaleString("ko-KR")}</td>
+                  <td data-price-src={l.priceSource?.kind ?? ""} style={{ ...td, fontSize: "var(--fs-12)", whiteSpace: "nowrap", color: l.priceSource?.kind === "history" ? "var(--accent)" : l.priceSource?.kind === "currency-mismatch" ? "var(--warn)" : "var(--ink-muted)" }}>{priceSourceLabel(l.priceSource) || "—"}</td>
                   <td style={{ ...td, textAlign: "right", fontFamily: "var(--font-mono)", color: "var(--accent)" }}>{(l.qty * l.unitCost).toLocaleString("ko-KR")}</td>
                 </tr>
               ))}
@@ -74,7 +76,7 @@ export function BomPanel({ code, runs }: { code: string; runs: RunResult[] }) {
               <dd data-testid="cost-total" style={{ margin: 0, fontFamily: "var(--font-mono)", textAlign: "right", fontWeight: 700, color: "var(--accent)", fontSize: "var(--fs-16)", borderTop: "1px solid var(--line)", paddingTop: 6 }}>{won(cost.cost.total)}</dd>
             </dl>
           )}
-          <p style={{ ...muted, margin: "8px 0 0" }}>단가는 샘플 값 — 실 단가표 바인딩 대상.</p>
+          <p style={{ ...muted, margin: "8px 0 0" }}>단가 = BOM Run 순간의 현재 단가 이력(Set-Up ▸ 자재·구매품 · p67), 없으면 코드 관계값(샘플). 스냅샷 값을 보여 줄 뿐 다시 계산하지 않는다. 아직 없음: 통화 환산 · 관계 배율(재질)의 이력 단가 적용.</p>
         </div>
       </div>
     </div>

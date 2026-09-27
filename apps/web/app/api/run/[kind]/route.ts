@@ -4,7 +4,9 @@ import { canEditProject } from "@/app/lib/project-perms";
 import { runApprovedForSession } from "@/app/lib/macro/run";
 import type { SlotValues } from "@/app/lib/rccs";
 import { buildEbom, buildCost } from "@/app/lib/output/bom";
-import { runBomCode, toBomLine, catalogFingerprint, dimsFor, sectionDimsFor, designRulesOf, checkDesign } from "@edim/bom-code";
+import { runBomCode, toBomLine, catalogFingerprint, dimsFor, sectionDimsFor, designRulesOf, checkDesign, buyItemOf } from "@edim/bom-code";
+import { applyPriceHistory, type PriceRowLike } from "@/app/lib/price";
+import { businessToday, dateOnly } from "@/app/lib/today";
 import { loadCatalog } from "@/app/lib/catalog";
 import { withTenant, saveBomCodeRun, getBomRun, revisionIdForSlots } from "@edim/db";
 
@@ -99,9 +101,17 @@ export async function POST(
   const result = runBomCode(catalog, slots, macroValue);
   if (!result.ok)
     return NextResponse.json({ error: `${result.error.code}: ${result.error.message}`, rejected }, { status: 422 });
-  const lines = result.lines.map(toBomLine);
-  const trace = result.lines.map((l) => ({ no: l.no, childCode: l.childCode, resolvedCode: l.resolvedCode, relSeq: l.relSeq, remarks: l.remarks }));
-  const catalogFp = catalogFingerprint(catalog);
+  const catalogFp = catalogFingerprint(catalog);   // 단가 이력은 카탈로그가 아니다 — 지문에 넣지 않는다(단가 한 줄로 옛 스냅샷이 막히지 않게)
+  // p67 단가 이력 → 원가(ccmd E): BOM Run 순간 "현재 단가"를 줄에 입히고 출처를 박는다. 이후 스냅샷은 바뀌지 않는다.
+  const codes = [...new Set(result.lines.map((l) => l.childCode))];
+  const priceRows = await withTenant(session.tenantId, (tx) => tx.priceHistory.findMany({ where: { code: { in: codes } } }));
+  const byCode = new Map<string, PriceRowLike[]>();
+  for (const r of priceRows)
+    byCode.set(r.code, [...(byCode.get(r.code) ?? []), { id: r.id, item: r.item, price: Number(r.price), currency: r.currency, supplier: r.supplier, effectiveFrom: dateOnly(r.effectiveFrom), createdAt: r.createdAt }]);
+  const productOf = new Map(catalog.productCodes.map((p) => [p.code, p]));
+  const priced = applyPriceHistory(result.lines, byCode, (l) => { const p = productOf.get(l.childCode); return p ? buyItemOf(p, slots) : null; }, businessToday());
+  const lines = priced.map((l) => ({ ...toBomLine(l), priceSource: l.priceSource }));
+  const trace = priced.map((l) => ({ no: l.no, childCode: l.childCode, resolvedCode: l.resolvedCode, relSeq: l.relSeq, remarks: l.remarks }));
   if (kind === "bom") {
     const cost = buildCost(lines);
     const clean: Record<string, string> = {};
@@ -121,7 +131,7 @@ export async function POST(
       saveBomCodeRun(tx, {
         stableId: node,
         code: typeof body.code === "string" ? body.code : "", slots: clean, macroValue, parentCode: result.parent,
-        catalogFp, lines: result.lines as unknown as object[], cost: cost as unknown as object,
+        catalogFp, lines: priced as unknown as object[], cost: cost as unknown as object,
         // 이 슬롯 조합으로 저장된 개정만 근거로 삼는다(없으면 null — 최신 개정을 대신 박지 않는다).
         codeRevisionId: node ? await revisionIdForSlots(tx, node, clean) : null,
         ...(macroSrc ?? {}),

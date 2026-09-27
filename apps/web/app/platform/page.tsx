@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { businessDateOf } from "@/app/lib/today";
 import {
   listTenantsForPlatform,
   listPlatformRequests,
@@ -132,7 +133,7 @@ export default async function PlatformPage() {
                   {t.slug}
                 </td>
                 <td style={td}>
-                  {new Date(t.createdAt).toISOString().slice(0, 10)}
+                  {businessDateOf(t.createdAt)}
                 </td>
                 <td style={td}>
                   {t.requestCount}

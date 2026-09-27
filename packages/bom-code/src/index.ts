@@ -220,14 +220,28 @@ export function sectionsFor(product: ProductCode, slots: SlotValues, macroValue:
 export function buyAttrsOf(code: ProductCode, slots: SlotValues = {}): Record<string, string> {
   const t = Object.values(code.tables ?? {}).find((x) => x.role === "buy");
   if (!t || t.rows.length === 0) return {};
-  const want = (slots[t.by] ?? "") || t.default;
-  const row = t.rows.find((r) => r.item === want) ?? t.rows[0]!;
+  const row = buyRowOf(t, slots);
   const out: Record<string, string> = {};
   for (const c of t.cols) {
     const v = row.cells[c.key];
     if (v !== undefined && v !== null && String(v) !== "") out[c.name] = String(v);
   }
   return out;
+}
+
+function buyRowOf(t: TechTable, slots: SlotValues): TableRow {
+  const want = (slots[t.by] ?? "") || t.default;
+  return t.rows.find((r) => r.item === want) ?? t.rows[0]!;
+}
+
+/**
+ * 이 슬롯에서 그 코드의 구매 속성표(buy)가 고르는 행의 Item — 단가 이력(p67 price_history.item)을 찾는 키.
+ * buyAttrsOf 와 같은 규칙(한 곳). buy 표가 없으면 null(단가 이력은 item "" 행만 본다).
+ */
+export function buyItemOf(code: ProductCode, slots: SlotValues = {}): string | null {
+  const t = Object.values(code.tables ?? {}).find((x) => x.role === "buy");
+  if (!t || t.rows.length === 0) return null;
+  return buyRowOf(t, slots).item;
 }
 
 /**

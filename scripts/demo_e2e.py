@@ -1226,15 +1226,66 @@ with sync_playwright() as p:
     gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data={"email":"owner@globex.test"})
     g3=gb.request.get(M3+f"?runId={rid3}"); gb.close()
     ok("S51d 읽기 전용 — viewer 도 볼 수 있다(200 · 쓰기 API 없음) · 다른 회사는 우리 스냅샷을 못 연다(404)", (v3.status, g3.status), v3.status==200 and g3.status==404)
+    # ── S52 ccmd E · p67 단가 이력 → BOM 원가·견적·구매 — BOM Run 순간의 "현재 단가"가 줄에 박히고, 스냅샷은 그 뒤 바뀌지 않는다 ──
+    PRC=BASE+"/api/setup/prices"; RUNB=BASE+"/api/run/bom"; N4="a0000000-0000-4000-8000-000000000004"
+    def bom_run():
+        return ctx.request.post(RUNB,headers=J0,data=json.dumps({"slots":S55_0,"code":"EU-55-2123-630SS-1-21-13-15","node":N4})).json()
+    def line_of(run,code):
+        tr={t["no"]:t["childCode"] for t in run["trace"]}
+        return [l for l in run["lines"] if tr.get(l["no"])==code][0]
+    TODAY=_dt.date.today().isoformat()
+    p1=ctx.request.post(PRC,headers=J0,data=json.dumps({"code":"PFP 1","price":25000,"effectiveFrom":TODAY,"note":"E2E price-to-cost"})).json()
+    r1=bom_run(); l1=line_of(r1,"PFP 1")
+    ok("S52a 현재 단가를 등록하고 BOM Run → 그 줄 단가 = 등록 단가, 출처 '이력'(priceId · 유효일)",
+       (l1["unitCost"], l1.get("priceSource")), l1["unitCost"]==25000 and l1.get("priceSource",{}).get("kind")=="history" and l1["priceSource"].get("priceId")==p1.get("id") and l1["priceSource"].get("effectiveFrom")==TODAY)
+    c1=ctx.request.post(BASE+"/api/run/cost",headers=J0,data=json.dumps({"runId":r1["runId"]})).json()["cost"]
+    mat=sum(l["qty"]*l["unitCost"] for l in r1["lines"]); lab=round(mat*0.18); ovh=round((mat+lab)*0.12)
+    ok("S52b 원가 합계 = Σ 수량×단가로 다시 세어 일치 (재료비 · 인건비 18% · 경비 12%)", (c1["material"],c1["labor"],c1["overhead"],c1["total"]),
+       c1["material"]==mat and c1["labor"]==lab and c1["overhead"]==ovh and c1["total"]==mat+lab+ovh)
+    q1=ctx.request.post(BASE+"/api/documents",headers=J0,data=json.dumps({"runId":r1["runId"],"type":"quotation"})).json()
+    qh=ctx.request.get(BASE+f"/api/documents/{q1.get('id')}/print").text()
+    pr1=ctx.request.post(BASE+"/api/purchase-requests",headers=J0,data=json.dumps({"runId":r1["runId"]})).json()
+    prs=[x for x in ctx.request.get(BASE+f"/api/purchase-requests?node={N4}").json()["rows"] if x["bomRunId"]==r1["runId"]]
+    prl=[l for l in (prs[0]["lines"] if prs else []) if str(l.get("resolvedCode","")).startswith("PFP 1")]
+    ok("S52c 같은 스냅샷의 견적(합계 = 원가 합계 · 단가 기준 줄)과 구매 요청(PFP 1 단가 25,000)이 같은 단가를 쓴다",
+       (q1.get("total"), c1["total"], 'data-testid="price-basis"' in qh, [float(l["unitPrice"]) for l in prl]),
+       q1.get("total")==c1["total"] and 'data-testid="price-basis"' in qh and prl and all(float(l["unitPrice"])==25000 for l in prl))
+    p2=ctx.request.post(PRC,headers=J0,data=json.dumps({"code":"PFP 1","price":31000,"effectiveFrom":TODAY,"note":"E2E price-to-cost 2"})).json()
+    c1b=ctx.request.post(BASE+"/api/run/cost",headers=J0,data=json.dumps({"runId":r1["runId"]})).json()["cost"]
+    qh_b=ctx.request.get(BASE+f"/api/documents/{q1.get('id')}/print").text()
+    r2=bom_run(); l2=line_of(r2,"PFP 1")
+    ok("S52d 단가를 바꿔도(새 행) 다시 Run 하지 않으면 옛 스냅샷 원가·견적은 그대로 — 새로 Run 하면 새 단가 31,000",
+       (c1b["total"]==c1["total"], qh_b==qh, l2["unitCost"], l2["priceSource"].get("priceId")==p2.get("id")),
+       c1b["total"]==c1["total"] and qh_b==qh and l2["unitCost"]==31000 and l2["priceSource"].get("priceId")==p2.get("id"))
+    ctx.request.post(PRC,headers=J0,data=json.dumps({"code":"PFP 1","price":99000,"effectiveFrom":"2099-01-01","note":"E2E future"}))
+    ctx.request.post(PRC,headers=J0,data=json.dumps({"code":"PFB 1","price":40,"currency":"USD","effectiveFrom":TODAY,"note":"E2E usd"}))
+    rel_pfb=[l for l in r2["lines"] if line_of(r2,"PFB 1")["no"]==l["no"]][0]["unitCost"]
+    r3=bom_run(); l3=line_of(r3,"PFP 1"); l3b=line_of(r3,"PFB 1")
+    ok("S52e 미래 단가(2099)는 적용되지 않고(31,000 그대로) · 원화가 아닌 단가는 적용하지 않고 관계값 유지('통화 불일치')",
+       (l3["unitCost"], l3b["unitCost"], l3b["priceSource"]["kind"]),
+       l3["unitCost"]==31000 and l3b["unitCost"]==rel_pfb and l3b["priceSource"]["kind"]=="currency-mismatch")
+    dw=ctx.request.post(BASE+"/api/drawings",headers=J0,data=json.dumps({"runId":r1["runId"],"type":"plan"}))
+    ok("S52f 단가 행을 더한 뒤에도 옛 스냅샷의 도면 생성이 막히지 않는다 (단가는 카탈로그 지문 밖 · 지문 동일)",
+       (dw.status, r1["catalogFp"]==r3["catalogFp"]), dw.status==200 and r1["catalogFp"]==r3["catalogFp"])
+    pg.goto(NODE4,wait_until="domcontentloaded"); hydrated(pg); nuke(pg)
+    if pg.get_attribute("[data-testid=toolbox-toggle]","aria-pressed")=="true":
+        pg.click("[data-testid=toolbox-toggle]"); pg.wait_for_selector("[data-testid=toolbox-toggle][aria-pressed=false]",timeout=30000)
+    nuke(pg); pg.click("[data-run=bom]")
+    pg.locator("button", has_text=re.compile(r"^BOM$")).first.click(force=True)
+    wait_sel(pg,"[data-testid=bom-table] [data-price-src=history]")
+    srcs=pg.eval_on_selector_all("[data-testid=bom-table] [data-price-src]","es=>es.map(e=>e.dataset.priceSrc)")
+    ok("S52g 화면 BOM 표가 줄마다 단가 출처(이력 · 관계값 · 통화 불일치)를 스냅샷 그대로 보인다",
+       sorted(set(srcs)), "history" in srcs and "relationship" in srcs and "currency-mismatch" in srcs)
+    nuke(pg); pg.screenshot(path=f"{OUT}/65_price_to_cost.png",full_page=True)
     # S37 은 맨 끝에서 센다 — 중간(옛 자리)에서는 뒤에 찍히는 5장(40·41·42·52·53)이 아직 없어,
     # 빈 폴더에서는 25장이라 실패하고 이전 실행 잔재가 있을 때만 통과했다(2026-09-24 실측).
     _want=["00_login","05_project_mgmt","06_module_cpq_stub","10_project_bound","11_code_builder","11b_revisions","12_macro_tab",
            "13_macro_approved","14_edim_run","15_bom_cost","16_design_tab","20_setup_subcode","21_setup_product_table",
            "22_setup_relationship","23_codebuilder_from_subcode","30_toolbox_program","31_toolbox_ui_tool","40_company_admin",
            "41_platform_console","42_user_management","43_drawings","44_document_tab","45_purchasing","46_quotation_print",
-           "47_techdata_print","48_dxf_plan","49_dxf_assembly","51_accepted","52_register","53_schedule","54_toolbar","55_project_mgmt","56_print_setup","57_ui_design","58_material","59_arrangement_code","60_spec_input","61_drawing_purpose","62_company_db","63_input_data","64_viewer3d"]
+           "47_techdata_print","48_dxf_plan","49_dxf_assembly","51_accepted","52_register","53_schedule","54_toolbar","55_project_mgmt","56_print_setup","57_ui_design","58_material","59_arrangement_code","60_spec_input","61_drawing_purpose","62_company_db","63_input_data","64_viewer3d","65_price_to_cost"]
     _miss=[w for w in _want if not os.path.exists(f"{OUT}/{w}.png") or os.path.getmtime(f"{OUT}/{w}.png")<T0]
-    ok("S37 캡처 41장이 이번 실행에서 전부 나온다 (잔재 파일은 세지 않음)", _miss or len(_want), not _miss)
+    ok("S37 캡처 42장이 이번 실행에서 전부 나온다 (잔재 파일은 세지 않음)", _miss or len(_want), not _miss)
     b.close()
 n=sum(1 for v in R.values() if v[0]); print(f"\n[demo_e2e] {n}/{len(R)} steps passed"); json.dump(R,open(f"{OUT}/demo_e2e_result.json","w",encoding="utf-8"),ensure_ascii=False,indent=1)
 sys.exit(0 if n==len(R) else 1)

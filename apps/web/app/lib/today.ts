@@ -14,7 +14,21 @@ export function businessToday(now: Date = new Date(), timeZone: string = EDIM_TZ
   return new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
 }
 
+/** 어떤 시각(생성일 등)의 회사 시간대 날짜 — businessToday 와 같은 Intl 방식(한 곳). */
+export function businessDateOf(at: Date | string, timeZone: string = EDIM_TZ): string {
+  return businessToday(at instanceof Date ? at : new Date(at), timeZone);
+}
+
 export function localToday(now: Date = new Date()): string {
   const p = (n: number) => String(n).padStart(2, "0");
   return `${now.getFullYear()}-${p(now.getMonth() + 1)}-${p(now.getDate())}`;
+}
+
+/**
+ * DB 의 DATE 열(Prisma 가 UTC 자정 Date 로 준다) → YYYY-MM-DD. "오늘"을 구하는 함수가 아니다 —
+ * 저장된 날짜를 그대로 글자로 바꿀 뿐이라 UTC 부분을 읽는 것이 맞다.
+ */
+export function dateOnly(d: Date): string {
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())}`;
 }
