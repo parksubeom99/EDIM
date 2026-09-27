@@ -66,6 +66,8 @@ async function resetDemo(): Promise<void> {
   await adminPrisma.mfgRate.deleteMany({ where: { tenantId: t } });
   // 0027: 리허설이 더한 ERP 기준정보(p64) — 예시 두 행은 seedDemo 가 다시 넣는다.
   await adminPrisma.erpMaster.deleteMany({ where: { tenantId: t } });
+  // 0028: 리허설이 만든 도면 템플릿(Sub Drawing 호출 · 주의사항, p39 · p40).
+  await adminPrisma.drawingTemplateItem.deleteMany({ where: { tenantId: t } });
   // 리허설이 역할을 바꿔 놓았을 수 있다(User Management 시연) → 시드 역할로 되돌린다.
   await adminPrisma.membership.updateMany({ where: { tenantId: t, userId: IDS.viewerA }, data: { role: "viewer" } });
   await adminPrisma.membership.updateMany({ where: { tenantId: t, userId: IDS.ownerA }, data: { role: "owner" } });

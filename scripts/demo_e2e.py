@@ -1670,15 +1670,58 @@ with sync_playwright() as p:
     ok("S63e viewer 는 보지만(200) 못 넣고·못 고치고·못 지운다(403) · 다른 회사는 우리 기준정보 0건 · 고치기·지우기 404 · 우리 행 그대로",
        (v0.status,v1.status,v2.status,v3.status,g0,g1.status,g2.status,still[0]["name"] if still else None),
        v0.status==200 and (v1.status,v2.status,v3.status)==(403,403,403) and g0==0 and (g1.status,g2.status)==(404,404) and still and still[0]["name"]=="설계팀")
+    # ── S64 H5 · p39 · p40 도면 템플릿 — Sub Drawing 호출(설계 우선순위) · Detail Design 주의사항 → 도면에 박히고 시트에 나온다 ──
+    DT=BASE+"/api/setup/drawing-template"; DRW=BASE+"/api/drawings"
+    pg.goto(BASE+"/setup",wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=setup-link-drawing-template]",timeout=30000); nuke(pg)
+    pg.click("[data-testid=setup-link-drawing-template]"); pg.wait_for_selector("[data-testid=dt][data-ready='1'][data-product=EU]",timeout=60000); nuke(pg)
+    for code,pr in (("KFP 1","2"),("KHR 1","1"),("PSH 1","1"),("KCP 1","2")):
+        pg.select_option("[data-testid=dt-sub-child]",code); pg.fill("[data-testid=dt-sub-priority]",pr); pg.click("[data-testid=dt-sub-add]")
+        wait_sel(pg,f"[data-testid='dt-sub-row-{code}']")
+    for txt,pr in (("베어링 하우징 조립 전 축 정렬 확인","1"),("<b>도장</b> 전 탈지","2")):
+        n0=len(pg.query_selector_all("[data-testid=dt-note-row]"))
+        pg.fill("[data-testid=dt-note-text]",txt); pg.fill("[data-testid=dt-note-priority]",pr); pg.click("[data-testid=dt-note-add]")
+        pg.wait_for_function("(n)=>document.querySelectorAll('[data-testid=dt-note-row]').length>n",arg=n0,timeout=30000)
+    nuke(pg); pg.screenshot(path=f"{OUT}/74_sub_drawing.png",full_page=True)
+    up=ctx.request.post(BASE+"/api/attachments",multipart={"ownerKind":"product_code","ownerKey":"KFP 1","kind":"dwg2d","file":{"name":"plug_fan.dxf","mimeType":"application/dxf","buffer":b"0\nSECTION\n2\nENTITIES\n0\nENDSEC\n0\nEOF\n"}})
+    r64,_c64=run10()
+    d1=ctx.request.post(DRW,headers=J0,data=json.dumps({"runId":r64["runId"],"type":"assembly"})).json(); m1=d1.get("meta",{})
+    sd=[(x["childCode"],x["priority"],(x.get("dwg") or {}).get("name")) for x in m1.get("subDrawings",[])]
+    ok("S64a 도면을 뜨면 템플릿의 하부 도면이 설계 우선순위 순(같으면 코드 순)으로 박힌다 — 이 BOM 에 없는 PSH 1(가습, D=A1 일 때만)은 부르지 않고, KFP 1 은 코드에 첨부한 DWG 를 가리킨다 · 주의사항 2",
+       (up.status, sd, m1.get("notes")),
+       up.status==200 and sd==[("KHR 1",1,None),("KCP 1",2,None),("KFP 1",2,"plug_fan.dxf")] and len(m1.get("notes",[]))==2 and m1.get("notes",[None])[0].startswith("베어링"))
+    sh1=ctx.request.get(DRW+f"/{d1.get('id')}/sheet"); t1=sh1.text()
+    order=re.findall(r'<tr data-code="([^"]+)"',t1)
+    ok("S64b 도면 시트(인쇄) — 저장된 DXF 를 SVG 로 · 하부 도면 표(Item · Description · Q'ty · Remarks · DWG) · 주의사항 목록(이스케이프)",
+       (sh1.status, order, "sheet-svg" in t1, "&lt;b&gt;도장&lt;/b&gt;" in t1),
+       sh1.status==200 and order==["KHR 1","KCP 1","KFP 1"] and 'data-testid="sheet-svg"' in t1 and "<svg" in t1 and 'data-testid="sheet-notes"' in t1 and "&lt;b&gt;도장&lt;/b&gt;" in t1 and "<b>도장</b>" not in t1)
+    pg.click("[data-testid='dt-sub-del-KFP 1']"); pg.wait_for_selector("[data-testid='dt-sub-row-KFP 1']",state="detached",timeout=30000)
+    t1b=ctx.request.get(DRW+f"/{d1.get('id')}/sheet").text()
+    d2=ctx.request.post(DRW,headers=J0,data=json.dumps({"runId":r64["runId"],"type":"assembly"})).json()
+    sd2=[x["childCode"] for x in d2.get("meta",{}).get("subDrawings",[])]
+    ok("S64c 템플릿을 고쳐도(KFP 1 빼기) 이미 뜬 도면 시트는 그대로 · 새로 뜬 도면(다음 개정)부터 빠진다", (re.findall(r'<tr data-code="([^"]+)"',t1b), d2.get("rev"), sd2),
+       re.findall(r'<tr data-code="([^"]+)"',t1b)==["KHR 1","KCP 1","KFP 1"] and sd2==["KHR 1","KCP 1"])
+    q=lambda body: ctx.request.post(DT,headers=J0,data=json.dumps(body))
+    e1=q({"productCode":"EU","kind":"sub","childCode":"ER","priority":1}); e2=q({"productCode":"EU","kind":"sub","childCode":"KHR 1","priority":3})
+    e3=q({"productCode":"EU","kind":"sub","childCode":"KCD 1","priority":0}); e4=q({"productCode":"ZZ","kind":"note","text":"x","priority":1}); e5=q({"productCode":"EU","kind":"note","text":"  ","priority":1})
+    ok("S64d 코드 관계에 없는 하위 코드 400 · 같은 하위 코드 409 · 우선순위 0 은 400 · 없는 제품 404 · 빈 주의사항 400", (e1.status,e2.status,e3.status,e4.status,e5.status),
+       (e1.status,e2.status,e3.status,e4.status,e5.status)==(400,409,400,404,400))
+    tid=ctx.request.get(DT+"?product=EU").json()["subs"][0]["id"]
+    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data={"email":"viewer@acme.test"})
+    v0=vw.request.get(DT+"?product=EU"); v1=vw.request.post(DT,headers=J0,data=json.dumps({"productCode":"EU","kind":"note","text":"v","priority":1})); v2=vw.request.delete(DT+f"/{tid}"); vw.close()
+    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data={"email":"owner@globex.test"})
+    g0=gb.request.get(DT+"?product=EU").json(); g1=gb.request.delete(DT+f"/{tid}"); g2=gb.request.get(DRW+f"/{d1.get('id')}/sheet"); gb.close()
+    ok("S64e viewer 는 보지만(200) 못 넣고·못 뺀다(403) · 다른 회사는 우리 템플릿 0건 · 빼기 404 · 우리 도면 시트 404",
+       (v0.status,v1.status,v2.status,len(g0.get("subs",[]))+len(g0.get("notes",[])),g1.status,g2.status),
+       (v0.status,v1.status,v2.status)==(200,403,403) and len(g0.get("subs",[]))+len(g0.get("notes",[]))==0 and (g1.status,g2.status)==(404,404))
     # S37 은 맨 끝에서 센다 — 중간(옛 자리)에서는 뒤에 찍히는 5장(40·41·42·52·53)이 아직 없어,
     # 빈 폴더에서는 25장이라 실패하고 이전 실행 잔재가 있을 때만 통과했다(2026-09-24 실측).
     _want=["00_login","05_project_mgmt","06_module_cpq_stub","10_project_bound","11_code_builder","11b_revisions","12_macro_tab",
            "13_macro_approved","14_edim_run","15_bom_cost","16_design_tab","20_setup_subcode","21_setup_product_table",
            "22_setup_relationship","23_codebuilder_from_subcode","30_toolbox_program","31_toolbox_ui_tool","40_company_admin",
            "41_platform_console","42_user_management","43_drawings","44_document_tab","45_purchasing","46_quotation_print",
-           "47_techdata_print","48_dxf_plan","49_dxf_assembly","51_accepted","52_register","53_schedule","54_toolbar","55_project_mgmt","56_print_setup","57_ui_design","58_material","59_arrangement_code","60_spec_input","61_drawing_purpose","62_company_db","63_input_data","64_viewer3d","65_price_to_cost","66_project_contacts","67_partner_edit","68_spec_import","69_code_approval","70_dwg_view","71_techdata_list","72_mfg_rate","73_erp_master"]
+           "47_techdata_print","48_dxf_plan","49_dxf_assembly","51_accepted","52_register","53_schedule","54_toolbar","55_project_mgmt","56_print_setup","57_ui_design","58_material","59_arrangement_code","60_spec_input","61_drawing_purpose","62_company_db","63_input_data","64_viewer3d","65_price_to_cost","66_project_contacts","67_partner_edit","68_spec_import","69_code_approval","70_dwg_view","71_techdata_list","72_mfg_rate","73_erp_master","74_sub_drawing"]
     _miss=[w for w in _want if not os.path.exists(f"{OUT}/{w}.png") or os.path.getmtime(f"{OUT}/{w}.png")<T0]
-    ok("S37 캡처 50장이 이번 실행에서 전부 나온다 (잔재 파일은 세지 않음)", _miss or len(_want), not _miss)
+    ok("S37 캡처 51장이 이번 실행에서 전부 나온다 (잔재 파일은 세지 않음)", _miss or len(_want), not _miss)
     b.close()
 n=sum(1 for v in R.values() if v[0]); print(f"\n[demo_e2e] {n}/{len(R)} steps passed"); json.dump(R,open(f"{OUT}/demo_e2e_result.json","w",encoding="utf-8"),ensure_ascii=False,indent=1)
 sys.exit(0 if n==len(R) else 1)

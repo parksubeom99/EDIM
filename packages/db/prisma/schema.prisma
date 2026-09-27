@@ -53,6 +53,7 @@ model Tenant {
   attachments2    Attachment[]
   mfgRates        MfgRate[]
   erpMasters      ErpMaster[]
+  drawingTemplateItems DrawingTemplateItem[]
 
   @@map("tenant")
 }
@@ -775,4 +776,22 @@ model ErpMaster {
 
   @@unique([tenantId, kind, code])
   @@map("erp_master")
+}
+
+/// 0028 · p39 도면 Templet · p40 Sub Drawing 호출(kind=sub · child_code · 설계 우선순위) · Detail Design 주의사항(kind=note · text)
+model DrawingTemplateItem {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  productCode String   @map("product_code")
+  kind        String
+  childCode   String?  @map("child_code")
+  text        String?
+  priority    Int
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdBy   String   @map("created_by") @db.Uuid
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, productCode], map: "drawing_template_item_product_idx")
+  @@map("drawing_template_item")
 }

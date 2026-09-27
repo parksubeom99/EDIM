@@ -10,7 +10,7 @@ import type { DxfInput, DrawingItem } from "./dxf";
  * 나중에 "이 도면이 어디서 나왔나"를 거꾸로 따라갈 수 있다(연결 장부 약함 #2).
  */
 export type DxfSource =
-  | { ok: true; input: DxfInput; run: { id: string; code: string; stableId: string | null; codeRevisionId: string | null } }
+  | { ok: true; input: DxfInput; run: { id: string; code: string; stableId: string | null; codeRevisionId: string | null; parentCode: string } }
   | { ok: false; status: number; error: string };
 
 interface SnapLine {
@@ -80,6 +80,6 @@ export async function dxfSourceFromRun(tenantId: string, runId: string): Promise
   return {
     ok: true,
     input: { code: run.code, dims: d.dims, dimItem: d.item, sections, secDims: d.secDims, items },
-    run: { id: run.id, code: run.code, stableId: run.hierarchyStable, codeRevisionId: run.codeRevisionId },
+    run: { id: run.id, code: run.code, stableId: run.hierarchyStable, codeRevisionId: run.codeRevisionId, parentCode: run.parentCode },
   };
 }

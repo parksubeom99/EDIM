@@ -850,7 +850,7 @@ function DrawingRegister({ runId, nodeStable, canEdit, verify }: { runId: string
           {Object.entries(DRAW_PURPOSE).map(([k, v]) => <option key={k} value={k}>{v}만</option>)}
           <option value="none">미지정만</option>
         </select>
-        <span>아직 없음: Sub Drawing(구획별 하부 도면) · Detail Dimension(mm 좌표 — 회사 실 CAD 규칙 필요)</span>
+        <span>Sub Drawing · 주의사항은 <a href="/setup/drawing-template" data-testid="drawing-template-link" style={{ color: "var(--accent)" }}>도면 템플릿</a>에서 · 아직 없음: Detail Dimension(mm 좌표 — 회사 실 CAD 규칙 필요)</span>
       </span>
       <span style={{ display: "inline-flex", gap: 8 }}>
         {(() => {
@@ -905,6 +905,15 @@ function DrawingRegister({ runId, nodeStable, canEdit, verify }: { runId: string
               </a>
               {d.purpose && <span style={{ padding: "0 6px", borderRadius: 3, border: "1px solid var(--accent)", color: "var(--accent)", fontSize: 11 }}>{DRAW_PURPOSE[d.purpose] ?? d.purpose}</span>}
               <span>{DRAW_LABEL[d.status] ?? d.status}</span>
+              {(() => {
+                // H5 · 도면을 뜰 때 박힌 하부 도면·주의사항 수 — 시트(인쇄)에서 도면과 함께 본다
+                const m = (d.meta ?? {}) as { subDrawings?: unknown[]; notes?: unknown[] };
+                return (
+                  <a href={`/api/drawings/${d.id}/sheet`} target="_blank" rel="noreferrer" data-testid="drawing-sheet" style={{ color: "var(--accent)" }}>
+                    시트{Array.isArray(m.subDrawings) || Array.isArray(m.notes) ? ` · Sub ${m.subDrawings?.length ?? 0} · 주의 ${m.notes?.length ?? 0}` : ""}
+                  </a>
+                );
+              })()}
               {canEdit && DRAW_NEXT[d.status] && (
                 <button type="button" data-testid={`drawing-advance-${d.drawingNo}-${d.currentRev}`} onClick={() => void advance(d.id, DRAW_NEXT[d.status]!)}
                   style={{ fontSize: "var(--fs-12)", padding: "2px 8px", background: "transparent", color: "var(--ink)", border: "1px solid var(--line)", borderRadius: "var(--radius-sm)" }}>

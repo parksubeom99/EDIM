@@ -4,6 +4,7 @@ import { getServerSession } from "@/app/lib/session";
 import { canEditProject } from "@/app/lib/project-perms";
 import { dxfSourceFromRun } from "@/app/lib/output/drawing-source";
 import { buildView, isDrawingView } from "@/app/lib/output/dxf";
+import { resolveSubDrawings, resolveNotes, type DwgLike } from "@/app/lib/drawing-template";
 
 /**
  * GET = 도면 목록(?purpose=approval|manufacturing|quotation|none 으로 거른다) · POST = BOM 스냅샷에서 도면을 떠서 남긴다(p24).
@@ -42,6 +43,16 @@ export async function POST(req: NextRequest) {
   if (!src.ok) return NextResponse.json({ error: src.error }, { status: src.status });
 
   const { dxf, meta } = buildView(type, src.input);
+  // H5 · p39 · p40 — 제품 도면 템플릿의 하부 도면(Sub Drawing) 호출 · Detail Design 주의사항을 **지금** 풀어 도면 meta 에 박는다.
+  // 스냅샷 줄에 있는 하위 코드만 · 설계 우선순위 순 · 각 코드의 등록 DWG(F4) 를 가리킨다. 도면 계산(DXF)은 그대로.
+  const tpl = await withTenant(session.tenantId, async (tx) => {
+    const items = await tx.drawingTemplateItem.findMany({ where: { productCode: src.run.parentCode } });
+    const codes = [...new Set(items.filter((t) => t.kind === "sub" && t.childCode).map((t) => t.childCode!))];
+    const att = codes.length ? await tx.attachment.findMany({ where: { ownerKind: "product_code", ownerKey: { in: codes } } }) : [];
+    const byCode = new Map<string, DwgLike[]>();
+    for (const a of att) byCode.set(a.ownerKey, [...(byCode.get(a.ownerKey) ?? []), { id: a.id, name: a.name, kind: a.kind, uploadedAt: a.uploadedAt }]);
+    return { subDrawings: resolveSubDrawings(src.input.items ?? [], items, byCode), notes: resolveNotes(items), templateOf: src.run.parentCode };
+  });
   // 도면번호 = 코드 + 종류. 같은 번호를 다시 뜨면 개정(A→B)이 붙는다.
   const NO: Record<string, string> = { plan: "PLN", assembly: "ASM", front: "FRT", right: "RHT", iso: "ISO", exploded: "EXP" };
   const drawingNo = `${src.run.code}-${NO[type]}${purpose ? `-${PURPOSE_NO[purpose]}` : ""}`;
@@ -54,12 +65,12 @@ export async function POST(req: NextRequest) {
       purpose,
       code: src.run.code,
       dxf,
-      meta: meta as unknown as object,
+      meta: { ...meta, ...tpl } as unknown as object,
       createdBy: session.userId,
     }),
   );
   return NextResponse.json({
     ok: true, id: row.id, drawingNo: row.drawingNo, rev: row.currentRev, status: row.status, purpose: row.purpose,
-    meta, message: `도면 ${row.drawingNo} Rev ${row.currentRev} 생성 · 치수 ${meta.dimItem} (W${meta.widthMm}×L${meta.lengthMm})`,
+    meta: { ...meta, ...tpl }, message: `도면 ${row.drawingNo} Rev ${row.currentRev} 생성 · 치수 ${meta.dimItem} (W${meta.widthMm}×L${meta.lengthMm})`,
   });
 }
