@@ -50,6 +50,7 @@ model Tenant {
   inputItems      InputItem[]
   projectContacts ProjectContact[]
   projectActivities ProjectActivity[]
+  attachments2    Attachment[]
 
   @@map("tenant")
 }
@@ -322,6 +323,8 @@ model ProductCode {
   materialTemplate String   @default("") @map("material_template")
   tables           Json     @default("{}") @db.JsonB
   sections         Json?    @db.JsonB
+  /// 0025 · p32 Approval Status — NULL 미지정 · draft → approved → retired(역행 금지 트리거)
+  approvalStatus   String?  @map("approval_status")
   createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt        DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
   createdBy        String   @map("created_by") @db.Uuid
@@ -711,4 +714,25 @@ model ProjectActivity {
 
   @@index([tenantId, projectId, activityDate], map: "project_activity_project_idx")
   @@map("project_activity")
+}
+
+/// 0025 · 첨부 — 코드 DWG(p32) · Arrangement Drawing Control(p35) · Data Up-Load(p18). 파일은 0014 저장소. 고치지 않는다(새 파일 = 새 행)
+model Attachment {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  ownerKind   String   @map("owner_kind")
+  ownerKey    String   @map("owner_key")
+  kind        String
+  name        String
+  description String?
+  fileRef     String   @map("file_ref")
+  fileMime    String?  @map("file_mime")
+  fileSize    Int?     @map("file_size")
+  uploadedAt  DateTime @default(now()) @map("uploaded_at") @db.Timestamptz(6)
+  uploadedBy  String   @map("uploaded_by") @db.Uuid
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, ownerKind, ownerKey], map: "attachment_owner_idx")
+  @@map("attachment")
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
+import { CodeDocs } from "./code-docs";
 import { localToday } from "@/app/lib/today";
 
 /**
@@ -212,8 +213,9 @@ export function MaterialRegistry({ canEdit }: { canEdit: boolean }) {
                 <button type="button" data-testid="mat-p-add" disabled={!(Number(pf.price) > 0)} onClick={() => void addPrice()} style={btn(true, !(Number(pf.price) > 0))}>쌓기</button>
               </div>
             )}
-            <p style={{ margin: "8px 0 0", fontSize: 11, color: "var(--ink-muted)" }}>아직 없음: 코드별 Approval Status · DWG(3D/2D) 첨부 · 이 단가의 BOM 원가 자동 반영.</p>
+            <p style={{ margin: "8px 0 0", fontSize: 11, color: "var(--ink-muted)" }}>단가 이력은 BOM Run 때 현재 단가로 원가에 들어갑니다(ccmd E). 아직 없음: 통화 환산.</p>
           </div>
+          <CodeDocs code={sel.code} canEdit={canEdit} />
           {msg && <p data-testid="mat-msg" data-ok={msg.ok ? "1" : "0"} style={{ margin: 0, fontSize: "var(--fs-12)", color: msg.ok ? "var(--accent)" : "var(--warn)" }}>{msg.text}</p>}
         </div>
       ) : (

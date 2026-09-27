@@ -39,7 +39,9 @@ export async function POST(req: NextRequest) {
   if (!CURRENCIES.includes(currency)) return NextResponse.json({ error: `통화는 ${CURRENCIES.join("·")}` }, { status: 400 });
   if (!/^\d{4}-\d{2}-\d{2}$/.test(eff) || Number.isNaN(Date.parse(eff))) return NextResponse.json({ error: "유효일은 YYYY-MM-DD" }, { status: 400 });
   const out = await withTenant(g.session.tenantId, async (tx) => {
-    if (!(await tx.productCode.findFirst({ where: { code } }))) return null;   // 등록된 코드에만 단가를 단다
+    const pc = await tx.productCode.findFirst({ where: { code } });
+    if (!pc) return null;   // 등록된 코드에만 단가를 단다
+    if (pc.approvalStatus === "retired") return "retired" as const;   // 0025 · 사용중지 코드에는 새 단가를 쌓지 않는다
     const sp = await partnerOk(tx, b.supplierId, "supplier");
     if (sp === false) return "badSupplier" as const;
     const tenantId = await requireTenant(tx);
@@ -49,6 +51,7 @@ export async function POST(req: NextRequest) {
     return row.id;
   });
   if (!out) return NextResponse.json({ error: `등록되지 않은 코드: ${code}` }, { status: 404 });
+  if (out === "retired") return NextResponse.json({ error: `${code} 는 사용중지된 코드 — 새 단가를 쌓지 않습니다` }, { status: 409 });
   if (out === "badSupplier") return NextResponse.json({ error: "공급처는 Company DB 의 이 회사 공급처여야 합니다" }, { status: 400 });
   return NextResponse.json({ ok: true, id: out });
 }

@@ -1386,15 +1386,49 @@ with sync_playwright() as p:
     g1=gb.request.patch(SI+f"/{cr['id']}",headers=J0,data=json.dumps({"label":"g"})); g2=gb.request.delete(SI+f"/{cr['id']}"); gb.close()
     ok("S55e viewer 는 Import·수정·삭제 모두 403 · 다른 회사는 우리 항목을 못 고치고 못 지운다(404·404)", (v1.status, v2.status, v3.status, g1.status, g2.status),
        v1.status==403 and v2.status==403 and v3.status==403 and g1.status==404 and g2.status==404)
+    # ── S56 F4 · p32 · p30 자재·구매 코드 Approval Status(작성중→승인→사용중지, 역행 금지) · DWG 2D/3D 첨부 — 0025 ──
+    AT=BASE+"/api/attachments"; CS=BASE+"/api/setup/code-status"; PRC=BASE+"/api/setup/prices"; MC4="PSH 1"
+    pg.goto(BASE+"/setup/material",wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=material-reg][data-ready='1']",timeout=60000); nuke(pg)
+    pg.click(f"[data-testid='mat-code-{MC4}']"); pg.wait_for_selector(f"[data-testid=mat-table][data-code='{MC4}']",timeout=30000)
+    pg.wait_for_selector("[data-testid=code-docs] [data-testid=code-dwg][data-ready='1']",timeout=30000)
+    st0=pg.get_attribute("[data-testid=code-status]","data-status")
+    pg.click("[data-testid=code-status-draft]"); pg.wait_for_selector("[data-testid=code-status][data-status=draft]",timeout=30000)
+    pg.click("[data-testid=code-status-approved]"); pg.wait_for_selector("[data-testid=code-status][data-status=approved]",timeout=30000)
+    back=ctx.request.post(CS,headers=J0,data=json.dumps({"code":MC4,"status":"draft"}))
+    ok("S56a 코드 상태 — 미지정 → 작성중 → 승인이 화면에서 되고, 되돌리기는 409(DB 트리거도 막는다)", (st0, back.status), st0=="" and back.status==409)
+    DXF2="0\nSECTION\n2\nENTITIES\n0\nENDSEC\n0\nEOF\n"
+    pg.set_input_files("[data-testid=code-dwg-file]",files=[{"name":"PSH1_front.dxf","mimeType":"application/dxf","buffer":DXF2.encode("utf-8")}])
+    pg.click("[data-testid=code-dwg-upload]"); pg.wait_for_selector("[data-testid=code-dwg-row][data-kind=dwg2d]",timeout=30000)
+    pg.select_option("[data-testid=code-dwg-kind]","dwg3d")
+    pg.set_input_files("[data-testid=code-dwg-file]",files=[{"name":"PSH1.step","mimeType":"application/octet-stream","buffer":b"ISO-10303-21;\nEND-ISO-10303-21;\n"}])
+    pg.click("[data-testid=code-dwg-upload]"); pg.wait_for_selector("[data-testid=code-dwg-row][data-kind=dwg3d]",timeout=30000)
+    nuke(pg); pg.screenshot(path=f"{OUT}/69_code_approval.png",full_page=True)
+    rows_a=ctx.request.get(AT+f"?ownerKind=product_code&ownerKey={MC4}").json()["rows"]
+    got=ctx.request.get(AT+f"/{[x for x in rows_a if x['kind']=='dwg2d'][0]['id']}/file").text()
+    ok("S56b DWG 첨부 — 2D(.dxf)·3D(.step)를 올리고, 내려받으면 올린 내용 그대로", (sorted(x["kind"] for x in rows_a), got==DXF2),
+       sorted(x["kind"] for x in rows_a)==["dwg2d","dwg3d"] and got==DXF2)
+    def up(kind, name, data, key=MC4, c=ctx):
+        return c.request.post(AT, multipart={"ownerKind":"product_code","ownerKey":key,"kind":kind,"file":{"name":name,"mimeType":"application/octet-stream","buffer":data}})
+    bad_ext=up("dwg2d","virus.exe",b"MZ"); big=up("dwg3d","big.stl",b"0"*(10*1024*1024+1)); nokey=up("dwg2d","a.dxf",b"x",key="NOPE 9")
+    ok("S56c 허용 밖 확장자 415 · 10MB 초과 413 · 없는 코드 404", (bad_ext.status, big.status, nokey.status), bad_ext.status==415 and big.status==413 and nokey.status==404)
+    ret=ctx.request.post(CS,headers=J0,data=json.dumps({"code":MC4,"status":"retired"}))
+    after=up("dwg2d","late.dxf",b"x"); pr=ctx.request.post(PRC,headers=J0,data=json.dumps({"code":MC4,"price":1000,"effectiveFrom":"2026-01-01"}))
+    ok("S56d 사용중지 — 새 도면 첨부 409 · 새 단가 409 (이미 뜬 BOM 스냅샷·첨부는 그대로)", (ret.status, after.status, pr.status), ret.status==200 and after.status==409 and pr.status==409)
+    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data={"email":"viewer@acme.test"})
+    v1=up("dwg2d","v.dxf",b"x",key="PFP 1",c=vw); v2=vw.request.post(CS,headers=J0,data=json.dumps({"code":"PFP 1","status":"approved"})); vw.close()
+    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data={"email":"owner@globex.test"})
+    g1=gb.request.get(AT+f"?ownerKind=product_code&ownerKey={MC4}").json()["rows"]; g2=gb.request.get(AT+f"/{rows_a[0]['id']}/file"); gb.close()
+    ok("S56e viewer 는 첨부·상태 변경 403 · 다른 회사는 우리 코드의 첨부를 못 보고(0건) 못 내려받는다(404)", (v1.status, v2.status, len(g1), g2.status),
+       v1.status==403 and v2.status==403 and len(g1)==0 and g2.status==404)
     # S37 은 맨 끝에서 센다 — 중간(옛 자리)에서는 뒤에 찍히는 5장(40·41·42·52·53)이 아직 없어,
     # 빈 폴더에서는 25장이라 실패하고 이전 실행 잔재가 있을 때만 통과했다(2026-09-24 실측).
     _want=["00_login","05_project_mgmt","06_module_cpq_stub","10_project_bound","11_code_builder","11b_revisions","12_macro_tab",
            "13_macro_approved","14_edim_run","15_bom_cost","16_design_tab","20_setup_subcode","21_setup_product_table",
            "22_setup_relationship","23_codebuilder_from_subcode","30_toolbox_program","31_toolbox_ui_tool","40_company_admin",
            "41_platform_console","42_user_management","43_drawings","44_document_tab","45_purchasing","46_quotation_print",
-           "47_techdata_print","48_dxf_plan","49_dxf_assembly","51_accepted","52_register","53_schedule","54_toolbar","55_project_mgmt","56_print_setup","57_ui_design","58_material","59_arrangement_code","60_spec_input","61_drawing_purpose","62_company_db","63_input_data","64_viewer3d","65_price_to_cost","66_project_contacts","67_partner_edit","68_spec_import"]
+           "47_techdata_print","48_dxf_plan","49_dxf_assembly","51_accepted","52_register","53_schedule","54_toolbar","55_project_mgmt","56_print_setup","57_ui_design","58_material","59_arrangement_code","60_spec_input","61_drawing_purpose","62_company_db","63_input_data","64_viewer3d","65_price_to_cost","66_project_contacts","67_partner_edit","68_spec_import","69_code_approval"]
     _miss=[w for w in _want if not os.path.exists(f"{OUT}/{w}.png") or os.path.getmtime(f"{OUT}/{w}.png")<T0]
-    ok("S37 캡처 45장이 이번 실행에서 전부 나온다 (잔재 파일은 세지 않음)", _miss or len(_want), not _miss)
+    ok("S37 캡처 46장이 이번 실행에서 전부 나온다 (잔재 파일은 세지 않음)", _miss or len(_want), not _miss)
     b.close()
 n=sum(1 for v in R.values() if v[0]); print(f"\n[demo_e2e] {n}/{len(R)} steps passed"); json.dump(R,open(f"{OUT}/demo_e2e_result.json","w",encoding="utf-8"),ensure_ascii=False,indent=1)
 sys.exit(0 if n==len(R) else 1)
