@@ -47,8 +47,13 @@ function lazyClient(
     const existing = globalForPrisma[slot];
     if (existing) return existing;
     const client = makeClient(process.env[envKey], envKey);
-    // Cache in dev to avoid exhausting connections across hot-reloads.
-    if (process.env.NODE_ENV !== "production") globalForPrisma[slot] = client;
+    // Always cache — one client (one pool) per slot per process.
+    // Before 2026-09-27 this cached only when NODE_ENV !== "production", and the
+    // Proxy below calls resolve() on EVERY property access, so a production
+    // server built a new PrismaClient (a new connection pool) per query and ran
+    // Postgres out of connection slots (HTTP 500 "too many clients" under
+    // `next start`; invisible under `next dev`). Found by El's sandbox run.
+    globalForPrisma[slot] = client;
     return client;
   };
 
