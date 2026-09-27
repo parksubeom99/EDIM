@@ -7,6 +7,7 @@
  */
 import type { LaborBasis } from "./bom";
 import { graphSvg, type OutputDataValue, type GraphSnap } from "../output-template";
+import { renderLayoutPage, LAYOUT_CSS, SIGNATURE_HTML, type LayoutElement } from "../print-layout";
 
 export interface SnapshotLike {
   id: string;
@@ -373,8 +374,18 @@ ${b.inputData && b.inputData.length > 0 ? `<table data-testid="techdata-inputdat
 <table><tr><th>Macro id</th><td class="mono">${esc(b.macro.id)}</td></tr><tr><th>Coding</th><td><pre data-testid="techdata-dsl">${esc(b.macro.dsl)}</pre></td></tr></table>
 <h2>Output Data</h2>
 <table><tr><th>${esc(b.output.name)}</th><td class="n"><span class="amount" data-testid="techdata-value">${esc(Math.round(b.output.value * 1000) / 1000)}</span></td></tr></table>
-${b.outputData && b.outputData.length > 0 ? `<table data-testid="techdata-outputdata"><tr>${b.outputData.map((o) => `<th>${esc(o.label)}</th>`).join("")}</tr><tr>${b.outputData.map((o) => `<td class="mono" data-key="${esc(o.key)}">${o.value === null ? `<span style="color:#b45309">${esc(o.note ?? "없음")}</span>` : `${esc(Math.round(o.value * 1000) / 1000)} ${esc(o.unit)}`}</td>`).join("")}</tr></table>` : ""}
-${b.graphs && b.graphs.length > 0 ? `<h2>Graph</h2>${b.graphs.map((g) => `<figure data-testid="techdata-graph" data-name="${esc(g.name)}" style="margin:6px 0"><figcaption style="font-size:12px;font-weight:600">${esc(g.name)}</figcaption>${graphSvg(g)}</figure>`).join("")}` : ""}`;
+${techOutputHtml(b)}`;
+}
+
+/** H6 Output 표 — 없으면 빈 글자 */
+function techOutputHtml(b: TechDataBody): string {
+  return `${b.outputData && b.outputData.length > 0 ? `<table data-testid="techdata-outputdata"><tr>${b.outputData.map((o) => `<th>${esc(o.label)}</th>`).join("")}</tr><tr>${b.outputData.map((o) => `<td class="mono" data-key="${esc(o.key)}">${o.value === null ? `<span style="color:#b45309">${esc(o.note ?? "없음")}</span>` : `${esc(Math.round(o.value * 1000) / 1000)} ${esc(o.unit)}`}</td>`).join("")}</tr></table>` : ""}
+`;
+}
+
+/** H6 그래프 — 없으면 빈 글자. 기본 인쇄본은 표 뒤에, 양식(H9)에서는 그래프 요소 자리에 */
+function techGraphsHtml(b: TechDataBody): string {
+  return b.graphs && b.graphs.length > 0 ? `<h2>Graph</h2>${b.graphs.map((g) => `<figure data-testid="techdata-graph" data-name="${esc(g.name)}" style="margin:6px 0"><figcaption style="font-size:12px;font-weight:600">${esc(g.name)}</figcaption>${graphSvg(g)}</figure>`).join("")}` : "";
 }
 
 /** p48 Print Set-up — 모양만 바꾸는 CSS. 숫자·내용은 그대로다(스냅샷에서 옮긴 body 를 다시 계산하지 않는다). */
@@ -395,15 +406,36 @@ ${p.color === "mono" ? "html { filter: grayscale(1); }" : ""}
 `;
 }
 
-export function renderDocumentHtml(doc: { docNo: string; currentRev: string; status: string; docType: string; body: unknown }, look?: PrintLook): string {
+/** H9 · 0030 인쇄 양식(버전 · 요소 배치) + 그 스냅샷으로 뜬 도면 SVG(있으면). 양식이 없으면 기존 인쇄본 그대로. */
+export interface PrintLayoutUse { version: number; elements: LayoutElement[]; pinned: boolean; drawingSvg?: string | null }
+
+export function renderDocumentHtml(doc: { docNo: string; currentRev: string; status: string; docType: string; body: unknown }, look?: PrintLook, layout?: PrintLayoutUse): string {
   const b = doc.body as QuotationBody | TechDataBody;
   const title = b.kind === "quotation" ? "견 적 서" : "TECH DATA";
-  const inner = b.kind === "quotation" ? quotationHtml(b) : techDataHtml(b);
+  const inner = layout ? layoutInner(doc, b, title, layout) : b.kind === "quotation" ? quotationHtml(b) : `${techDataHtml(b)}${techGraphsHtml(b)}`;
   return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${esc(doc.docNo)} Rev ${esc(doc.currentRev)}</title><style>${PRINT_CSS}${look ? setupCss(look) : ""}</style></head><body${look ? ` data-print-setup="${esc(`${look.paper}-${look.orientation}-${look.color}`)}"` : ""}>${look?.watermark ? `<div class="wm" data-testid="print-watermark">${esc(look.watermark)}</div>` : ""}<div class="sheet">
+<title>${esc(doc.docNo)} Rev ${esc(doc.currentRev)}</title><style>${PRINT_CSS}${layout ? LAYOUT_CSS : ""}${look ? setupCss(look) : ""}</style></head><body${look ? ` data-print-setup="${esc(`${look.paper}-${look.orientation}-${look.color}`)}"` : ""}>${look?.watermark ? `<div class="wm" data-testid="print-watermark">${esc(look.watermark)}</div>` : ""}<div class="sheet">
 ${look?.header ? `<div class="ph" data-testid="print-header">${esc(look.header)}</div>` : ""}<div class="top"><h1>${title}</h1><div class="meta"><span class="mono">${esc(doc.docNo)}</span> · Rev ${esc(doc.currentRev)} · <span class="status" data-testid="doc-status">${esc(STATUS_LABEL[doc.status] ?? doc.status)}</span><br>${esc(b.date)}</div></div>
 ${inner}
 ${footOf(b.source)}
 ${look?.footer ? `<div class="pf" data-testid="print-footer">${esc(look.footer)}</div>` : ""}<p class="noprint" style="margin-top:14px"><button onclick="window.print()">인쇄 / PDF 저장</button></p>
 </div></body></html>`;
+}
+
+/** H9 · 양식 쪽 — 요소 종류마다 body(스냅샷)의 한 조각을 넣는다. 숫자는 다시 세지 않는다. */
+function layoutInner(doc: { docNo: string; currentRev: string; status: string }, b: QuotationBody | TechDataBody, title: string, layout: PrintLayoutUse): string {
+  const p = b.project;
+  const fields = `<table data-testid="print-fields"><tr><th>Document</th><td class="mono">${esc(doc.docNo)} · Rev ${esc(doc.currentRev)}</td><th>Date</th><td>${esc(b.date)}</td></tr>`
+    + `<tr><th>${b.kind === "quotation" ? "Customer" : "Project"}</th><td>${esc(b.kind === "quotation" ? p?.clientName ?? "—" : p ? `${p.projectNo} · ${p.name}` : "—")}</td><th>Code</th><td class="mono">${esc(b.code)}</td></tr></table>`;
+  const parts = {
+    title: `<h1>${title}</h1>`,
+    fields,
+    table: b.kind === "quotation" ? quotationHtml(b) : `${techDataHtml(b)}`,
+    graph: b.kind === "techdata" ? techGraphsHtml(b) || undefined : undefined,
+    drawing: layout.drawingSvg ? `<div data-testid="print-drawing">${layout.drawingSvg}</div>` : undefined,
+    signature: SIGNATURE_HTML,
+    logo: `<div class="lg">NOVA Solution</div>`,
+  };
+  return `<p class="noprint" style="font-size:11px;color:#667" data-testid="print-layout-note">인쇄 양식 v${layout.version}${layout.pinned ? " — 발행 때 박힌 버전(양식을 고쳐도 이 발행본은 그대로)" : " — 발행 전: 최신 양식을 따릅니다"}</p>`
+    + renderLayoutPage(layout.version, layout.elements, parts);
 }

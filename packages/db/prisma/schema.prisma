@@ -57,6 +57,7 @@ model Tenant {
   outputItems     OutputItem[]
   graphDefs       GraphDef[]
   tableMetas      TableMeta[]
+  printLayouts    PrintLayout[]
 
   @@map("tenant")
 }
@@ -478,6 +479,8 @@ model Document {
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
   createdBy       String   @map("created_by") @db.Uuid
+  /// 0030 · 발행되는 순간 박히는 인쇄 양식 버전(트리거). NULL = 발행 전이거나 양식 없음
+  printLayoutId   String?  @map("print_layout_id") @db.Uuid
 
   tenant  Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   bomRun  BomCodeRun @relation(fields: [bomRunId], references: [id])
@@ -857,4 +860,20 @@ model TableMeta {
 
   @@unique([tenantId, productCode, tableName])
   @@map("table_meta")
+}
+
+/// 0030 · p48 인쇄 양식 편집기 — 문서 종류마다 요소 배치(쪽 대비 %). 저장 = 새 버전(쌓기만)
+model PrintLayout {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  docType   String   @map("doc_type")
+  version   Int
+  elements  Json
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdBy String   @map("created_by") @db.Uuid
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, docType, version])
+  @@map("print_layout")
 }

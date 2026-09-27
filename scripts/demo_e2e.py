@@ -1830,15 +1830,57 @@ with sync_playwright() as p:
     bq=ctx.request.get(DS+"?type=zzz")
     ok("S67e Data Management 는 읽기 목록 — viewer 200 · 다른 회사 목록에는 우리 식·그래프가 없다 · 모르는 type 400",
        (v0.status, len(g0), bq.status), v0.status==200 and not any(r["type"] in ("formula","chart") and (r["href"].endswith(N4) or r["name"]=="Monthly orders") for r in g0) and bq.status==400)
+    # ── S68 H9 · p48 인쇄 양식 편집기 — 요소를 끌어 배치·크기 조절 → 새 버전 저장 → 인쇄본이 배치를 따르고, 발행본은 발행 순간 버전에 고정 ──
+    PL=BASE+"/api/setup/print-layouts"
+    pg.goto(BASE+"/setup",wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=setup-link-print-layout]",timeout=30000); nuke(pg)
+    pg.click("[data-testid=setup-link-print-layout]"); pg.wait_for_selector("[data-testid=pl][data-ready='1'][data-doctype=techdata]",timeout=60000); nuke(pg)
+    pg.click("[data-testid=pl-default]")
+    gx0=float(pg.get_attribute("[data-testid=pl-el-graph]","data-x")); gy0=float(pg.get_attribute("[data-testid=pl-el-graph]","data-y"))
+    bb=pg.locator("[data-testid=pl-el-graph]").bounding_box(); pg.mouse.move(bb["x"]+bb["width"]/2, bb["y"]+bb["height"]/2); pg.mouse.down()
+    pg.mouse.move(bb["x"]+bb["width"]/2-60, bb["y"]+bb["height"]/2+40, steps=8); pg.mouse.up()
+    tw0=float(pg.get_attribute("[data-testid=pl-el-table]","data-w"))
+    hb=pg.locator("[data-testid=pl-handle-table]").bounding_box(); pg.mouse.move(hb["x"]+4, hb["y"]+4); pg.mouse.down(); pg.mouse.move(hb["x"]-30, hb["y"]+20, steps=6); pg.mouse.up()
+    gx1=float(pg.get_attribute("[data-testid=pl-el-graph]","data-x")); gy1=float(pg.get_attribute("[data-testid=pl-el-graph]","data-y")); tw1=float(pg.get_attribute("[data-testid=pl-el-table]","data-w"))
+    pg.click("[data-testid=pl-add-text]"); pg.wait_for_selector("[data-testid=pl-sel-text]",timeout=10000); pg.fill("[data-testid=pl-sel-text]","Good air makes Good Life")
+    pg.click("[data-testid=pl-save]"); pg.wait_for_selector("[data-testid=pl][data-latest='1']",timeout=30000)
+    nuke(pg); pg.screenshot(path=f"{OUT}/78_print_layout.png",full_page=True)
+    l1=ctx.request.get(PL+"?docType=techdata").json()["latest"]; g1=[e for e in l1["elements"] if e["kind"]=="graph"][0]
+    ok("S68a 편집기 — 기본 양식 배치 → 그래프를 끌어 옮기고(x·y 바뀜) · 표 모서리로 크기(w 줄어듦) · 글상자 더하고 → v1 저장",
+       ((gx0,gy0),(gx1,gy1),(tw0,tw1),l1["version"],len(l1["elements"])),
+       gx1<gx0 and gy1>gy0 and tw1<tw0 and l1["version"]==1 and len(l1["elements"])==7 and g1["x"]==gx1)
+    tdA=ctx.request.post(DOCS,headers=J0,data=json.dumps({"runId":RUN1,"type":"techdata"})).json(); hA=ctx.request.get(DOCS+f"/{tdA.get('id')}/print").text()
+    ok("S68b 발행 전 Tech Data 인쇄본이 v1 배치를 따른다 — 그래프 칸 위치 = 편집기에서 옮긴 자리 · 글상자 글자 · 숫자는 문서 body 그대로",
+       ('data-layout-version="1"' in hA, f'left:{g1["x"]}%;top:{g1["y"]}%' in hA, "Good air makes Good Life" in hA, "발행 전" in hA),
+       'data-layout-version="1"' in hA and f'left:{g1["x"]}%;top:{g1["y"]}%' in hA and "Good air makes Good Life" in hA and "발행 전" in hA and 'data-testid="techdata-value"' in hA)
+    for st in ("review","approved","issued"):
+        sr=ctx.request.patch(DOCS+f"/{tdA.get('id')}",headers=J0,data=json.dumps({"status":st}))
+    els2=[dict(e, **({"x":40.0} if e["kind"]=="title" else {})) for e in l1["elements"]]
+    v2=ctx.request.post(PL,headers=J0,data=json.dumps({"docType":"techdata","elements":els2})).json()
+    hA2=ctx.request.get(DOCS+f"/{tdA.get('id')}/print").text()
+    tdB=ctx.request.post(DOCS,headers=J0,data=json.dumps({"runId":RUN1,"type":"techdata"})).json(); hB=ctx.request.get(DOCS+f"/{tdB.get('id')}/print").text()
+    vers=ctx.request.get(PL+"?docType=techdata").json()["versions"]
+    ok("S68c 발행하면 그 순간의 양식 버전이 박힌다 — 양식을 v2 로 고쳐도 발행본은 v1 배치 그대로 · 새 문서는 v2 · 버전 목록에 'v1 발행 1건'",
+       (sr.status, v2.get("version"), 'data-layout-version="1"' in hA2, "발행 때 박힌 버전" in hA2, 'data-layout-version="2"' in hB, [(v["version"],v["issued"]) for v in vers]),
+       sr.status==200 and v2.get("version")==2 and 'data-layout-version="1"' in hA2 and "발행 때 박힌 버전" in hA2 and 'data-layout-version="2"' in hB and 'data-el="title" data-id="title" style="left:5%' in hA2 and 'data-el="title" data-id="title" style="left:40%' in hB and dict((v["version"],v["issued"]) for v in vers).get(1)==1)
+    q=lambda body: ctx.request.post(PL,headers=J0,data=json.dumps(body))
+    e1=q({"docType":"techdata","elements":[{"kind":"table","x":80,"y":0,"w":30,"h":10}]}); e2=q({"docType":"techdata","elements":[{"kind":"chart","x":0,"y":0,"w":10,"h":10}]})
+    e3=q({"docType":"techdata","elements":[]}); e4=q({"docType":"invoice","elements":[{"kind":"title","x":0,"y":0,"w":10,"h":10}]})
+    ok("S68d 쪽 밖 400 · 모르는 요소 400 · 빈 양식 400 · 모르는 문서 종류 400", (e1.status,e2.status,e3.status,e4.status), (e1.status,e2.status,e3.status,e4.status)==(400,400,400,400))
+    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data={"email":"viewer@acme.test"})
+    v0=vw.request.get(PL+"?docType=techdata"); v1=vw.request.post(PL,headers=J0,data=json.dumps({"docType":"techdata","elements":l1["elements"]})); vw.close()
+    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data={"email":"owner@globex.test"})
+    g0=gb.request.get(PL+"?docType=techdata").json(); g2=gb.request.get(DOCS+f"/{tdA.get('id')}/print"); gb.close()
+    ok("S68e viewer 는 보지만(200) 저장 못 한다(403) · 다른 회사는 우리 양식 버전 0 · 우리 발행본 인쇄 404",
+       (v0.status, v1.status, len(g0.get("versions",[])), g2.status), v0.status==200 and v1.status==403 and len(g0.get("versions",[]))==0 and g0.get("latest") is None and g2.status==404)
     # S37 은 맨 끝에서 센다 — 중간(옛 자리)에서는 뒤에 찍히는 5장(40·41·42·52·53)이 아직 없어,
     # 빈 폴더에서는 25장이라 실패하고 이전 실행 잔재가 있을 때만 통과했다(2026-09-24 실측).
     _want=["00_login","05_project_mgmt","06_module_cpq_stub","10_project_bound","11_code_builder","11b_revisions","12_macro_tab",
            "13_macro_approved","14_edim_run","15_bom_cost","16_design_tab","20_setup_subcode","21_setup_product_table",
            "22_setup_relationship","23_codebuilder_from_subcode","30_toolbox_program","31_toolbox_ui_tool","40_company_admin",
            "41_platform_console","42_user_management","43_drawings","44_document_tab","45_purchasing","46_quotation_print",
-           "47_techdata_print","48_dxf_plan","49_dxf_assembly","51_accepted","52_register","53_schedule","54_toolbar","55_project_mgmt","56_print_setup","57_ui_design","58_material","59_arrangement_code","60_spec_input","61_drawing_purpose","62_company_db","63_input_data","64_viewer3d","65_price_to_cost","66_project_contacts","67_partner_edit","68_spec_import","69_code_approval","70_dwg_view","71_techdata_list","72_mfg_rate","73_erp_master","74_sub_drawing","75_output_template","76_coding_list","77_wizards"]
+           "47_techdata_print","48_dxf_plan","49_dxf_assembly","51_accepted","52_register","53_schedule","54_toolbar","55_project_mgmt","56_print_setup","57_ui_design","58_material","59_arrangement_code","60_spec_input","61_drawing_purpose","62_company_db","63_input_data","64_viewer3d","65_price_to_cost","66_project_contacts","67_partner_edit","68_spec_import","69_code_approval","70_dwg_view","71_techdata_list","72_mfg_rate","73_erp_master","74_sub_drawing","75_output_template","76_coding_list","77_wizards","78_print_layout"]
     _miss=[w for w in _want if not os.path.exists(f"{OUT}/{w}.png") or os.path.getmtime(f"{OUT}/{w}.png")<T0]
-    ok("S37 캡처 54장이 이번 실행에서 전부 나온다 (잔재 파일은 세지 않음)", _miss or len(_want), not _miss)
+    ok("S37 캡처 55장이 이번 실행에서 전부 나온다 (잔재 파일은 세지 않음)", _miss or len(_want), not _miss)
     b.close()
 n=sum(1 for v in R.values() if v[0]); print(f"\n[demo_e2e] {n}/{len(R)} steps passed"); json.dump(R,open(f"{OUT}/demo_e2e_result.json","w",encoding="utf-8"),ensure_ascii=False,indent=1)
 sys.exit(0 if n==len(R) else 1)

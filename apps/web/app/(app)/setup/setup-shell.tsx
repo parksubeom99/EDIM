@@ -59,6 +59,7 @@ export function SetupShell({ initialTab }: { initialTab: Tab }) {
         <Link href="/setup/material" data-testid="setup-link-material" style={{ color: "var(--accent)", fontSize: "var(--fs-13)" }}>자재·구매품 등록 (p32) →</Link>
         <Link href="/setup/drawing-template" data-testid="setup-link-drawing-template" style={{ color: "var(--accent)", fontSize: "var(--fs-13)" }}>도면 템플릿 (p39) →</Link>
         <Link href="/setup/mfg" data-testid="setup-link-mfg" style={{ color: "var(--accent)", fontSize: "var(--fs-13)" }}>제조 정보 표 (p66) →</Link>
+        <Link href="/setup/print-layout" data-testid="setup-link-print-layout" style={{ color: "var(--accent)", fontSize: "var(--fs-13)" }}>인쇄 양식 편집기 (p48) →</Link>
         <Link href="/setup/print" data-testid="setup-link-print" style={{ color: "var(--accent)", fontSize: "var(--fs-13)" }}>Print 설정 (p48) →</Link>
         <Link href="/setup/ui" data-testid="setup-link-ui" style={{ color: "var(--accent)", fontSize: "var(--fs-13)" }}>UI Design (p26) →</Link>
         <h1 style={{ fontFamily: "var(--font-display)", fontSize: "var(--fs-18, 18px)", fontWeight: 600, margin: 0 }}>Set-up / PLM · BOM Code Set-Up</h1>
