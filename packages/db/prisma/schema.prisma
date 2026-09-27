@@ -52,6 +52,7 @@ model Tenant {
   projectActivities ProjectActivity[]
   attachments2    Attachment[]
   mfgRates        MfgRate[]
+  erpMasters      ErpMaster[]
 
   @@map("tenant")
 }
@@ -755,4 +756,23 @@ model MfgRate {
 
   @@unique([tenantId, productCode, process])
   @@map("mfg_rate")
+}
+
+/// 0027 · p64 [ERP Set-up] 기준정보 6종(Department · Warehouse · Inventory · Bank · Employee · Nation). 종류별 칸은 attrs.
+model ErpMaster {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  kind      String
+  code      String
+  name      String
+  attrs     Json     @default("{}")
+  remarks   String   @default("")
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdBy String   @map("created_by") @db.Uuid
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, kind, code])
+  @@map("erp_master")
 }

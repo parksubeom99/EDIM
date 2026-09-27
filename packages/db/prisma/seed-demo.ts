@@ -28,6 +28,12 @@ export const DEMO_PARTNERS = [
   { kind: "supplier", code: "S-KSB", name: "KSB Motor", contact: "영업 1팀", nation: "KR" },
 ] as const;
 
+/** 0027 · p64 ERP 기준정보 예시 두 행 — 나머지는 회사가 채운다. Company DB 두 곳의 Nation "KR" 이 이 국가를 가리킨다. */
+export const DEMO_ERP_MASTER = [
+  { kind: "nation", code: "KR", name: "대한민국", attrs: { currency: "KRW" } },
+  { kind: "department", code: "D100", name: "설계팀", attrs: {} },
+] as const;
+
 /** 0022 · p16 Input Data 템플릿 데모 — 청사진의 두 항목. */
 export const DEMO_INPUT_ITEMS = [
   { key: "temperature", label: "Temperature", unit: "°C", defaultValue: 20, minValue: -40, maxValue: 60 },
@@ -41,6 +47,11 @@ export async function seedDemo(opts: { forceCatalog?: boolean } = {}): Promise<v
     if ((await tx.partner.count()) > 0) return;
     for (const p of DEMO_PARTNERS) await tx.partner.create({ data: { tenantId: IDS.tenantA, ...p, createdBy: IDS.ownerA } });
     console.log(`Demo seed: ${DEMO_PARTNERS.length} partners (p64 Company DB).`);
+  });
+  await withTenant(IDS.tenantA, async (tx) => {
+    if ((await tx.erpMaster.count()) > 0) return;
+    for (const m of DEMO_ERP_MASTER) await tx.erpMaster.create({ data: { tenantId: IDS.tenantA, kind: m.kind, code: m.code, name: m.name, attrs: { ...m.attrs }, createdBy: IDS.ownerA } });
+    console.log(`Demo seed: ${DEMO_ERP_MASTER.length} ERP master rows (p64).`);
   });
   // 0022 · p16 Input Data 템플릿 — 청사진 그대로 Temperature °C · Humidity %
   await withTenant(IDS.tenantA, async (tx) => {

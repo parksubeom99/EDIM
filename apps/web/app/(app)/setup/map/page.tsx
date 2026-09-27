@@ -49,7 +49,7 @@ const MAP: { col: string; groups: Group[] }[] = [
   { col: "ERP (Set-Up / User)", groups: [
     { title: "Company info.", items: [
       { id: "c-erp", label: "1. ERP System", href: "/m/company" },
-      { id: "c-dept", label: "2. Department", none: "필요한 입력: 회사 부서 체계" },
+      { id: "c-dept", label: "2. Department · 기준정보(Warehouse · Inventory · Bank · Employee · Nation)", href: "/setup/erp?kind=department" },
       { id: "c-pcr", label: "3. PCR", href: "/workbench" },
       { id: "c-db", label: "4. Company DB", href: "/setup/company" },
     ] },

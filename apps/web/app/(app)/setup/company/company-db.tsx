@@ -6,7 +6,7 @@ import { useCallback, useEffect, useState, type CSSProperties } from "react";
  * ⑧ Company DB (청사진 p64 [ERP Set-up]) — 고객 · 공급처 두 목록.
  * 프로젝트 관리의 Client 와 자재 단가 이력의 공급처가 이 목록에서 고른다(글자 열도 함께 채워 옛 데이터를 보존).
  * 수정 · 사용 중지 · 삭제(0024 — 프로젝트·단가 이력·구매 요청이 가리키면 삭제 409, 대신 사용 중지).
- * 아직 없음: Warehouse · Inventory · Bank · Employee · Nation 표.
+ * Department · Warehouse · Inventory · Bank · Employee · Nation 은 /setup/erp (H4 · 0027).
  */
 interface Partner { id: string; kind: string; code: string; name: string; contact: string; nation: string; remarks: string; active: boolean }
 const KINDS = [{ kind: "customer", label: "고객 · Customer", ph: "C-001" }, { kind: "supplier", label: "공급처 · Supplier", ph: "S-001" }] as const;
@@ -105,7 +105,7 @@ export function CompanyDb({ canEdit }: { canEdit: boolean }) {
       })}
       {msg && <p data-testid="company-db-msg" data-ok={msg.ok ? "1" : "0"} style={{ gridColumn: "1 / -1", margin: 0, fontSize: "var(--fs-12)", color: msg.ok ? "var(--accent)" : "var(--warn)" }}>{msg.text}</p>}
       <p style={{ gridColumn: "1 / -1", margin: 0, fontSize: 11, color: "var(--ink-muted)" }}>
-        쓰는 곳: 프로젝트 관리 ▸ Client (고객) · Set-Up ▸ 자재·구매품 ▸ 단가 이력 공급처. 가리키는 곳이 있으면 삭제 대신 사용 중지. 코드는 바꾸지 않습니다. 아직 없음: Warehouse · Inventory · Bank · Employee · Nation 표 — 필요한 입력: 회사 창고·재고·계좌 데이터.
+        쓰는 곳: 프로젝트 관리 ▸ Client (고객) · Set-Up ▸ 자재·구매품 ▸ 단가 이력 공급처. 가리키는 곳이 있으면 삭제 대신 사용 중지. 코드는 바꾸지 않습니다. Department · Warehouse · Inventory · Bank · Employee · Nation 은 ERP 기준정보(/setup/erp)에서 — Nation 코드는 여기 Nation 칸이 가리킵니다.
       </p>
     </section>
   );

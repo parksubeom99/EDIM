@@ -1566,8 +1566,9 @@ with sync_playwright() as p:
     st={h: ctx.request.get(BASE+h).status for h in hrefs}
     ok("S61b 지도의 링크가 가리키는 화면이 모두 열린다(200)", st, len(hrefs)>=10 and all(v==200 for v in st.values()))
     nones=pg.eval_on_selector_all("[data-kind=none]","es=>es.map(e=>e.innerText)")
-    ok("S61c 없는 것은 있는 척하지 않는다 — Work Process · Department · 그 밖의 ERP 는 '아직 없음 — 필요한 입력' 으로", len(nones),
-       len(nones)==3 and all("아직 없음" in t and "필요한 입력" in t for t in nones))
+    # H4(ccmd H) 이후 Department 는 ERP 기준정보 화면(/setup/erp)으로 링크 — 아직 없음은 Work Process · 그 밖의 ERP 둘.
+    ok("S61c 없는 것은 있는 척하지 않는다 — Work Process · 그 밖의 ERP 는 '아직 없음 — 필요한 입력' 으로", len(nones),
+       len(nones)==2 and all("아직 없음" in t and "필요한 입력" in t for t in nones))
     vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data={"email":"viewer@acme.test"}); vm=vw.request.get(BASE+"/setup/map"); vw.close()
     ok("S61d 지도는 읽기 화면 — viewer 도 연다(200)", vm.status, vm.status==200)
     # ── S62 F10 · p66 · p67 제조 정보 표(공정별 시간 × 임율 · 장비) → 인건비 · 견적 적용(스냅샷 단가·출처) ──
@@ -1614,15 +1615,70 @@ with sync_playwright() as p:
     left=ctx.request.get(MR+"?product=EU").json()["rows"]
     ok("S62f viewer 는 보지만(200) 못 넣고·못 지운다(403) · 다른 회사는 우리 표를 못 보고(0건) 못 지운다(404) · 우리 표는 그대로",
        (v0.status, v1.status, v2.status, len(g1), g2.status, len(left)), v0.status==200 and v1.status==403 and v2.status==403 and len(g1)==0 and g2.status==404 and len(left)==1)
+    # ── S63 H4 · p64 ERP 기준정보 6종 — Department · Warehouse · Inventory · Bank · Employee · Nation (Company DB 틀 재사용) ──
+    EM=BASE+"/api/setup/erp-master"
+    def em_rows(kind=None, c=ctx): return c.request.get(EM+(f"?kind={kind}" if kind else "")).json().get("rows",[])
+    pg.goto(BASE+"/setup",wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=setup-link-erp]",timeout=30000); nuke(pg)
+    pg.click("[data-testid=setup-link-erp]"); pg.wait_for_selector("[data-testid=erp-master][data-ready='1'][data-kind=department]",timeout=60000); nuke(pg)
+    def em_add(kind, code, name, fields):
+        pg.click(f"[data-testid=erp-tab-{kind}]"); wait_sel(pg,f"[data-testid=erp-master][data-kind={kind}]")
+        pg.fill("[data-testid=erp-new-code]",code); pg.fill("[data-testid=erp-new-name]",name)
+        for k,v,sel in fields:
+            if sel: pg.select_option(f"[data-testid=erp-new-{k}]",v)
+            else: pg.fill(f"[data-testid=erp-new-{k}]",v)
+        pg.click("[data-testid=erp-add]"); wait_sel(pg,f"[data-testid=erp-row-{code}]")
+    em_add("department","D200","구매팀",[("parent","D100",True),("manager","김부장",False)])
+    em_add("warehouse","W01","본사 창고",[("location","화성 1동",False)])
+    em_add("inventory","INV-001","KDP 재고",[("warehouse","W01",True),("item","KDP",False),("qty","12",False),("unit","ea",False)])
+    em_add("bank","B01","거래 은행(예시)",[("branch","본점",False),("account","000-00-000000",False),("nation","KR",True)])
+    em_add("nation","US","미국",[("currency","USD",False)])
+    em_add("employee","E001","홍길동",[("department","D200",True),("title","과장",False),("email","hong@acme.test",False)])
+    nuke(pg); pg.screenshot(path=f"{OUT}/73_erp_master.png",full_page=True)
+    allr=em_rows(); byk={k:[r for r in allr if r["kind"]==k] for k in ("department","warehouse","inventory","bank","employee","nation")}
+    e1=[r for r in byk["employee"] if r["code"]=="E001"]; i1=[r for r in byk["inventory"] if r["code"]=="INV-001"]
+    ok("S63a ERP 기준정보 6종을 화면에서 등록한다 — 직원은 부서를, 재고는 창고를, 은행은 국가를 목록에서 골라 가리킨다(수량은 수)",
+       {k:len(v) for k,v in byk.items()} | {"E001": e1[0]["attrs"] if e1 else None, "INV": i1[0]["attrs"] if i1 else None},
+       all(len(v)>=1 for v in byk.values()) and e1 and e1[0]["attrs"].get("department")=="D200" and i1 and i1[0]["attrs"].get("qty")==12 and i1[0]["attrs"].get("warehouse")=="W01")
+    pg.click("[data-testid=erp-tab-department]"); wait_sel(pg,"[data-testid=erp-master][data-kind=department]")
+    pg.click("[data-testid=erp-del-D200]"); wait_sel(pg,"[data-testid=erp-msg][data-ok='0']")
+    m409=pg.inner_text("[data-testid=erp-msg]") if pg.query_selector("[data-testid=erp-msg]") else ""
+    kr=[r for r in byk["nation"] if r["code"]=="KR"][0]; dkr=ctx.request.delete(EM+f"/{kr['id']}")
+    ok("S63b 가리키는 곳이 있으면 삭제 409 + 어디서 가리키는지 — 부서 D200(직원 1) · 국가 KR(은행 1 · Company DB 2), 화면에 이유",
+       (m409[:80], dkr.status, dkr.json().get("usage")), "409" in m409 and "사용 중" in m409 and dkr.status==409 and "bank.nation 1" in dkr.json().get("usage",{}).get("detail",[]) and any(d.startswith("Company DB") for d in dkr.json().get("usage",{}).get("detail",[])))
+    d200=[r for r in byk["department"] if r["code"]=="D200"][0]; d100=[r for r in byk["department"] if r["code"]=="D100"][0]
+    j0=lambda d: json.dumps(d)
+    x5=ctx.request.patch(EM+f"/{d100['id']}",headers=J0,data=j0({"attrs":{"parent":"D200"}}))   # D200 의 상위가 D100 → 순환
+    pg.click("[data-testid=erp-toggle-D200]"); pg.wait_for_selector("[data-testid=erp-row-D200][data-active='0']",timeout=30000)
+    x1=ctx.request.post(EM,headers=J0,data=j0({"kind":"employee","code":"E002","name":"새 직원","attrs":{"department":"D200"}}))
+    x2=ctx.request.patch(EM+f"/{e1[0]['id']}",headers=J0,data=j0({"attrs":{"department":"D200","title":"차장"}}))
+    x3=ctx.request.post(EM,headers=J0,data=j0({"kind":"employee","code":"E003","name":"부서 없음","attrs":{}}))
+    x4=ctx.request.post(EM,headers=J0,data=j0({"kind":"nation","code":"JP","name":"일본","attrs":{"currency":"yen"}}))
+    x6=ctx.request.patch(EM+f"/{d100['id']}",headers=J0,data=j0({"code":"D999"}))
+    x7=ctx.request.post(EM,headers=J0,data=j0({"kind":"department","code":"D100","name":"중복"}))
+    x8=ctx.request.post(EM,headers=J0,data=j0({"kind":"desk","code":"X","name":"x"}))
+    ok("S63c 사용 중지된 부서는 새로 못 가리키고(400) 이미 가리키던 직원은 그대로 고친다(200) · 필수 칸 400 · 통화 형식 400 · 부서 순환 400 · 코드 변경 400 · 중복 409 · 모르는 종류 400",
+       (x1.status,x2.status,x3.status,x4.status,x5.status,x6.status,x7.status,x8.status),
+       (x1.status,x2.status,x3.status,x4.status,x5.status,x6.status,x7.status,x8.status)==(400,200,400,400,400,400,409,400))
+    inv=i1[0]; w01=[r for r in byk["warehouse"] if r["code"]=="W01"][0]
+    y1=ctx.request.delete(EM+f"/{w01['id']}"); y2=ctx.request.delete(EM+f"/{inv['id']}"); y3=ctx.request.delete(EM+f"/{w01['id']}")
+    ok("S63d 창고는 재고가 가리키는 동안 409, 재고를 지우면 창고도 지워진다(200)", (y1.status,y2.status,y3.status), (y1.status,y2.status,y3.status)==(409,200,200))
+    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data={"email":"viewer@acme.test"})
+    v0=vw.request.get(EM); v1=vw.request.post(EM,headers=J0,data=j0({"kind":"nation","code":"CN","name":"중국"})); v2=vw.request.patch(EM+f"/{d100['id']}",headers=J0,data=j0({"name":"x"})); v3=vw.request.delete(EM+f"/{d100['id']}"); vw.close()
+    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data={"email":"owner@globex.test"})
+    g0=len(em_rows(c=gb)); g1=gb.request.patch(EM+f"/{d100['id']}",headers=J0,data=j0({"name":"hijack"})); g2=gb.request.delete(EM+f"/{e1[0]['id']}"); gb.close()
+    still=[r for r in em_rows("department") if r["code"]=="D100"]
+    ok("S63e viewer 는 보지만(200) 못 넣고·못 고치고·못 지운다(403) · 다른 회사는 우리 기준정보 0건 · 고치기·지우기 404 · 우리 행 그대로",
+       (v0.status,v1.status,v2.status,v3.status,g0,g1.status,g2.status,still[0]["name"] if still else None),
+       v0.status==200 and (v1.status,v2.status,v3.status)==(403,403,403) and g0==0 and (g1.status,g2.status)==(404,404) and still and still[0]["name"]=="설계팀")
     # S37 은 맨 끝에서 센다 — 중간(옛 자리)에서는 뒤에 찍히는 5장(40·41·42·52·53)이 아직 없어,
     # 빈 폴더에서는 25장이라 실패하고 이전 실행 잔재가 있을 때만 통과했다(2026-09-24 실측).
     _want=["00_login","05_project_mgmt","06_module_cpq_stub","10_project_bound","11_code_builder","11b_revisions","12_macro_tab",
            "13_macro_approved","14_edim_run","15_bom_cost","16_design_tab","20_setup_subcode","21_setup_product_table",
            "22_setup_relationship","23_codebuilder_from_subcode","30_toolbox_program","31_toolbox_ui_tool","40_company_admin",
            "41_platform_console","42_user_management","43_drawings","44_document_tab","45_purchasing","46_quotation_print",
-           "47_techdata_print","48_dxf_plan","49_dxf_assembly","51_accepted","52_register","53_schedule","54_toolbar","55_project_mgmt","56_print_setup","57_ui_design","58_material","59_arrangement_code","60_spec_input","61_drawing_purpose","62_company_db","63_input_data","64_viewer3d","65_price_to_cost","66_project_contacts","67_partner_edit","68_spec_import","69_code_approval","70_dwg_view","71_techdata_list","72_mfg_rate"]
+           "47_techdata_print","48_dxf_plan","49_dxf_assembly","51_accepted","52_register","53_schedule","54_toolbar","55_project_mgmt","56_print_setup","57_ui_design","58_material","59_arrangement_code","60_spec_input","61_drawing_purpose","62_company_db","63_input_data","64_viewer3d","65_price_to_cost","66_project_contacts","67_partner_edit","68_spec_import","69_code_approval","70_dwg_view","71_techdata_list","72_mfg_rate","73_erp_master"]
     _miss=[w for w in _want if not os.path.exists(f"{OUT}/{w}.png") or os.path.getmtime(f"{OUT}/{w}.png")<T0]
-    ok("S37 캡처 49장이 이번 실행에서 전부 나온다 (잔재 파일은 세지 않음)", _miss or len(_want), not _miss)
+    ok("S37 캡처 50장이 이번 실행에서 전부 나온다 (잔재 파일은 세지 않음)", _miss or len(_want), not _miss)
     b.close()
 n=sum(1 for v in R.values() if v[0]); print(f"\n[demo_e2e] {n}/{len(R)} steps passed"); json.dump(R,open(f"{OUT}/demo_e2e_result.json","w",encoding="utf-8"),ensure_ascii=False,indent=1)
 sys.exit(0 if n==len(R) else 1)
