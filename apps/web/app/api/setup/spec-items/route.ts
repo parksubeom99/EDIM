@@ -2,13 +2,14 @@ import { NextResponse, type NextRequest } from "next/server";
 import { withTenant, writeAudit, requireTenant } from "@edim/db";
 import { specDefError, type SpecItemDef, type SlotKey, type SpecSource } from "@edim/bom-code";
 import { loadCatalog } from "@/app/lib/catalog";
+import { cleanSource } from "@/app/lib/spec-def";
 import { guard, str, dbError } from "../_guard";
 
 /**
  * ⑥ 사양 입력표 — 사양 항목 정의 (청사진 p46 [Spec List in-put table]).
  * GET  ?product=EU → { rows: [{ key, label, unit, slot, source, seq }] }  (회사 것만 — RLS)
  * POST { productCode, key, label, unit, slot, source } → 등록. 표·열·슬롯이 등록된 카탈로그와 맞아야 한다(400).
- * 아직 없음: 항목 수정·삭제 · Import(엑셀) · Option 정의(Item Image).
+ * 수정·삭제 = ./[id] · CSV Import = ./import (F3). 아직 없음: xlsx · Option 정의(Item Image).
  */
 export async function GET(req: NextRequest) {
   const g = await guard(false);
@@ -34,11 +35,7 @@ export async function POST(req: NextRequest) {
   if (!product) return NextResponse.json({ error: `제품 코드 ${productCode} 없음` }, { status: 404 });
   const bad = specDefError(def, catalog, productCode);
   if (bad) return NextResponse.json({ error: bad }, { status: 400 });
-  // 저장은 정의에 쓰이는 필드만 — 화면이 보낸 잡값이 source 에 섞이지 않게
-  const s = def.source;
-  const source = s.kind === "choice" ? { kind: "choice" }
-    : s.kind === "item" ? { kind: "item", op: s.op, ...(s.scale !== undefined ? { scale: s.scale } : {}) }
-    : { kind: "table", table: s.table, col: s.col, op: s.op };
+  const source = cleanSource(def.source) as object;   // 저장 모양 한 곳(app/lib/spec-def.ts)
   try {
     const id = await withTenant(g.session.tenantId, async (tx) => {
       const tenantId = await requireTenant(tx);

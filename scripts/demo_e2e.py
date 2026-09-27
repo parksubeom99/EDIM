@@ -1351,15 +1351,50 @@ with sync_playwright() as p:
     ok("S54e viewer 는 고치거나 지울 수 없다(403·403) · 다른 회사는 우리 고객·공급처를 못 고치고 못 지운다(404·404)", (v1.status, v2.status, g1.status, g2.status),
        v1.status==403 and v2.status==403 and g1.status==404 and g2.status==404)
     ctx.request.patch(PJ+f"/{pj['id']}",headers=J0,data=json.dumps({"clientId":"","clientName":"Micron","remarks":""}))   # 원복
+    # ── S55 F3 · p46 사양 항목 수정·삭제 · CSV Import(미리보기 → 확정, 틀린 줄은 줄 번호와 이유) ──
+    SI=BASE+"/api/setup/spec-items"
+    pg.goto(BASE+"/setup/spec",wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=spec-items][data-ready='1']",timeout=60000); nuke(pg)
+    pg.select_option("[data-testid=spec-product]","EU"); pg.wait_for_selector("[data-testid=spec-items][data-ready='1'][data-product=EU]",timeout=30000)
+    n0=len(ctx.request.get(SI+"?product=EU").json()["rows"])
+    BAD_CSV="key,label,unit,slot,kind,op,scale,table,col\nfan_power,팬 동력,kW,B,table,ge,,cap,A\ncoil_rows,코일 열수,,B,table,ge,,cap,B\nairflow,중복 키,,B,item,ge,1000,,\nbad_tbl,슬롯 틀림,,E,table,ge,,cap,M\n"
+    pg.set_input_files("[data-testid=spec-import-file]",files=[{"name":"spec.csv","mimeType":"text/csv","buffer":BAD_CSV.encode("utf-8")}])
+    pg.wait_for_function("()=>!document.querySelector('[data-testid=spec-import-preview]').disabled",timeout=10000)
+    pg.click("[data-testid=spec-import-preview]"); pg.wait_for_selector("[data-testid=spec-import-preview-table]",timeout=30000)
+    lines=pg.eval_on_selector_all("[data-testid^=spec-import-line-]","es=>es.map(e=>[e.dataset.testid.replace('spec-import-line-',''),e.dataset.ok,e.innerText.slice(-40)])")
+    locked=pg.eval_on_selector("[data-testid=spec-import-confirm]","e=>e.disabled")
+    nuke(pg); pg.screenshot(path=f"{OUT}/68_spec_import.png",full_page=True)
+    ok("S55a 미리보기 — 틀린 줄은 파일의 줄 번호와 이유(중복 key · 표의 슬롯 불일치)로 보이고, 틀린 줄이 있으면 확정이 잠긴다",
+       ([(l[0],l[1]) for l in lines], locked), [(l[0],l[1]) for l in lines]==[("2","1"),("3","1"),("4","0"),("5","0")] and locked and "이미 있는 key" in lines[2][2])
+    forced=ctx.request.post(SI+"/import",headers=J0,data=json.dumps({"productCode":"EU","csv":BAD_CSV,"confirm":True}))
+    n1=len(ctx.request.get(SI+"?product=EU").json()["rows"])
+    pg.fill("[data-testid=spec-import-text]","\n".join(BAD_CSV.split("\n")[:3])+"\n")
+    pg.click("[data-testid=spec-import-preview]"); pg.wait_for_function("()=>{const b=document.querySelector('[data-testid=spec-import-confirm]'); return b && !b.disabled;}",timeout=30000)
+    pg.click("[data-testid=spec-import-confirm]"); pg.wait_for_selector("[data-testid=spec-row-coil_rows]",timeout=30000)
+    ok("S55b 틀린 줄이 섞이면 확정 요청도 400 · 하나도 들어가지 않는다 → 고친 CSV 는 확정으로 2개가 들어온다",
+       (forced.status, n1-n0, len(ctx.request.get(SI+"?product=EU").json()["rows"])-n0), forced.status==400 and n1==n0 and len(ctx.request.get(SI+"?product=EU").json()["rows"])==n0+2)
+    pg.click("[data-testid=se-edit-coil_rows]"); pg.fill("[data-testid=se-label]","코일 열 수"); pg.fill("[data-testid=se-unit]","열"); pg.click("[data-testid=se-save]")
+    wait_text(pg,"[data-testid=spec-row-coil_rows]","코일 열 수")
+    pg.click("[data-testid=se-del-fan_power]"); pg.wait_for_selector("[data-testid=spec-row-fan_power]",state="detached",timeout=30000)
+    rows=ctx.request.get(SI+"?product=EU").json()["rows"]; cr=[x for x in rows if x["key"]=="coil_rows"][0]
+    ok("S55c 화면에서 이름·단위 수정과 삭제가 된다", (cr["label"], cr["unit"], any(x["key"]=="fan_power" for x in rows)), cr["label"]=="코일 열 수" and cr["unit"]=="열" and not any(x["key"]=="fan_power" for x in rows))
+    k400=ctx.request.patch(SI+f"/{cr['id']}",headers=J0,data=json.dumps({"key":"x"}))
+    s400=ctx.request.patch(SI+f"/{cr['id']}",headers=J0,data=json.dumps({"source":{"kind":"table","table":"nope","col":"A","op":"ge"}}))
+    ok("S55d key 바꾸기 400 · 카탈로그에 없는 표로 바꾸기 400(수정도 등록과 같은 대조)", (k400.status, s400.status), k400.status==400 and s400.status==400)
+    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data={"email":"viewer@acme.test"})
+    v1=vw.request.post(SI+"/import",headers=J0,data=json.dumps({"productCode":"EU","csv":BAD_CSV})); v2=vw.request.patch(SI+f"/{cr['id']}",headers=J0,data=json.dumps({"label":"v"})); v3=vw.request.delete(SI+f"/{cr['id']}"); vw.close()
+    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data={"email":"owner@globex.test"})
+    g1=gb.request.patch(SI+f"/{cr['id']}",headers=J0,data=json.dumps({"label":"g"})); g2=gb.request.delete(SI+f"/{cr['id']}"); gb.close()
+    ok("S55e viewer 는 Import·수정·삭제 모두 403 · 다른 회사는 우리 항목을 못 고치고 못 지운다(404·404)", (v1.status, v2.status, v3.status, g1.status, g2.status),
+       v1.status==403 and v2.status==403 and v3.status==403 and g1.status==404 and g2.status==404)
     # S37 은 맨 끝에서 센다 — 중간(옛 자리)에서는 뒤에 찍히는 5장(40·41·42·52·53)이 아직 없어,
     # 빈 폴더에서는 25장이라 실패하고 이전 실행 잔재가 있을 때만 통과했다(2026-09-24 실측).
     _want=["00_login","05_project_mgmt","06_module_cpq_stub","10_project_bound","11_code_builder","11b_revisions","12_macro_tab",
            "13_macro_approved","14_edim_run","15_bom_cost","16_design_tab","20_setup_subcode","21_setup_product_table",
            "22_setup_relationship","23_codebuilder_from_subcode","30_toolbox_program","31_toolbox_ui_tool","40_company_admin",
            "41_platform_console","42_user_management","43_drawings","44_document_tab","45_purchasing","46_quotation_print",
-           "47_techdata_print","48_dxf_plan","49_dxf_assembly","51_accepted","52_register","53_schedule","54_toolbar","55_project_mgmt","56_print_setup","57_ui_design","58_material","59_arrangement_code","60_spec_input","61_drawing_purpose","62_company_db","63_input_data","64_viewer3d","65_price_to_cost","66_project_contacts","67_partner_edit"]
+           "47_techdata_print","48_dxf_plan","49_dxf_assembly","51_accepted","52_register","53_schedule","54_toolbar","55_project_mgmt","56_print_setup","57_ui_design","58_material","59_arrangement_code","60_spec_input","61_drawing_purpose","62_company_db","63_input_data","64_viewer3d","65_price_to_cost","66_project_contacts","67_partner_edit","68_spec_import"]
     _miss=[w for w in _want if not os.path.exists(f"{OUT}/{w}.png") or os.path.getmtime(f"{OUT}/{w}.png")<T0]
-    ok("S37 캡처 44장이 이번 실행에서 전부 나온다 (잔재 파일은 세지 않음)", _miss or len(_want), not _miss)
+    ok("S37 캡처 45장이 이번 실행에서 전부 나온다 (잔재 파일은 세지 않음)", _miss or len(_want), not _miss)
     b.close()
 n=sum(1 for v in R.values() if v[0]); print(f"\n[demo_e2e] {n}/{len(R)} steps passed"); json.dump(R,open(f"{OUT}/demo_e2e_result.json","w",encoding="utf-8"),ensure_ascii=False,indent=1)
 sys.exit(0 if n==len(R) else 1)
