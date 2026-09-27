@@ -1072,8 +1072,12 @@ with sync_playwright() as p:
        bv=="25" and ev=="SS" and asm.startswith("EU-25-") and "SS" in asm and fan_line=="25")
     nuke(pg); pg.screenshot(path=f"{OUT}/60_spec_input.png",full_page=True)
     rv0=len(ctx.request.get(BASE+"/api/rccs/revisions?node=a0000000-0000-4000-8000-000000000004").json().get("revisions",[]))
-    pg.fill("[data-testid=rev-reason]","spec input recommend (E2E)"); pg.click("[data-testid=rev-save]",force=True)
-    pg.wait_for_function("(n)=>fetch('/api/rccs/revisions?node=a0000000-0000-4000-8000-000000000004').then(r=>r.json()).then(j=>(j.revisions||[]).length>n)", arg=rv0, timeout=30000)
+    pg.fill("[data-testid=rev-reason]","spec input recommend (E2E)")
+    # 운영 모드(next start)에서는 추천 직후 저장 버튼이 아직 busy 로 잠겨 있을 때 force 클릭이 조용히 버려졌다(ccmd H STEP 1 게이트 · 286/287).
+    # 버튼이 풀리길 기다렸다가 저장 POST 응답을 받아서 넘어간다(S4c 와 같은 방식).
+    pg.wait_for_selector("[data-testid=rev-save]:not([disabled])",timeout=30000)
+    with pg.expect_response(lambda r: "/api/rccs/revisions" in r.url and r.request.method=="POST", timeout=30000):
+        pg.click("[data-testid=rev-save]")
     rv1=ctx.request.get(BASE+"/api/rccs/revisions?node=a0000000-0000-4000-8000-000000000004").json().get("revisions",[])
     ok("S47c 저장은 기존 개정(Rev) 한 곳 — 추천된 코드가 새 개정으로 남는다", (len(rv1)-rv0, rv1[0]["code"] if rv1 else None),
        len(rv1)==rv0+1 and rv1[0]["code"]==asm)
