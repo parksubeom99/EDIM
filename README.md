@@ -3,7 +3,7 @@
 **제품 코드 한 줄에서 BOM · 도면 · 원가 · 견적 · 기술 자료 · 구매 요청이 나온다.**
 공기조화기(AHU) 같은 주문 생산(Configure-to-Order) 제품을 위한 CPQ + PLM + ERP 통합 플랫폼의 베타입니다.
 
-> 상태(2026-09-27 · main): 발표 시나리오 e2e **287/287**(개발 모드 · 운영 모드 `next build → start` 각 1회) · 단위 테스트 **228**(vitest) + auth PASS · DB 검증 **9종** PASS · 청사진 70장 중 **실동 29 · 부분 17 · 미착수 5**(개념·표지 19 — 엘 확정판 2)
+> 상태(2026-09-27 · main): 발표 시나리오 e2e **322/322**(개발 모드 · 운영 모드 `next build → start` 각 1회) · 단위 테스트 **258**(vitest) + auth PASS · DB 검증 **9종** PASS · 청사진 70장 중 **실동 29 · 부분 17 · 미착수 5**(개념·표지 19 — 엘 확정판 2 · ccmd H 초안은 34 · 12 · 5, 엘 재측정 전)
 > 이 수치는 **Windows 11 로컬 실측**입니다(Node 24 · pnpm 9.15.4 · Docker PG16 · Python 3.12). Windows 첫 실행은 2026-09-26, 이후 e2e 를 여러 번 연속으로 돌렸습니다 — 아래 [정직 고지](#정직-고지) 참조.
 
 ## 📸 화면
@@ -88,7 +88,7 @@ packages/macro-verify       정적 검증 + dry-run            packages/macro-re
 packages/hierarchy-address  Work Hierarchy 주소 체계        packages/core-ontology    순수 도메인 타입
 packages/db                 스키마 · 마이그레이션 · RLS · DB 검증 스크립트(prisma/*-test.ts)
 packages/auth · packages/ui 세션/RBAC · 디자인 시스템
-scripts/demo_e2e.py         발표 시나리오 287단계 (화면 + API + DXF 파싱 · 3D 뷰어 WebGL)
+scripts/demo_e2e.py         발표 시나리오 322단계 (화면 + API + DXF 파싱 · 3D 뷰어 WebGL)
 scripts/publish_screens.py  스크린샷 → docs/screens/*.webp
 docs/                       00-corpus(청사진 색인) · 01-design(설계) · 02-reports(보고서 생성기) · plan · deck · DEMO.md
 ```
@@ -110,10 +110,10 @@ Windows 기준 상세 절차와 발표 당일 순서는 [`docs/DEMO.md`](docs/DE
 
 ```bash
 pnpm typecheck                                        # 11 패키지
-pnpm -r --workspace-concurrency=1 test                # 단위 테스트 228 (PostgreSQL 필요)
+pnpm -r --workspace-concurrency=1 test                # 단위 테스트 258 (PostgreSQL 필요)
 pnpm --filter @edim/db rls:test                       # + revision · backbone · platform · drawing · document
 pnpm db:reset:demo && pnpm dev &                      # 발표 시나리오
-python scripts/demo_e2e.py http://localhost:3000 <캡처 폴더>   # 287/287 이면 시연 장면이 기계적으로 재현된다 (캡처 49장)
+python scripts/demo_e2e.py http://localhost:3000 <캡처 폴더>   # 322/322 이면 시연 장면이 기계적으로 재현된다 (캡처 56장)
 ```
 
 | 검증 | 무엇을 못 박는가 |
@@ -122,7 +122,7 @@ python scripts/demo_e2e.py http://localhost:3000 <캡처 폴더>   # 287/287 이
 | `revision:test` | 코드 개정은 append-only — 앱 역할에 UPDATE/DELETE 권한이 없다 |
 | `backbone:test`(14) | BOM 이 등록된 관계에서 나온다 |
 | `drawing:test`(23) · `document:test`(37) | 산출물은 스냅샷을 참조하고, 발행·발주되면 **앱을 우회해도** 수정·삭제가 거부된다 |
-| `demo_e2e.py`(287) | 치수 표 한 칸 → 도면 폭만 변함(ezdxf 파싱) · 견적 합계 = 원가 · 구매 줄 = 스냅샷의 구매 품목 |
+| `demo_e2e.py`(322) | 치수 표 한 칸 → 도면 폭만 변함(ezdxf 파싱) · 견적 합계 = 원가 · 구매 줄 = 스냅샷의 구매 품목 |
 
 CI 워크플로는 [`docs/ci/ci.yml`](docs/ci) 에 준비돼 있으나 **아직 `.github/workflows/` 에 배선되지 않았습니다**(작업 토큰에 Workflows 권한이 없음).
 
