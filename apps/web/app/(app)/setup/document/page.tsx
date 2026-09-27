@@ -10,7 +10,8 @@ export default async function DocumentSetupPage() {
   return (
     <main style={{ maxWidth: 1240, margin: "3vh auto", padding: "16px 24px" }}>
       <Link href="/setup" style={{ color: "var(--accent)", fontSize: "var(--fs-13)" }}>← Set-Up</Link>{" "}
-      <Link href="/setup/input-data" style={{ color: "var(--accent)", fontSize: "var(--fs-13)", marginLeft: 12 }}>Input Data 템플릿 →</Link>
+      <Link href="/setup/input-data" style={{ color: "var(--accent)", fontSize: "var(--fs-13)", marginLeft: 12 }}>Input Data 템플릿 →</Link>{" "}
+      <Link href="/setup/coding-list" style={{ color: "var(--accent)", fontSize: "var(--fs-13)", marginLeft: 12 }}>Coding List →</Link>
       <h1 style={{ fontFamily: "var(--font-display)", fontWeight: 500, margin: "10px 0 2px" }}>Tech. Data &amp; Document Set-Up</h1>
       <p style={{ margin: 0, fontSize: "var(--fs-13)", color: "var(--ink-muted)" }}>CPQ &gt; Set-Up &gt; Document (p47 · p16) — Output Data 템플릿 · 그래프 전용 data · Table List. Tech Data 를 만들 때 값이 문서에 박힙니다.</p>
       <DocumentSetup canEdit={canEditCatalog(session.role)} />

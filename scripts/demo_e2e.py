@@ -1762,15 +1762,41 @@ with sync_playwright() as p:
     g0=len(gb.request.get(OI).json().get("rows",[])); g1=len(gb.request.get(GR).json().get("rows",[])); g2=gb.request.delete(OI+f"/{wid}"); gb.close()
     ok("S65e viewer 는 보지만(200) 못 넣고·못 고친다(403) · 다른 회사는 우리 Output·그래프 0건 · 지우기 404",
        (v0.status,v1.status,v2.status,g0,g1,g2.status), v0.status==200 and (v1.status,v2.status)==(403,403) and g0==0 and g1==0 and g2.status==404)
+    # ── S66 H7 · p47 Coding List — 노드마다 승인 매크로 1개 · 작업대 Inspector 에서 이동 · 행에서 작업대로 ──
+    CL=BASE+"/api/macros/coding-list"
+    pg.goto(BASE+f"/workbench?node={N4}",wait_until="domcontentloaded"); hydrated(pg); pg.wait_for_selector("[data-testid=inspector-coding-list]",timeout=60000); nuke(pg)
+    pg.click("[data-testid=inspector-coding-list]"); pg.wait_for_selector("[data-testid=coding-list][data-ready='1']",timeout=60000)
+    ms=ctx.request.get(BASE+f"/api/macros?node={N4}").json(); ms=ms.get("macros",ms.get("rows",[])) if isinstance(ms,dict) else ms
+    ap=[x for x in ms if x.get("status")=="approved"]
+    shown=pg.get_attribute(f"[data-testid=cl-row-{N4}]","data-approved"); cnt=pg.get_attribute(f"[data-testid=cl-row-{N4}]","data-count")
+    rows=ctx.request.get(CL).json()["rows"]; prj=[r for r in rows if r["stableId"]==N4][0]
+    ok("S66a Inspector 의 Coding List 로 이동 — 프로젝트 노드에 붙은 승인 매크로 개정(1개)이 목록에 그대로 · 마지막 BOM 이 쓴 개정도",
+       (shown, cnt, [x.get("revision") for x in ap], (prj.get("lastRun") or {}).get("macroRevision")),
+       len(ap)==1 and shown==str(ap[0].get("revision")) and cnt=="1" and prj.get("lastRun") is not None and prj["approved"]["dsl"]==ap[0].get("dsl"))
+    ahu=[r for r in rows if r["label"]=="AHU-01"][0]
+    d0=ahu["drafts"]
+    dr=ctx.request.post(BASE+"/api/macros",headers=J0,data=json.dumps({"node":ahu["stableId"],"dsl":"=SUM(Table1(A,1:1))","mode":"draft"}))
+    ahu2=[r for r in ctx.request.get(CL).json()["rows"] if r["stableId"]==ahu["stableId"]][0]
+    pg.reload(wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=coding-list][data-ready='1']",timeout=60000)
+    nuke(pg); pg.screenshot(path=f"{OUT}/76_coding_list.png",full_page=True)
+    ok("S66b 초안은 승인 매크로가 아니다 — AHU-01 에 초안을 저장해도 '승인 매크로 없음' · 초안 수만 +1",
+       (dr.status, ahu2["approved"], ahu2["drafts"]-d0, "승인 매크로 없음" in pg.inner_text(f"[data-testid=cl-row-{ahu['stableId']}]")),
+       dr.status==200 and ahu2["approved"] is None and ahu2["drafts"]==d0+1 and "승인 매크로 없음" in pg.inner_text(f"[data-testid=cl-row-{ahu['stableId']}]"))
+    pg.click(f"[data-testid=cl-open-{N4}]"); pg.wait_for_selector("[data-testid=canvas-cmds][data-ready='1']",timeout=60000)
+    ok("S66c 행의 노드 이름을 누르면 그 노드의 작업대로", pg.url.replace(BASE,""), pg.url.endswith(f"/workbench?node={N4}"))
+    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data={"email":"viewer@acme.test"}); v0=vw.request.get(CL); vw.close()
+    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data={"email":"owner@globex.test"}); g0=gb.request.get(CL).json().get("rows",[]); gb.close()
+    ok("S66d 읽기 목록 — viewer 도 본다(200) · 다른 회사 목록에는 우리 노드가 없다", (v0.status, len(g0), any(r["stableId"]==N4 for r in g0)),
+       v0.status==200 and not any(r["stableId"] in (N4, ahu["stableId"]) for r in g0))
     # S37 은 맨 끝에서 센다 — 중간(옛 자리)에서는 뒤에 찍히는 5장(40·41·42·52·53)이 아직 없어,
     # 빈 폴더에서는 25장이라 실패하고 이전 실행 잔재가 있을 때만 통과했다(2026-09-24 실측).
     _want=["00_login","05_project_mgmt","06_module_cpq_stub","10_project_bound","11_code_builder","11b_revisions","12_macro_tab",
            "13_macro_approved","14_edim_run","15_bom_cost","16_design_tab","20_setup_subcode","21_setup_product_table",
            "22_setup_relationship","23_codebuilder_from_subcode","30_toolbox_program","31_toolbox_ui_tool","40_company_admin",
            "41_platform_console","42_user_management","43_drawings","44_document_tab","45_purchasing","46_quotation_print",
-           "47_techdata_print","48_dxf_plan","49_dxf_assembly","51_accepted","52_register","53_schedule","54_toolbar","55_project_mgmt","56_print_setup","57_ui_design","58_material","59_arrangement_code","60_spec_input","61_drawing_purpose","62_company_db","63_input_data","64_viewer3d","65_price_to_cost","66_project_contacts","67_partner_edit","68_spec_import","69_code_approval","70_dwg_view","71_techdata_list","72_mfg_rate","73_erp_master","74_sub_drawing","75_output_template"]
+           "47_techdata_print","48_dxf_plan","49_dxf_assembly","51_accepted","52_register","53_schedule","54_toolbar","55_project_mgmt","56_print_setup","57_ui_design","58_material","59_arrangement_code","60_spec_input","61_drawing_purpose","62_company_db","63_input_data","64_viewer3d","65_price_to_cost","66_project_contacts","67_partner_edit","68_spec_import","69_code_approval","70_dwg_view","71_techdata_list","72_mfg_rate","73_erp_master","74_sub_drawing","75_output_template","76_coding_list"]
     _miss=[w for w in _want if not os.path.exists(f"{OUT}/{w}.png") or os.path.getmtime(f"{OUT}/{w}.png")<T0]
-    ok("S37 캡처 52장이 이번 실행에서 전부 나온다 (잔재 파일은 세지 않음)", _miss or len(_want), not _miss)
+    ok("S37 캡처 53장이 이번 실행에서 전부 나온다 (잔재 파일은 세지 않음)", _miss or len(_want), not _miss)
     b.close()
 n=sum(1 for v in R.values() if v[0]); print(f"\n[demo_e2e] {n}/{len(R)} steps passed"); json.dump(R,open(f"{OUT}/demo_e2e_result.json","w",encoding="utf-8"),ensure_ascii=False,indent=1)
 sys.exit(0 if n==len(R) else 1)

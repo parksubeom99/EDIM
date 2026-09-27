@@ -61,6 +61,7 @@ export function MacroPanel({
       <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 6 }}>
         <div style={h}>Macro · EDIM Toolbox</div>
         <span style={muted}>Prompt → Macro(DSL) → Verify → Approve → Run (p57) · 런타임 무LLM</span>
+        <a href="/setup/coding-list" data-testid="macro-coding-list" style={{ marginLeft: "auto", fontSize: "var(--fs-12)", color: "var(--accent)" }}>Coding List →</a>
       </div>
       {!project && <p style={{ ...muted, margin: "0 0 8px" }}>프로젝트 노드를 선택하면 매크로가 그 노드에 바인딩됩니다.</p>}
       <textarea

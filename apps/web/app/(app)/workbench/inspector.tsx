@@ -122,6 +122,8 @@ export function Inspector({
       <div style={{ color: "var(--ink-muted)", fontSize: "var(--fs-13)" }}>
         <Section name="Code">
           <CodeChip code={code || "—"} />{rev ? <span data-testid="code-rev" style={{ marginLeft: 6, fontFamily: "var(--font-mono)", fontSize: "var(--fs-12)", color: "var(--accent)" }}>Rev {rev}</span> : null}
+          {/* H7 · p47 Coding List — 노드마다 붙은 승인 매크로 개정 목록으로 */}
+          <a href="/setup/coding-list" data-testid="inspector-coding-list" style={{ fontSize: "var(--fs-12)", color: "var(--accent)" }}>Coding List (노드별 승인 매크로) →</a>
         </Section>
         <p style={{ margin: 0 }}>프로젝트 노드를 선택하면 Spec · Data Up-Load · Schedule · Approval · Description이 바인딩됩니다.</p>
         {nodeStable && (
@@ -139,6 +141,8 @@ export function Inspector({
       <Section name="Code">
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           <CodeChip code={code || "—"} />{rev ? <span data-testid="code-rev" style={{ marginLeft: 6, fontFamily: "var(--font-mono)", fontSize: "var(--fs-12)", color: "var(--accent)" }}>Rev {rev}</span> : null}
+          {/* H7 · p47 Coding List — 노드마다 붙은 승인 매크로 개정 목록으로 */}
+          <a href="/setup/coding-list" data-testid="inspector-coding-list" style={{ fontSize: "var(--fs-12)", color: "var(--accent)" }}>Coding List (노드별 승인 매크로) →</a>
           <span style={{ fontSize: "var(--fs-12)", color: "var(--ink-muted)" }}>
             item: {project.itemType ?? "—"}
           </span>
