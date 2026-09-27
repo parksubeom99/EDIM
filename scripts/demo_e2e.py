@@ -1420,6 +1420,33 @@ with sync_playwright() as p:
     g1=gb.request.get(AT+f"?ownerKind=product_code&ownerKey={MC4}").json()["rows"]; g2=gb.request.get(AT+f"/{rows_a[0]['id']}/file"); gb.close()
     ok("S56e viewer 는 첨부·상태 변경 403 · 다른 회사는 우리 코드의 첨부를 못 보고(0건) 못 내려받는다(404)", (v1.status, v2.status, len(g1), g2.status),
        v1.status==403 and v2.status==403 and len(g1)==0 and g2.status==404)
+    # ── S57 F5 · p35 · p30 Arrangement Drawing Control — 승인된 Arrangement Code 에만 DWG 를 붙인다(F4 첨부 재사용) ──
+    AC=BASE+"/api/setup/arrangement-codes"; AT=BASE+"/api/attachments"
+    ctx.request.post(AC,headers=J0,data=json.dumps({"code":"E2E-ADC","productCode":"EU","description":"F5 drawing control"}))
+    adc=[x for x in ctx.request.get(AC).json()["rows"] if x["code"]=="E2E-ADC"][0]
+    def upa(name, data, c=ctx, key=None):
+        return c.request.post(AT, multipart={"ownerKind":"arrangement_code","ownerKey":key or adc["id"],"kind":"dwg2d","file":{"name":name,"mimeType":"application/dxf","buffer":data}})
+    pg.goto(BASE+"/setup/arrangement-code",wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=arr-codes][data-ready='1']",timeout=60000); nuke(pg)
+    pg.click("[data-testid=ac-row-E2E-ADC]"); pg.wait_for_selector("[data-testid=ac-detail][data-code=E2E-ADC]",timeout=30000)
+    pg.wait_for_selector("[data-testid=ac-dwg][data-ready='1']",timeout=30000)
+    locked=bool(pg.query_selector("[data-testid=ac-dwg-locked]")); pend=upa("early.dxf",b"0\nEOF\n")
+    ok("S57a 승인 전(Pending) Arrangement Code — 화면은 올리기 자리를 잠그고, API 도 409", (locked, pend.status), locked and pend.status==409)
+    ctx.request.post(AC+f"/{adc['id']}/decide",headers=J0,data=json.dumps({"decision":"approve","note":"E2E"}))
+    pg.reload(wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=arr-codes][data-ready='1']",timeout=60000); nuke(pg)
+    pg.click("[data-testid=ac-row-E2E-ADC]"); pg.wait_for_selector("[data-testid=ac-detail][data-status=approved]",timeout=30000)
+    pg.wait_for_selector("[data-testid=ac-dwg-file]",timeout=30000)
+    ADXF="0\nSECTION\n2\nENTITIES\n0\nTEXT\n1\nE2E-ADC\n0\nENDSEC\n0\nEOF\n"
+    pg.set_input_files("[data-testid=ac-dwg-file]",files=[{"name":"E2E-ADC_arrangement.dxf","mimeType":"application/dxf","buffer":ADXF.encode("utf-8")}])
+    pg.click("[data-testid=ac-dwg-upload]"); pg.wait_for_selector("[data-testid=ac-dwg-row][data-kind=dwg2d]",timeout=30000)
+    rows=ctx.request.get(AT+f"?ownerKind=arrangement_code&ownerKey={adc['id']}").json()["rows"]
+    got=ctx.request.get(AT+f"/{rows[0]['id']}/file").text()
+    ok("S57b 승인 뒤 화면에서 Arrangement 도면(DXF)을 올리고 그대로 내려받는다", (len(rows), got==ADXF), len(rows)==1 and got==ADXF)
+    nope=upa("x.dxf",b"x",key="00000000-0000-4000-8000-000000000000"); ext=c_ext=ctx.request.post(AT, multipart={"ownerKind":"arrangement_code","ownerKey":adc["id"],"kind":"dwg2d","file":{"name":"x.exe","mimeType":"application/octet-stream","buffer":b"MZ"}})
+    ok("S57c 없는 Arrangement Code 404 · 허용 밖 확장자 415", (nope.status, ext.status), nope.status==404 and ext.status==415)
+    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data={"email":"viewer@acme.test"}); v1=upa("v.dxf",b"x",c=vw); vw.close()
+    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data={"email":"owner@globex.test"})
+    g1=upa("g.dxf",b"x",c=gb); g2=gb.request.get(AT+f"?ownerKind=arrangement_code&ownerKey={adc['id']}").json()["rows"]; gb.close()
+    ok("S57d viewer 403 · 다른 회사는 우리 Arrangement Code 에 못 붙이고(404) 목록도 0건", (v1.status, g1.status, len(g2)), v1.status==403 and g1.status==404 and len(g2)==0)
     # S37 은 맨 끝에서 센다 — 중간(옛 자리)에서는 뒤에 찍히는 5장(40·41·42·52·53)이 아직 없어,
     # 빈 폴더에서는 25장이라 실패하고 이전 실행 잔재가 있을 때만 통과했다(2026-09-24 실측).
     _want=["00_login","05_project_mgmt","06_module_cpq_stub","10_project_bound","11_code_builder","11b_revisions","12_macro_tab",

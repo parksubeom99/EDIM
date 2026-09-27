@@ -1,13 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import { AttachmentPanel } from "../../attachment-panel";
 
 /**
  * p35 Arrangement Code Registration.
  *   New      = 제품 코드를 골라 그 제품의 지금 배치(구획 순서·길이·방향·부품 위치)를 이름 붙여 등록 → Approval Status: Pending
  *   Approve  = owner 가 승인/반려(한 번뿐) → Approved / Rejected
  *   적용     = Approved 만. 기존 Arrangement 저장 규칙(구획 중복·BOM 관계 잠금·부품=그 구획의 자식)을 그대로 탄다.
- * 아직 없음: Arrangement Drawing Control(DWG 첨부) · 코드 Group 체계(FDV 같은 분류 코드 규칙).
+ * Arrangement Drawing Control(p35 · p30) = 승인된 코드에 DWG 첨부(0025 공용 첨부 — F5).
+ * 아직 없음: 코드 Group 체계(FDV 같은 분류 코드 규칙) — 필요한 입력: 회사 분류 규칙.
  */
 interface Comp { code: string; at: string; level: string }
 interface Sec { name: string; len?: number; dir?: string; when?: unknown; components?: Comp[] }
@@ -140,12 +142,17 @@ export function ArrangementCodes({ canEdit, isOwner }: { canEdit: boolean; isOwn
                   style={btn(sel.status === "approved", busy || sel.status !== "approved")}>{sel.productCode} 에 적용</button>
               )}
             </div>
+            <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px solid var(--line)" }}>
+              <AttachmentPanel ownerKind="arrangement_code" ownerKey={sel.id} kinds={["dwg2d", "dwg3d"]} canEdit={canEdit}
+                title="Arrangement Drawing Control · DWG (p35)" testid="ac-dwg"
+                disabledReason={sel.status === "approved" ? null : "승인된 Arrangement Code 에만 도면을 붙입니다"} />
+            </div>
           </div>
         ) : (
           <div style={{ ...card, color: "var(--ink-muted)", fontSize: "var(--fs-13)" }}>{ready ? "왼쪽에서 코드를 고르거나 새로 등록하십시오" : "불러오는 중…"}</div>
         )}
         {msg && <p data-testid="ac-msg" data-ok={msg.ok ? "1" : "0"} style={{ margin: 0, fontSize: "var(--fs-12)", color: msg.ok ? "var(--accent)" : "var(--warn)" }}>{msg.text}</p>}
-        <p style={{ margin: 0, fontSize: 11, color: "var(--ink-muted)" }}>아직 없음: Arrangement Drawing Control(DWG 첨부) · 코드 Group 체계(FDV 같은 분류 규칙).</p>
+        <p style={{ margin: 0, fontSize: 11, color: "var(--ink-muted)" }}>아직 없음: 코드 Group 체계(FDV 같은 분류 규칙) — 필요한 입력: 회사 분류 규칙.</p>
       </div>
     </section>
   );
