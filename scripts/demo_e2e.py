@@ -1547,6 +1547,21 @@ with sync_playwright() as p:
     gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data={"email":"owner@globex.test"}); g1=upn(NP,"g.csv",b"x",c=gb); g2=gb.request.get(AT+f"?ownerKind=node&ownerKey={NP}").json()["rows"]; gb.close()
     ok("S60c viewer 는 볼 수 있지만(200) 못 올린다(403) · 다른 회사는 우리 노드에 못 올리고(404) 목록도 0건", (v2.status, v1.status, g1.status, len(g2)),
        v2.status==200 and v1.status==403 and g1.status==404 and len(g2)==0)
+    # ── S61 F9 · p54 System Set-Up 지도 — 있는 화면은 링크, 없는 것은 "아직 없음 — 필요한 입력" ──
+    pg.goto(BASE+"/setup",wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=setup-link-map]",timeout=30000); nuke(pg)
+    pg.click("[data-testid=setup-link-map]"); pg.wait_for_selector("[data-testid=setup-map]",timeout=30000)
+    kinds={x[0]:x[1] for x in pg.eval_on_selector_all("[data-testid^=map-]","es=>es.map(e=>[e.dataset.testid.replace('map-',''),e.dataset.kind])")}
+    must=["s15","s16","s411","s31","s34","s32","s33","c-db"]
+    ok("S61a 청사진 p54 에서 빠졌던 항목이 이어졌다 — Arrangement Code · Arrangement Set-up · TLM Design · CPQ Selection · Print Set-up · Technical · Document · Company DB 가 링크",
+       [ (k,kinds.get(k)) for k in must], all(kinds.get(k)=="link" for k in must))
+    hrefs=sorted(set(pg.eval_on_selector_all("[data-kind=link]","es=>es.map(e=>e.getAttribute('href'))")))
+    st={h: ctx.request.get(BASE+h).status for h in hrefs}
+    ok("S61b 지도의 링크가 가리키는 화면이 모두 열린다(200)", st, len(hrefs)>=10 and all(v==200 for v in st.values()))
+    nones=pg.eval_on_selector_all("[data-kind=none]","es=>es.map(e=>e.innerText)")
+    ok("S61c 없는 것은 있는 척하지 않는다 — Work Process · Department · 그 밖의 ERP 는 '아직 없음 — 필요한 입력' 으로", len(nones),
+       len(nones)==3 and all("아직 없음" in t and "필요한 입력" in t for t in nones))
+    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data={"email":"viewer@acme.test"}); vm=vw.request.get(BASE+"/setup/map"); vw.close()
+    ok("S61d 지도는 읽기 화면 — viewer 도 연다(200)", vm.status, vm.status==200)
     # S37 은 맨 끝에서 센다 — 중간(옛 자리)에서는 뒤에 찍히는 5장(40·41·42·52·53)이 아직 없어,
     # 빈 폴더에서는 25장이라 실패하고 이전 실행 잔재가 있을 때만 통과했다(2026-09-24 실측).
     _want=["00_login","05_project_mgmt","06_module_cpq_stub","10_project_bound","11_code_builder","11b_revisions","12_macro_tab",
