@@ -641,6 +641,8 @@ model Partner {
   contact   String   @default("")
   nation    String   @default("")
   remarks   String   @default("")
+  /// 0024 · 사용 중지(false)면 새로 고르는 목록에서 빠진다 — 이미 가리키는 행은 그대로
+  active    Boolean  @default(true)
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   createdBy String   @map("created_by") @db.Uuid
 

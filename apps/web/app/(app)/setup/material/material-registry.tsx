@@ -16,7 +16,7 @@ interface Row { item: string; cells: Record<string, string | number> }
 interface Table { no: number; by: string; default: string; role?: string; cols: Col[]; rows: Row[] }
 interface Code { code: string; name: string; kind: string; category: string; unit: string; specTemplate: string; materialTemplate: string; tables: Record<string, Table>; sections?: unknown }
 interface Price { id: string; item: string; price: number; currency: string; supplier: string; supplierId?: string | null; effectiveFrom: string; note: string | null; state: string }
-interface Supplier { id: string; code: string; name: string }
+interface Supplier { id: string; code: string; name: string; active?: boolean }
 
 const card: CSSProperties = { background: "var(--surface-1)", border: "1px solid var(--line)", borderRadius: "var(--radius-md)", padding: 12 };
 const lab: CSSProperties = { fontSize: "var(--fs-12)", color: "var(--ink-muted)", fontWeight: 600 };
@@ -205,7 +205,7 @@ export function MaterialRegistry({ canEdit }: { canEdit: boolean }) {
                 <select data-testid="mat-p-supplier-pick" value={pf.supplierId} title="Company DB 공급처"
                   onChange={(e) => { const x = suppliers.find((s) => s.id === e.target.value); setPf({ ...pf, supplierId: x?.id ?? "", supplier: x?.name ?? pf.supplier }); }} style={inp}>
                   <option value="">Company DB —</option>
-                  {suppliers.map((x) => <option key={x.id} value={x.id}>{x.code} · {x.name}</option>)}
+                  {suppliers.filter((x) => x.active !== false).map((x) => <option key={x.id} value={x.id}>{x.code} · {x.name}</option>)}
                 </select>
                 <input data-testid="mat-p-date" type="date" value={pf.effectiveFrom} onChange={(e) => setPf({ ...pf, effectiveFrom: e.target.value })} style={inp} />
                 <input data-testid="mat-p-note" placeholder="메모" value={pf.note} onChange={(e) => setPf({ ...pf, note: e.target.value })} style={inp} />

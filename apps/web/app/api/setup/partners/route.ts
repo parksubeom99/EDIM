@@ -6,7 +6,7 @@ import { guard, str, dbError } from "../_guard";
  * ⑧ Company DB (청사진 p64 [ERP Set-up] · p67 Supplier) — 고객 · 공급처.
  * GET  ?kind=customer|supplier → { rows }  (회사 것만 — RLS)
  * POST { kind, code, name, contact?, nation?, remarks? } → 등록 (같은 kind 안에서 code 중복 409)
- * 프로젝트(client_id)·단가 이력(supplier_id)은 이 목록을 가리킨다. 아직 없음: 수정·삭제 · Warehouse · Inventory · Bank.
+ * 프로젝트(client_id)·단가 이력(supplier_id)은 이 목록을 가리킨다. 수정·삭제·사용 중지 = ./[id] (0024). 아직 없음: Warehouse · Inventory · Bank.
  */
 const PARTNER_KINDS =["customer", "supplier"] as const;
 const isKind = (v: unknown): v is (typeof PARTNER_KINDS)[number] => typeof v === "string" && (PARTNER_KINDS as readonly string[]).includes(v);
@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
   if (kind && !isKind(kind)) return NextResponse.json({ error: "kind 는 customer · supplier" }, { status: 400 });
   const rows = await withTenant(g.session.tenantId, (tx) =>
     tx.partner.findMany({ where: kind ? { kind } : {}, orderBy: [{ kind: "asc" }, { code: "asc" }] }));
-  return NextResponse.json({ rows: rows.map((r) => ({ id: r.id, kind: r.kind, code: r.code, name: r.name, contact: r.contact, nation: r.nation, remarks: r.remarks })) });
+  return NextResponse.json({ rows: rows.map((r) => ({ id: r.id, kind: r.kind, code: r.code, name: r.name, contact: r.contact, nation: r.nation, remarks: r.remarks, active: r.active })) });
 }
 
 export async function POST(req: NextRequest) {

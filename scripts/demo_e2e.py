@@ -1315,15 +1315,51 @@ with sync_playwright() as p:
     g1=gb.request.get(PJ+f"/{pid}/contacts"); g2=gb.request.get(PJ+f"/{pid}/activities"); g3=gb.request.delete(BASE+f"/api/project-contacts/{cs[0]['id']}"); gb.close()
     ok("S53e viewer 는 담당자·활동을 못 쌓는다(403·403) · 다른 회사는 우리 프로젝트의 담당자·활동을 못 보고 못 지운다(404·404·404)",
        (v1.status, v2.status, g1.status, g2.status, g3.status), v1.status==403 and v2.status==403 and g1.status==404 and g2.status==404 and g3.status==404)
+    # ── S54 F2 · p64 · p12 고객·공급처 수정 · 사용 중지 · 삭제(가리키면 409) — 0024 ──
+    PT=BASE+"/api/setup/partners"; PJ=BASE+"/api/projects"; PRC=BASE+"/api/setup/prices"
+    ctx.request.post(PT,headers=J0,data=json.dumps({"kind":"customer","code":"E2E-C9","name":"Hyundai Fab (E2E)"}))
+    ctx.request.post(PT,headers=J0,data=json.dumps({"kind":"supplier","code":"E2E-S8","name":"Daehan Filter (E2E)"}))
+    ctx.request.post(PT,headers=J0,data=json.dumps({"kind":"supplier","code":"E2E-S9","name":"Unused Supply (E2E)"}))
+    pts=ctx.request.get(PT).json()["rows"]; c9=[x for x in pts if x["code"]=="E2E-C9"][0]; s8=[x for x in pts if x["code"]=="E2E-S8"][0]; s9=[x for x in pts if x["code"]=="E2E-S9"][0]
+    pj=[x for x in ctx.request.get(PJ).json()["rows"] if x["projectNo"]=="PS-61313-5"][0]
+    link=ctx.request.patch(PJ+f"/{pj['id']}",headers=J0,data=json.dumps({"clientId":c9["id"]}))
+    pcode=[x["code"] for x in ctx.request.get(CAT).json()["productCodes"] if x["kind"]=="purchase"][0]
+    ctx.request.post(PRC,headers=J0,data=json.dumps({"code":pcode,"price":1000,"effectiveFrom":"2026-01-05","supplierId":s8["id"],"note":"E2E f2"}))
+    pg.goto(BASE+"/setup/company",wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=company-db][data-ready='1']",timeout=60000); nuke(pg)
+    pg.click("[data-testid=pe-edit-E2E-C9]"); pg.fill("[data-testid=pe-name]","Hyundai Fab 2 (E2E)"); pg.fill("[data-testid=pe-contact]","설비팀 02-000-0000"); pg.click("[data-testid=pe-save]")
+    wait_text(pg,"[data-testid=partner-row-E2E-C9]","Hyundai Fab 2")
+    ok("S54a 고객 수정 — 이름·연락처를 고치면 목록과 API 가 바뀐다(코드는 그대로)", pg.inner_text("[data-testid=partner-row-E2E-C9]")[:60].replace("\n"," "),
+       "Hyundai Fab 2 (E2E)" in pg.inner_text("[data-testid=partner-row-E2E-C9]") and link.status==200)
+    pg.click("[data-testid=pe-del-E2E-C9]"); pg.wait_for_selector("[data-testid=company-db-msg][data-ok='0']",timeout=30000)
+    m409=pg.inner_text("[data-testid=company-db-msg]")
+    d8=ctx.request.delete(PT+f"/{s8['id']}")
+    ok("S54b 가리키는 곳이 있으면 삭제 409 — 고객(프로젝트 1) · 공급처(단가 이력 1), 거부 이유가 화면에 보인다", (m409[:70], d8.status),
+       "409" in m409 and "프로젝트 1" in m409 and d8.status==409 and d8.json()["usage"]["prices"]==1)
+    pg.click("[data-testid=pe-toggle-E2E-C9]"); pg.wait_for_selector("[data-testid=partner-row-E2E-C9][data-active='0']",timeout=30000)
+    nuke(pg); pg.screenshot(path=f"{OUT}/67_partner_edit.png",full_page=True)
+    keep=ctx.request.patch(PJ+f"/{pj['id']}",headers=J0,data=json.dumps({"clientId":c9["id"],"remarks":"E2E keep inactive client"}))
+    newlink=ctx.request.post(PJ,headers=J0,data=json.dumps({"projectNo":"E2E-F2-NEW","name":"x","clientId":c9["id"]}))
+    ok("S54c 사용 중지 — 이미 가리키는 프로젝트는 그대로 저장되고(200), 새로 거는 것은 400 (목록에서도 빠진다)",
+       (keep.status, newlink.status), keep.status==200 and newlink.status==400)
+    d9=ctx.request.delete(PT+f"/{s9['id']}"); gone=not any(x["code"]=="E2E-S9" for x in ctx.request.get(PT).json()["rows"])
+    bad=ctx.request.patch(PT+f"/{s9['id']}",headers=J0,data=json.dumps({"code":"X"}))
+    ok("S54d 아무도 가리키지 않는 공급처는 지워진다(200 · 목록에서 사라짐) · 코드 바꾸기는 400", (d9.status, gone, bad.status), d9.status==200 and gone and bad.status in (400,404))
+    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data={"email":"viewer@acme.test"})
+    v1=vw.request.patch(PT+f"/{c9['id']}",headers=J0,data=json.dumps({"name":"v"})); v2=vw.request.delete(PT+f"/{c9['id']}"); vw.close()
+    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data={"email":"owner@globex.test"})
+    g1=gb.request.patch(PT+f"/{c9['id']}",headers=J0,data=json.dumps({"name":"g"})); g2=gb.request.delete(PT+f"/{s8['id']}"); gb.close()
+    ok("S54e viewer 는 고치거나 지울 수 없다(403·403) · 다른 회사는 우리 고객·공급처를 못 고치고 못 지운다(404·404)", (v1.status, v2.status, g1.status, g2.status),
+       v1.status==403 and v2.status==403 and g1.status==404 and g2.status==404)
+    ctx.request.patch(PJ+f"/{pj['id']}",headers=J0,data=json.dumps({"clientId":"","clientName":"Micron","remarks":""}))   # 원복
     # S37 은 맨 끝에서 센다 — 중간(옛 자리)에서는 뒤에 찍히는 5장(40·41·42·52·53)이 아직 없어,
     # 빈 폴더에서는 25장이라 실패하고 이전 실행 잔재가 있을 때만 통과했다(2026-09-24 실측).
     _want=["00_login","05_project_mgmt","06_module_cpq_stub","10_project_bound","11_code_builder","11b_revisions","12_macro_tab",
            "13_macro_approved","14_edim_run","15_bom_cost","16_design_tab","20_setup_subcode","21_setup_product_table",
            "22_setup_relationship","23_codebuilder_from_subcode","30_toolbox_program","31_toolbox_ui_tool","40_company_admin",
            "41_platform_console","42_user_management","43_drawings","44_document_tab","45_purchasing","46_quotation_print",
-           "47_techdata_print","48_dxf_plan","49_dxf_assembly","51_accepted","52_register","53_schedule","54_toolbar","55_project_mgmt","56_print_setup","57_ui_design","58_material","59_arrangement_code","60_spec_input","61_drawing_purpose","62_company_db","63_input_data","64_viewer3d","65_price_to_cost","66_project_contacts"]
+           "47_techdata_print","48_dxf_plan","49_dxf_assembly","51_accepted","52_register","53_schedule","54_toolbar","55_project_mgmt","56_print_setup","57_ui_design","58_material","59_arrangement_code","60_spec_input","61_drawing_purpose","62_company_db","63_input_data","64_viewer3d","65_price_to_cost","66_project_contacts","67_partner_edit"]
     _miss=[w for w in _want if not os.path.exists(f"{OUT}/{w}.png") or os.path.getmtime(f"{OUT}/{w}.png")<T0]
-    ok("S37 캡처 43장이 이번 실행에서 전부 나온다 (잔재 파일은 세지 않음)", _miss or len(_want), not _miss)
+    ok("S37 캡처 44장이 이번 실행에서 전부 나온다 (잔재 파일은 세지 않음)", _miss or len(_want), not _miss)
     b.close()
 n=sum(1 for v in R.values() if v[0]); print(f"\n[demo_e2e] {n}/{len(R)} steps passed"); json.dump(R,open(f"{OUT}/demo_e2e_result.json","w",encoding="utf-8"),ensure_ascii=False,indent=1)
 sys.exit(0 if n==len(R) else 1)

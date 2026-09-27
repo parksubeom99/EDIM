@@ -25,7 +25,7 @@ interface Proj {
   clientId: string | null;
   owner: { email: string; name: string | null } | null;
 }
-interface Customer { id: string; code: string; name: string; contact: string }
+interface Customer { id: string; code: string; name: string; contact: string; active?: boolean }
 interface Member { userId: string; email: string; name: string | null; role: string }
 interface Att { id: string; department: string; docType: string; name: string; description: string | null; hasFile: boolean; fileMime: string | null; fileSize: number | null; uploadedAt: string }
 
@@ -197,7 +197,8 @@ export function ProjectManagement({ canEdit }: { canEdit: boolean }) {
                     setForm((f) => ({ ...f, clientId: c?.id ?? null, ...(c ? { clientName: c.name, clientContact: f.clientContact || c.contact } : {}) }));
                   }} style={{ ...inp, width: 150 }}>
                   <option value="">Company DB —</option>
-                  {customers.map((c) => <option key={c.id} value={c.id}>{c.code} · {c.name}</option>)}
+                  {/* 0024 · 사용 중지 고객은 새로 고를 수 없다 — 이미 걸린 고객은 그대로 보인다 */}
+                  {customers.filter((c) => c.active !== false || c.id === form.clientId).map((c) => <option key={c.id} value={c.id}>{c.code} · {c.name}{c.active === false ? " (사용 중지)" : ""}</option>)}
                 </select>
               </span>
               <span style={lab}>Remarks</span>

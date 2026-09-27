@@ -22,10 +22,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const name = txt(b.name, 120);
   if (name === null) return NextResponse.json({ error: "Name 은 비울 수 없습니다" }, { status: 400 });
   const out = await withTenantSession(session, async (tx) => {
-    if (!(await getProject(tx, id))) return "missing" as const;
+    const cur = await getProject(tx, id);
+    if (!cur) return "missing" as const;
     const owner = await ownerOk(tx, b.ownerId);
     if (owner === false) return "badOwner" as const;
-    const client = await partnerOk(tx, b.clientId, "customer");   // 0021 · Company DB 고객
+    const client = await partnerOk(tx, b.clientId, "customer", cur.clientId);   // 0021 · Company DB 고객(0024 사용 중지 고객은 새로 못 건다)
     if (client === false) return "badClient" as const;
     const patch: UpdateProjectPatch = {
       ...(name !== undefined ? { name } : {}), ...(type ? { type } : {}),
