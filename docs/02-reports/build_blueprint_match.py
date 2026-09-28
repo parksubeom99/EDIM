@@ -327,7 +327,7 @@ def s_cover():
 <h1>70장 중<br><em>어디까지</em> 왔나</h1>
 <p class="sub">청사진(EDIM.pdf) 70쪽을 한 장씩 실제 화면 옆에 놓았습니다. 도는 것은 도는 대로, 없는 것은 없는 대로 적었습니다.</p>
 <div class="big4"><div class="b L"><i>{c["L"]}</i>실동</div><div class="b P"><i>{c["P"]}</i>부분</div><div class="b N"><i>{c["N"]}</i>미착수</div><div class="b C"><i>{c["C"]}</i>개념·표지</div></div>
-<div class="meta">main {MAIN} · {DATE} · 엘 재측정 확정 — typecheck 11 · 단위 228 · DB 검증 9종 · e2e 287/287(운영 빌드 · 연결 수리본) · 회장님 조정 대상</div></div></section>'''
+<div class="meta">main {MAIN} · 2026-09-28 · 엘 재측정 확정 — typecheck 11 · 단위 258 · DB 검증 9종 · e2e 322/322(운영 빌드 · 동시 연결 14) · 회장님 조정 대상</div></div></section>'''
 
 def s_grid():
     rows = ""
@@ -390,7 +390,7 @@ def s_remaining():
 <tr><td>E7</td><td>인쇄본 Office 내보내기(.docx · .xlsx) — 지금은 브라우저 PDF</td><td>인쇄본은 스냅샷 body 에서만 나온다(그대로 옮기면 된다)</td><td>없음 — 지시만</td><td>p48 부분 → 실동</td></tr>
 <tr><td>E8</td><td>툴바 Delete — 잠긴 구획이면 미리 잠그기(표 쪽과 같게)</td><td>작은 화면 일관성 수정</td><td>없음 — 지시만</td><td>p58 gap 하나</td></tr>
 </tbody></table>
-<p class="onote">09-27 밤(ccmd H) 끝낸 것: 연결 고갈 수리 머지 · 시연 안전판 태그 · H4 ERP 기준정보 6종 · H5 Sub Drawing·주의사항 · H6 Output·그래프·Table List · H7 Coding List · H8 함수·그래프 마법사·Data Management · H9 인쇄 양식 편집기 · H10 도면 주석 → 5쪽 부분 → 실동(초안 — 엘 재측정 후 확정).</p>
+<p class="onote">09-27 밤(ccmd H) 끝낸 것: 연결 고갈 수리 머지 · 시연 안전판 태그 · H4 ERP 기준정보 6종 · H5 Sub Drawing·주의사항 · H6 Output·그래프·Table List · H7 Coding List · H8 함수·그래프 마법사·Data Management · H9 인쇄 양식 편집기 · H10 도면 주석 → 5쪽 부분 → 실동(엘 확정).</p>
 </div></div></section>
 
 <section class="slide"><div class="stage"><header><span class="no">끝2</span><h2>남은 작업 — 회장님·사장님 자료와 결정이 필요한 것</h2></header>
