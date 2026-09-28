@@ -146,3 +146,5 @@ export {
   PRINT_DOC_TYPES, PAPERS, FONTS, DEFAULT_PRINT, isPrintDocType, parsePrintSettings, getPrintSetup, savePrintSetup,
   type PrintDocType, type PrintSettings,
 } from "./print";
+
+export { hashPassword, verifyPassword, burnVerify } from "./password";

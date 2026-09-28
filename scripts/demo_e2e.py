@@ -8,6 +8,10 @@ OUT=sys.argv[2] if len(sys.argv)>2 else "shots"
 import os; os.makedirs(OUT,exist_ok=True)
 T0=time.time()-1
 R={}
+# p11 · 0032 — 샘플 계정 비밀번호(공개 데모용 값 · seed.ts DEMO_PASSWORD)
+PW="edim-demo-2026"
+def LOGIN(email,pw=PW): return {"email":email,"password":pw}
+BAD_LOGIN="이메일 또는 비밀번호가 맞지 않습니다"
 def nuke(pg): pg.evaluate("document.querySelectorAll('nextjs-portal').forEach(e=>e.remove())")
 def ok(k,v,cond): R[k]=(bool(cond),v); print(("PASS" if cond else "FAIL"),k,"→",v)
 # 고정 sleep 대신 상태를 기다린다(ccmd C 0-1 규칙 · 2026-09-27). 못 오면 예외 대신 넘어가고, 뒤의 단언이 판정한다.
@@ -23,9 +27,29 @@ def wait_sel(pg,sel,t=30000):
 with sync_playwright() as p:
     b=p.chromium.launch(); ctx=b.new_context(viewport={"width":1440,"height":900}); pg=ctx.new_page()
     # 캡처 복원(E8): 로그인 화면은 세션이 생기기 전에 찍는다
-    pg.goto(BASE+"/login",wait_until="domcontentloaded"); pg.wait_for_selector("input",timeout=30000)
-    pg.fill("input","owner@acme.test"); nuke(pg); pg.screenshot(path=f"{OUT}/00_login.png",full_page=True)
-    r=ctx.request.post(BASE+"/api/auth/login",data={"email":"owner@acme.test"}); ok("S0 login",r.status,r.status==200)
+    pg.goto(BASE+"/login",wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=login][data-ready='1']",timeout=60000)
+    pg.fill("[data-testid=login-email]","owner@acme.test"); pg.fill("[data-testid=login-password]",PW); nuke(pg); pg.screenshot(path=f"{OUT}/00_login.png",full_page=True)
+    # p11 — 틀린 비밀번호는 화면에 한 문장(계정 존재 여부를 흘리지 않는다) → 옳은 비밀번호로 들어간다
+    pg.fill("[data-testid=login-password]","wrong-password"); pg.click("[data-testid=login-submit]"); wait_sel(pg,"[data-testid=login-error]")
+    err_ui=pg.inner_text("[data-testid=login-error]") if pg.query_selector("[data-testid=login-error]") else ""
+    pg.fill("[data-testid=login-password]",PW)
+    with pg.expect_navigation(timeout=60000): pg.click("[data-testid=login-submit]")
+    ok("S0a 로그인 화면 — 이메일 + 비밀번호 칸 · 'sign in (dev)' 문구 없음 · 틀리면 한 문장 · 옳으면 들어간다",
+       (err_ui, pg.url.replace(BASE,"")), err_ui==BAD_LOGIN and "/login" not in pg.url)
+    r=ctx.request.post(BASE+"/api/auth/login",data=LOGIN("owner@acme.test")); ok("S0 login",r.status,r.status==200)
+    t0=b.new_context()
+    wr=[t0.request.post(BASE+"/api/auth/login",data=d) for d in (LOGIN("owner@acme.test","edim-demo-2025"), LOGIN("nobody@acme.test"), {"email":"owner@acme.test"}, LOGIN("platform@edim.test","x"))]
+    ok("S0b 틀린 비밀번호 · 없는 이메일 · 비밀번호 빠짐 · 플랫폼 관리자 틀린 비밀번호 — 모두 401 · 같은 문장(계정이 있는지 흘리지 않는다)",
+       [(x.status, x.json().get("error")) for x in wr], all(x.status==401 and x.json().get("error")==BAD_LOGIN for x in wr))
+    lk=[t0.request.post(BASE+"/api/auth/login",data=LOGIN("lock-test@acme.test","bad")).status for _ in range(6)]
+    ok("S0c 같은 이메일로 10분 안에 5번 틀리면 잠시 잠금 — 여섯 번째는 429", lk, lk==[401]*5+[429])
+    cfg=t0.request.get(BASE+"/api/auth/login").json(); lg=t0.request.post(BASE+"/api/auth/login",data={"email":"legacy@acme.test"}).status; t0.close()
+    ok("S0d 비밀번호 해시가 없는 옛 계정 — 개발 모드(EDIM_DEV_LOGIN=1)에서만 이메일로 들어오고, 운영 모드(기본 0)에서는 거절(401)",
+       (("dev" if cfg.get("devLogin") else "prod"), lg), (cfg.get("devLogin") is True and lg==200) or (cfg.get("devLogin") is False and lg==401))
+    pg.goto(BASE+"/login",wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=login][data-ready='1']",timeout=60000)
+    lt=pg.inner_text("[data-testid=login]")
+    ok("S0e SSO 는 만들지 않았다 — EDIM_OIDC_ISSUER 가 없으면 SSO 버튼도 없다 · 'sign in (dev)' 문구 없음", (cfg.get("sso"), "sign in (dev)" in lt, bool(pg.query_selector("[data-testid=login-sso]"))),
+       cfg.get("sso") is False and "sign in (dev)" not in lt and not pg.query_selector("[data-testid=login-sso]"))
     pg.goto(BASE+"/workbench",wait_until="domcontentloaded"); pg.wait_for_selector("text=Code Builder",timeout=30000); hydrated(pg)
     # S1 프로젝트 노드 선택
     pg.click("text=PS-61313"); wait_text(pg,"body","Micron FAB AHU"); insp=pg.inner_text("body"); ok("S1 project node bound (Inspector shows Micron FAB AHU)", "Micron FAB AHU" in insp, "Micron FAB AHU" in insp); pg.screenshot(path=f"{OUT}/10_project_bound.png")
@@ -140,7 +164,7 @@ with sync_playwright() as p:
     pg.reload(wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=toolbox-window]",timeout=30000); ok("S15c open + docked state survive a reload", True, pg.get_attribute("[data-testid=toolbox-window]","data-docked")=="1")
     pg.click("[data-testid=toolbox-reset]"); pg.click("[data-testid=toolbox-close]"); time.sleep(0.3)
     # S11 권한: viewer는 등록을 못 한다 (서버에서 차단)
-    v=b.new_context(); v.request.post(BASE+"/api/auth/login",data={"email":"viewer@acme.test"})
+    v=b.new_context(); v.request.post(BASE+"/api/auth/login",data=LOGIN("viewer@acme.test"))
     r=v.request.post(BASE+"/api/setup/sub-codes",headers=J,data=json.dumps({"group":"AHU Code","itemKey":"B","itemName":"용량","value":"99"})); ok("S11 viewer cannot register codes (403)", r.status, r.status==403); v.close()
     # ── P4-a 치수 전파 · 도면 (p38~40 Key Dimension · p24 Drawings) ─────────────
     import ezdxf, io
@@ -794,7 +818,7 @@ with sync_playwright() as p:
     ok("S16c 회사 계정의 /platform 화면은 403 안내", body[:40].replace("\n"," "), "403" in body and "플랫폼 관리자 전용" in body)
     # S16d 플랫폼 계정 = 별도 사람. 로그인하면 /platform으로 간다
     pl=b.new_context(viewport={"width":1440,"height":900}); plp=pl.new_page()
-    r=pl.request.post(BASE+"/api/auth/login",data={"email":"platform@edim.test"})
+    r=pl.request.post(BASE+"/api/auth/login",data=LOGIN("platform@edim.test"))
     ok("S16d 멤버십 없는 플랫폼 계정이 로그인된다 → /platform", (r.status, r.json().get("redirect")), r.status==200 and r.json().get("redirect")=="/platform")
     plp.goto(BASE+"/platform",wait_until="domcontentloaded"); plp.wait_for_selector("[data-testid=request-queue]",timeout=30000); time.sleep(1.2); nuke(plp)
     body=plp.inner_text("body")
@@ -820,7 +844,7 @@ with sync_playwright() as p:
     ok("S16j 결정이 회사 화면으로 돌아온다 ('승인됨' + 결정 메모)", subj[-14:], subj in body and "승인됨" in body and "Special 개발 착수" in body)
     pl.close()
     # S17 2층→3층: owner가 역할을 올리면 그 계정의 권한이 실제로 바뀐다 (p54 User Management)
-    v2=b.new_context(); v2.request.post(BASE+"/api/auth/login",data={"email":"viewer@acme.test"})
+    v2=b.new_context(); v2.request.post(BASE+"/api/auth/login",data=LOGIN("viewer@acme.test"))
     r=v2.request.post(BASE+"/api/setup/sub-codes",headers=J,data=json.dumps({"group":"AHU Code","itemKey":"B","itemName":"용량","value":"97"})); before=r.status
     pg.select_option("[data-testid='role-viewer@acme.test']","engineer"); time.sleep(2.0)
     r2=v2.request.post(BASE+"/api/setup/sub-codes",headers=J,data=json.dumps({"group":"AHU Code","itemKey":"B","itemName":"용량","value":"97"})); after=r2.status
@@ -877,12 +901,12 @@ with sync_playwright() as p:
     big=ctx.request.post(BASE+"/api/project-attachments",multipart={"projectId":got["id"],"department":"영업","docType":"File",
         "file":{"name":"big.bin","mimeType":"application/octet-stream","buffer":b"0"*(10*1024*1024+1)}})
     ok("S42g 10MB 를 넘는 파일은 받지 않는다 (413)", big.status, big.status==413)
-    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data={"email":"viewer@acme.test"})
+    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data=LOGIN("viewer@acme.test"))
     vp=vw.request.patch(BASE+f"/api/projects/{got['id']}",headers=J0,data=json.dumps({"remarks":"viewer 수정"}))
     vu=vw.request.post(BASE+"/api/project-attachments",multipart={"projectId":got["id"],"department":"영업","docType":"File","file":{"name":"x.txt","mimeType":"text/plain","buffer":b"x"}})
     vw.close()
     ok("S42h viewer 는 헤더 수정·자료 등록이 막힌다 (403 · 403)", (vp.status, vu.status), vp.status==403 and vu.status==403)
-    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data={"email":"owner@globex.test"})
+    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data=LOGIN("owner@globex.test"))
     gx=gb.request.get(BASE+f"/api/project-attachments/{att['id']}/file"); gp=gb.request.patch(BASE+f"/api/projects/{got['id']}",headers=J0,data=json.dumps({"remarks":"x"}))
     gb.close()
     ok("S42i 다른 회사는 이 파일도 프로젝트도 못 본다 (RLS — 404 · 404)", (gx.status, gp.status), gx.status==404 and gp.status==404)
@@ -917,9 +941,9 @@ with sync_playwright() as p:
        qt0 is not None and qt0==qt1 and 'data-print-setup="A4-landscape-mono"' in h1 and "size: A4 landscape" in h1 and 'data-testid="print-watermark">CONFIDENTIAL' in h1 and 'data-testid="print-header"' in h1 and 'data-testid="print-footer"' in h1)
     td=ctx.request.get(PS+"?type=techdata").json()
     ok("S43e 양식은 문서 종류마다 따로다 — Tech Data 는 여전히 기본", (td["saved"], td["settings"]["color"]), (not td["saved"]) and td["settings"]["color"]=="color")
-    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data={"email":"viewer@acme.test"})
+    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data=LOGIN("viewer@acme.test"))
     vp=vw.request.put(PS,headers=J0,data=json.dumps({"type":"quotation","settings":{"color":"color"}})); vw.close()
-    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data={"email":"owner@globex.test"})
+    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data=LOGIN("owner@globex.test"))
     gq=gb.request.get(PS+"?type=quotation").json(); gb.close()
     ok("S43f viewer 는 양식을 못 바꾸고(403), 다른 회사는 이 회사 양식을 못 본다(자기 기본값)", (vp.status, gq["saved"]), vp.status==403 and not gq["saved"])
     fr=pg.frame_locator("[data-testid=ps-preview]")
@@ -967,9 +991,9 @@ with sync_playwright() as p:
     cp=[x for x in ctx.request.get(UF).json()["rows"] if x["name"]=="E2E 용량 조회 사본"][0]
     ok("S44e Templet 호출하여 Customizing — 같은 위젯·Set-up 의 사본이 새 폼으로 생긴다(사본은 Templet 아님)", (len(cp["spec"]["widgets"]), cp["isTemplet"]),
        cp["spec"]==f1["spec"] and not cp["isTemplet"])
-    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data={"email":"viewer@acme.test"})
+    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data=LOGIN("viewer@acme.test"))
     vp=vw.request.post(UF,headers=J0,data=json.dumps({"name":"viewer 폼"})); vw.close()
-    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data={"email":"owner@globex.test"})
+    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data=LOGIN("owner@globex.test"))
     gl=gb.request.get(UF).json()["rows"]; gd=gb.request.delete(UF+"/"+f1["id"]); gb.close()
     ok("S44f viewer 는 폼을 못 만들고(403), 다른 회사는 이 폼을 못 보고 못 지운다(0건 · 404)", (vp.status, len(gl), gd.status), vp.status==403 and len(gl)==0 and gd.status==404)
     pg.click("[data-testid='ui-form-E2E 용량 조회']"); pg.wait_for_selector("[data-widget=table1]",timeout=30000); pg.click("[data-widget=button1]")
@@ -1007,9 +1031,9 @@ with sync_playwright() as p:
        st==["예정","현재","지난"] and cur.startswith("1,280,000"))
     z=ctx.request.post(PR,headers=J0,data=json.dumps({"code":MC,"price":0,"effectiveFrom":TODAY}))
     nf=ctx.request.post(PR,headers=J0,data=json.dumps({"code":"NOPE-XX","price":10,"effectiveFrom":TODAY}))
-    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data={"email":"viewer@acme.test"})
+    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data=LOGIN("viewer@acme.test"))
     vp=vw.request.post(PR,headers=J0,data=json.dumps({"code":MC,"price":10,"effectiveFrom":TODAY})); vw.close()
-    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data={"email":"owner@globex.test"})
+    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data=LOGIN("owner@globex.test"))
     gp=gb.request.get(PR+"?code="+MC).json()["rows"]; gb.close()
     ok("S45e 단가 0 은 400 · 없는 코드는 404 · viewer 는 403 · 다른 회사는 이 이력을 못 본다(0건)", (z.status, nf.status, vp.status, len(gp)),
        z.status==400 and nf.status==404 and vp.status==403 and len(gp)==0)
@@ -1026,7 +1050,7 @@ with sync_playwright() as p:
     ok("S46a 등록 — EU 의 지금 배치가 스냅샷으로 떠지고 Approval Status 는 Pending", (fdv["status"], [x["name"] for x in fdv["sections"]]==names0),
        fdv["status"]=="pending" and [x["name"] for x in fdv["sections"]]==names0)
     ap0=ctx.request.post(AC+f"/{fdv['id']}/apply",headers=J0,data="{}")
-    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data={"email":"viewer@acme.test"})
+    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data=LOGIN("viewer@acme.test"))
     vd=vw.request.post(AC+f"/{fdv['id']}/decide",headers=J0,data=json.dumps({"decision":"approve"})); vw.close()
     ok("S46b 승인 전에는 적용이 막히고(409), viewer 는 승인할 수 없다(403)", (ap0.status, vd.status), ap0.status==409 and vd.status==403)
     pg.click("[data-testid=ac-row-FDV-E2E]"); pg.wait_for_selector("[data-testid=ac-detail][data-code=FDV-E2E]",timeout=30000)
@@ -1049,7 +1073,7 @@ with sync_playwright() as p:
     ap2=ctx.request.post(AC+f"/{rj['id']}/apply",headers=J0,data="{}")
     dup=ctx.request.post(AC,headers=J0,data=json.dumps({"code":"FDV-E2E","productCode":"EU"}))
     ok("S46e 반려된 코드는 적용할 수 없고(409), 같은 코드 이름은 다시 등록할 수 없다(409)", (ap2.status, dup.status), ap2.status==409 and dup.status==409)
-    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data={"email":"owner@globex.test"})
+    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data=LOGIN("owner@globex.test"))
     gl=gb.request.get(AC).json()["rows"]; ga=gb.request.post(AC+f"/{fdv['id']}/apply",headers=J0,data="{}"); gb.close()
     ok("S46f 다른 회사는 이 코드를 못 보고 적용도 못 한다 (0건 · 404)", (len(gl), ga.status), len(gl)==0 and ga.status==404)
     pg.click("[data-testid=ac-row-FDV-E2E]"); pg.wait_for_selector("[data-testid=ac-detail][data-code=FDV-E2E]",timeout=30000)
@@ -1090,9 +1114,9 @@ with sync_playwright() as p:
     uk=ctx.request.post(SR,headers=J0,data=json.dumps({"productCode":"EU","inputs":{"nope":"1"}}))
     ok("S47d 잘못된 정의는 400(표의 행 슬롯과 사양 슬롯이 다르다) · 맞는 등록값이 없으면 지어내지 않고 unmet · 없는 사양 키는 400",
        (bad.status, un.get("unmet"), un.get("slots"), uk.status), bad.status==400 and un.get("unmet")==["B"] and un.get("slots")=={} and uk.status==400)
-    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data={"email":"viewer@acme.test"})
+    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data=LOGIN("viewer@acme.test"))
     vp=vw.request.post(SI,headers=J0,data=json.dumps({"productCode":"EU","key":"v_try","label":"v","slot":"E","source":{"kind":"choice"}})); vw.close()
-    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data={"email":"owner@globex.test"})
+    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data=LOGIN("owner@globex.test"))
     gl=gb.request.get(SI+"?product=EU").json()["rows"]; gr=gb.request.post(SR,headers=J0,data=json.dumps({"productCode":"EU","inputs":{"airflow":"11000"}})); gb.close()
     ok("S47e viewer 는 사양 항목을 못 만든다(403) · 다른 회사는 이 항목을 못 보고(0건) 우리 제품으로 추천도 못 받는다(404)", (vp.status, len(gl), gr.status),
        vp.status==403 and len(gl)==0 and gr.status==404)
@@ -1128,10 +1152,10 @@ with sync_playwright() as p:
     ok("S48c 잘못된 용도는 400(등록·목록) · 발행 전에는 용도를 바꿀 수 있고(제작도→견적도) · 발행된 도면은 409(잠금)",
        (b400.status, g400.status, ch.status, now, li.status if li else "발행 도면 없음"),
        b400.status==400 and g400.status==400 and ch.status==200 and now=="quotation" and li is not None and li.status==409)
-    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data={"email":"viewer@acme.test"})
+    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data=LOGIN("viewer@acme.test"))
     vp=vw.request.post(DW,headers=J0,data=json.dumps({"runId":rid,"type":"front","purpose":"approval"}))
     vpa=vw.request.patch(DW+f"/{apv[0]['id']}",headers=J0,data=json.dumps({"purpose":"quotation"})); vw.close()
-    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data={"email":"owner@globex.test"})
+    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data=LOGIN("owner@globex.test"))
     gl=gb.request.get(DW+"?purpose=approval").json()["rows"]; gpa=gb.request.patch(DW+f"/{apv[0]['id']}",headers=J0,data=json.dumps({"purpose":"quotation"})); gb.close()
     ok("S48d viewer 는 용도 도면을 못 만들고 못 바꾼다(403·403) · 다른 회사는 우리 승인도를 못 보고(0건) 못 바꾼다(404)",
        (vp.status, vpa.status, len(gl), gpa.status), vp.status==403 and vpa.status==403 and len(gl)==0 and gpa.status==404)
@@ -1167,9 +1191,9 @@ with sync_playwright() as p:
     wrong2=ctx.request.post(PRC,headers=J0,data=json.dumps({"code":mc,"price":1000,"effectiveFrom":"2026-01-03","supplierId":c1["id"]}))
     ok("S49d 없는 종류는 400 · 같은 코드는 409 · 공급처를 고객으로(프로젝트) · 고객을 공급처로(단가) 가리키면 400",
        (bk.status, dup.status, wrong.status, wrong2.status), bk.status==400 and dup.status==409 and wrong.status==400 and wrong2.status==400)
-    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data={"email":"viewer@acme.test"})
+    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data=LOGIN("viewer@acme.test"))
     vp=vw.request.post(PT,headers=J0,data=json.dumps({"kind":"customer","code":"V1","name":"v"})); vw.close()
-    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data={"email":"owner@globex.test"})
+    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data=LOGIN("owner@globex.test"))
     gl=gb.request.get(PT).json()["rows"]; gc=gb.request.post(PJ,headers=J0,data=json.dumps({"projectNo":"GX-E2E-1","name":"gx","clientId":c1["id"]})); gb.close()
     ok("S49e viewer 는 등록 못 한다(403) · 다른 회사는 우리 고객·공급처를 못 보고(0건) 자기 프로젝트에 우리 고객을 걸 수 없다(400)",
        (vp.status, len(gl), gc.status), vp.status==403 and len(gl)==0 and gc.status==400)
@@ -1208,9 +1232,9 @@ with sync_playwright() as p:
     o3=ctx.request.post(II,headers=J0,data=json.dumps({"key":"bad_range","label":"x","minValue":10,"maxValue":1}))
     ok("S50c 범위 밖(습도 120 %) · 템플릿에 없는 항목(density) 은 문서를 만들지 않는다(400·400) · 최소>최대 정의는 400",
        (o1.status, o2.status, o3.status), o1.status==400 and o2.status==400 and o3.status==400)
-    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data={"email":"viewer@acme.test"})
+    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data=LOGIN("viewer@acme.test"))
     vi=vw.request.post(II,headers=J0,data=json.dumps({"key":"v_try","label":"v"})); vw.close()
-    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data={"email":"owner@globex.test"})
+    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data=LOGIN("owner@globex.test"))
     gi=gb.request.get(II).json()["rows"]; gd=gb.request.get(DOCS+f"/{da.get('id')}/print"); gb.close()
     ok("S50d viewer 는 항목을 못 만든다(403) · 다른 회사는 우리 템플릿을 못 보고(0건) 우리 Tech Data 도 못 연다(404)",
        (vi.status, len(gi), gd.status), vi.status==403 and len(gi)==0 and gd.status==404)
@@ -1237,9 +1261,9 @@ with sync_playwright() as p:
     ok("S51b 보기 전환(평면) 뒤에도 뷰어가 살아 있다", pg.get_attribute("[data-testid=viewer3d]","data-ready"), pg.get_attribute("[data-testid=viewer3d]","data-ready")=="1")
     n400=ctx.request.get(M3); n404=ctx.request.get(M3+"?runId=00000000-0000-4000-8000-000000000000")
     ok("S51c runId 없으면 400 · 없는 스냅샷은 404 — 스냅샷 없이 3D 를 지어내지 않는다", (n400.status, n404.status), n400.status==400 and n404.status==404)
-    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data={"email":"viewer@acme.test"})
+    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data=LOGIN("viewer@acme.test"))
     v3=vw.request.get(M3+f"?runId={rid3}"); vw.close()
-    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data={"email":"owner@globex.test"})
+    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data=LOGIN("owner@globex.test"))
     g3=gb.request.get(M3+f"?runId={rid3}"); gb.close()
     ok("S51d 읽기 전용 — viewer 도 볼 수 있다(200 · 쓰기 API 없음) · 다른 회사는 우리 스냅샷을 못 연다(404)", (v3.status, g3.status), v3.status==200 and g3.status==404)
     # ── S52 ccmd E · p67 단가 이력 → BOM 원가·견적·구매 — BOM Run 순간의 "현재 단가"가 줄에 박히고, 스냅샷은 그 뒤 바뀌지 않는다 ──
@@ -1325,9 +1349,9 @@ with sync_playwright() as p:
     e2=ctx.request.post(PJ+f"/{pid}/activities",headers=J0,data=json.dumps({"date":"2026-13-40","kind":"call","content":"x"}))
     e3=ctx.request.post(PJ+f"/{pid}/activities",headers=J0,data=json.dumps({"date":"2026-09-27","kind":"sms","content":"x"}))
     ok("S53d 이름 없는 담당자 · 잘못된 날짜 · 없는 종류는 400", (e1.status, e2.status, e3.status), e1.status==400 and e2.status==400 and e3.status==400)
-    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data={"email":"viewer@acme.test"})
+    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data=LOGIN("viewer@acme.test"))
     v1=vw.request.post(PJ+f"/{pid}/contacts",headers=J0,data=json.dumps({"name":"v"})); v2=vw.request.post(PJ+f"/{pid}/activities",headers=J0,data=json.dumps({"date":"2026-09-27","kind":"call","content":"v"})); vw.close()
-    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data={"email":"owner@globex.test"})
+    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data=LOGIN("owner@globex.test"))
     g1=gb.request.get(PJ+f"/{pid}/contacts"); g2=gb.request.get(PJ+f"/{pid}/activities"); g3=gb.request.delete(BASE+f"/api/project-contacts/{cs[0]['id']}"); gb.close()
     ok("S53e viewer 는 담당자·활동을 못 쌓는다(403·403) · 다른 회사는 우리 프로젝트의 담당자·활동을 못 보고 못 지운다(404·404·404)",
        (v1.status, v2.status, g1.status, g2.status, g3.status), v1.status==403 and v2.status==403 and g1.status==404 and g2.status==404 and g3.status==404)
@@ -1360,9 +1384,9 @@ with sync_playwright() as p:
     d9=ctx.request.delete(PT+f"/{s9['id']}"); gone=not any(x["code"]=="E2E-S9" for x in ctx.request.get(PT).json()["rows"])
     bad=ctx.request.patch(PT+f"/{s9['id']}",headers=J0,data=json.dumps({"code":"X"}))
     ok("S54d 아무도 가리키지 않는 공급처는 지워진다(200 · 목록에서 사라짐) · 코드 바꾸기는 400", (d9.status, gone, bad.status), d9.status==200 and gone and bad.status in (400,404))
-    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data={"email":"viewer@acme.test"})
+    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data=LOGIN("viewer@acme.test"))
     v1=vw.request.patch(PT+f"/{c9['id']}",headers=J0,data=json.dumps({"name":"v"})); v2=vw.request.delete(PT+f"/{c9['id']}"); vw.close()
-    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data={"email":"owner@globex.test"})
+    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data=LOGIN("owner@globex.test"))
     g1=gb.request.patch(PT+f"/{c9['id']}",headers=J0,data=json.dumps({"name":"g"})); g2=gb.request.delete(PT+f"/{s8['id']}"); gb.close()
     ok("S54e viewer 는 고치거나 지울 수 없다(403·403) · 다른 회사는 우리 고객·공급처를 못 고치고 못 지운다(404·404)", (v1.status, v2.status, g1.status, g2.status),
        v1.status==403 and v2.status==403 and g1.status==404 and g2.status==404)
@@ -1396,9 +1420,9 @@ with sync_playwright() as p:
     k400=ctx.request.patch(SI+f"/{cr['id']}",headers=J0,data=json.dumps({"key":"x"}))
     s400=ctx.request.patch(SI+f"/{cr['id']}",headers=J0,data=json.dumps({"source":{"kind":"table","table":"nope","col":"A","op":"ge"}}))
     ok("S55d key 바꾸기 400 · 카탈로그에 없는 표로 바꾸기 400(수정도 등록과 같은 대조)", (k400.status, s400.status), k400.status==400 and s400.status==400)
-    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data={"email":"viewer@acme.test"})
+    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data=LOGIN("viewer@acme.test"))
     v1=vw.request.post(SI+"/import",headers=J0,data=json.dumps({"productCode":"EU","csv":BAD_CSV})); v2=vw.request.patch(SI+f"/{cr['id']}",headers=J0,data=json.dumps({"label":"v"})); v3=vw.request.delete(SI+f"/{cr['id']}"); vw.close()
-    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data={"email":"owner@globex.test"})
+    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data=LOGIN("owner@globex.test"))
     g1=gb.request.patch(SI+f"/{cr['id']}",headers=J0,data=json.dumps({"label":"g"})); g2=gb.request.delete(SI+f"/{cr['id']}"); gb.close()
     ok("S55e viewer 는 Import·수정·삭제 모두 403 · 다른 회사는 우리 항목을 못 고치고 못 지운다(404·404)", (v1.status, v2.status, v3.status, g1.status, g2.status),
        v1.status==403 and v2.status==403 and v3.status==403 and g1.status==404 and g2.status==404)
@@ -1430,9 +1454,9 @@ with sync_playwright() as p:
     ret=ctx.request.post(CS,headers=J0,data=json.dumps({"code":MC4,"status":"retired"}))
     after=up("dwg2d","late.dxf",b"x"); pr=ctx.request.post(PRC,headers=J0,data=json.dumps({"code":MC4,"price":1000,"effectiveFrom":"2026-01-01"}))
     ok("S56d 사용중지 — 새 도면 첨부 409 · 새 단가 409 (이미 뜬 BOM 스냅샷·첨부는 그대로)", (ret.status, after.status, pr.status), ret.status==200 and after.status==409 and pr.status==409)
-    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data={"email":"viewer@acme.test"})
+    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data=LOGIN("viewer@acme.test"))
     v1=up("dwg2d","v.dxf",b"x",key="PFP 1",c=vw); v2=vw.request.post(CS,headers=J0,data=json.dumps({"code":"PFP 1","status":"approved"})); vw.close()
-    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data={"email":"owner@globex.test"})
+    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data=LOGIN("owner@globex.test"))
     g1=gb.request.get(AT+f"?ownerKind=product_code&ownerKey={MC4}").json()["rows"]; g2=gb.request.get(AT+f"/{rows_a[0]['id']}/file"); gb.close()
     ok("S56e viewer 는 첨부·상태 변경 403 · 다른 회사는 우리 코드의 첨부를 못 보고(0건) 못 내려받는다(404)", (v1.status, v2.status, len(g1), g2.status),
        v1.status==403 and v2.status==403 and len(g1)==0 and g2.status==404)
@@ -1459,8 +1483,8 @@ with sync_playwright() as p:
     ok("S57b 승인 뒤 화면에서 Arrangement 도면(DXF)을 올리고 그대로 내려받는다", (len(rows), got==ADXF), len(rows)==1 and got==ADXF)
     nope=upa("x.dxf",b"x",key="00000000-0000-4000-8000-000000000000"); ext=c_ext=ctx.request.post(AT, multipart={"ownerKind":"arrangement_code","ownerKey":adc["id"],"kind":"dwg2d","file":{"name":"x.exe","mimeType":"application/octet-stream","buffer":b"MZ"}})
     ok("S57c 없는 Arrangement Code 404 · 허용 밖 확장자 415", (nope.status, ext.status), nope.status==404 and ext.status==415)
-    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data={"email":"viewer@acme.test"}); v1=upa("v.dxf",b"x",c=vw); vw.close()
-    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data={"email":"owner@globex.test"})
+    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data=LOGIN("viewer@acme.test")); v1=upa("v.dxf",b"x",c=vw); vw.close()
+    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data=LOGIN("owner@globex.test"))
     g1=upa("g.dxf",b"x",c=gb); g2=gb.request.get(AT+f"?ownerKind=arrangement_code&ownerKey={adc['id']}").json()["rows"]; gb.close()
     ok("S57d viewer 403 · 다른 회사는 우리 Arrangement Code 에 못 붙이고(404) 목록도 0건", (v1.status, g1.status, len(g2)), v1.status==403 and g1.status==404 and len(g2)==0)
     # ── S58 F6 · p13 Sub Item list · DWG View(화면에 띄우기 — 스냅샷 DXF 를 서버에서 SVG 로, 새 도면 계산 없음) ──
@@ -1494,8 +1518,8 @@ with sync_playwright() as p:
     ok("S58c 뷰어 안에서 뷰를 바꾸면(3D 등각) 그 뷰를 그리고, 내려받기 링크도 그 뷰의 DXF", iso_href, iso_href.endswith("type=iso"))
     b1=ctx.request.get(DX+f"?runId={rid6}&type=nope&format=svg"); b2=ctx.request.get(DX+"?runId=00000000-0000-4000-8000-000000000000&type=plan&format=svg")
     ok("S58d 없는 뷰 400 · 없는 스냅샷 404", (b1.status, b2.status), b1.status==400 and b2.status==404)
-    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data={"email":"viewer@acme.test"}); v1=vw.request.get(DX+f"?runId={rid6}&type=plan&format=svg"); vw.close()
-    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data={"email":"owner@globex.test"}); g1=gb.request.get(DX+f"?runId={rid6}&type=plan&format=svg"); gb.close()
+    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data=LOGIN("viewer@acme.test")); v1=vw.request.get(DX+f"?runId={rid6}&type=plan&format=svg"); vw.close()
+    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data=LOGIN("owner@globex.test")); g1=gb.request.get(DX+f"?runId={rid6}&type=plan&format=svg"); gb.close()
     ok("S58e 읽기 전용 — viewer 는 볼 수 있다(200 · 쓰기 없음) · 다른 회사는 우리 스냅샷 도면을 못 연다(404)", (v1.status, g1.status), v1.status==200 and g1.status==404)
     # ── S59 F7 · p15 Technical data 목록(모아보기·거르기) · 입력값 CSV Import ──
     TD=BASE+"/api/techdata"; DOCS=BASE+"/api/documents"; N4="a0000000-0000-4000-8000-000000000004"
@@ -1532,8 +1556,8 @@ with sync_playwright() as p:
     ok("S59c CSV 로 채운 값으로 Tech Data 를 만들면 문서에 그 값(27 °C · 55 %)이 스냅샷으로 남는다", d7.get("docNo"),
        'data-key="temperature">27 °C' in hp and 'data-key="humidity">55 %' in hp)
     bs=ctx.request.get(TD+"?status=bogus")
-    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data={"email":"viewer@acme.test"}); v1=vw.request.get(TD); vw.close()
-    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data={"email":"owner@globex.test"}); g1=gb.request.get(TD).json()["rows"]; gb.close()
+    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data=LOGIN("viewer@acme.test")); v1=vw.request.get(TD); vw.close()
+    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data=LOGIN("owner@globex.test")); g1=gb.request.get(TD).json()["rows"]; gb.close()
     ok("S59d 잘못된 상태 400 · 읽기 전용이라 viewer 는 볼 수 있다(200) · 다른 회사는 우리 Tech Data 를 못 본다(0건)", (bs.status, v1.status, len(g1)),
        bs.status==400 and v1.status==200 and len(g1)==0)
     # ── S60 F8 · p18 · p16 Data Up-Load — 작업대 노드에 자료를 올리고 Inspector 에 목록(F4 첨부·0014 저장소 재사용) ──
@@ -1555,8 +1579,8 @@ with sync_playwright() as p:
         return c.request.post(AT, multipart={"ownerKind":"node","ownerKey":key,"kind":"data","file":{"name":name,"mimeType":"application/octet-stream","buffer":data}})
     e1=upn(NP,"run.exe",b"MZ"); e2=upn("00000000-0000-4000-8000-000000000000","a.csv",b"x")
     ok("S60b 허용 밖 확장자 415 · 없는 노드 404", (e1.status, e2.status), e1.status==415 and e2.status==404)
-    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data={"email":"viewer@acme.test"}); v1=upn(NP,"v.csv",b"x",c=vw); v2=vw.request.get(AT+f"?ownerKind=node&ownerKey={NP}"); vw.close()
-    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data={"email":"owner@globex.test"}); g1=upn(NP,"g.csv",b"x",c=gb); g2=gb.request.get(AT+f"?ownerKind=node&ownerKey={NP}").json()["rows"]; gb.close()
+    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data=LOGIN("viewer@acme.test")); v1=upn(NP,"v.csv",b"x",c=vw); v2=vw.request.get(AT+f"?ownerKind=node&ownerKey={NP}"); vw.close()
+    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data=LOGIN("owner@globex.test")); g1=upn(NP,"g.csv",b"x",c=gb); g2=gb.request.get(AT+f"?ownerKind=node&ownerKey={NP}").json()["rows"]; gb.close()
     ok("S60c viewer 는 볼 수 있지만(200) 못 올린다(403) · 다른 회사는 우리 노드에 못 올리고(404) 목록도 0건", (v2.status, v1.status, g1.status, len(g2)),
        v2.status==200 and v1.status==403 and g1.status==404 and len(g2)==0)
     # ── S61 F9 · p54 System Set-Up 지도 — 있는 화면은 링크, 없는 것은 "아직 없음 — 필요한 입력" ──
@@ -1573,7 +1597,7 @@ with sync_playwright() as p:
     # H4(ccmd H) 이후 Department 는 ERP 기준정보 화면(/setup/erp)으로 링크 — 아직 없음은 Work Process · 그 밖의 ERP 둘.
     ok("S61c 없는 것은 있는 척하지 않는다 — Work Process · 그 밖의 ERP 는 '아직 없음 — 필요한 입력' 으로", len(nones),
        len(nones)==2 and all("아직 없음" in t and "필요한 입력" in t for t in nones))
-    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data={"email":"viewer@acme.test"}); vm=vw.request.get(BASE+"/setup/map"); vw.close()
+    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data=LOGIN("viewer@acme.test")); vm=vw.request.get(BASE+"/setup/map"); vw.close()
     ok("S61d 지도는 읽기 화면 — viewer 도 연다(200)", vm.status, vm.status==200)
     # ── S62 F10 · p66 · p67 제조 정보 표(공정별 시간 × 임율 · 장비) → 인건비 · 견적 적용(스냅샷 단가·출처) ──
     MR=BASE+"/api/setup/mfg-rates"; RUNB=BASE+"/api/run/bom"; DOCS=BASE+"/api/documents"; N4="a0000000-0000-4000-8000-000000000004"
@@ -1612,9 +1636,9 @@ with sync_playwright() as p:
     dup=ctx.request.post(MR,headers=J0,data=json.dumps({"productCode":"EU","process":"조립","hours":1,"rate":1000}))
     ok("S62e 시간 0 은 400 · 없는 제품 404 · 같은 공정 409", (z.status, nf.status, dup.status), z.status==400 and nf.status==404 and dup.status==409)
     rows=ctx.request.get(MR+"?product=EU").json()["rows"]
-    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data={"email":"viewer@acme.test"})
+    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data=LOGIN("viewer@acme.test"))
     v0=vw.request.get(MR+"?product=EU"); v1=vw.request.post(MR,headers=J0,data=json.dumps({"productCode":"EU","process":"v","hours":1,"rate":1})); v2=vw.request.delete(MR+f"/{rows[0]['id']}"); vw.close()
-    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data={"email":"owner@globex.test"})
+    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data=LOGIN("owner@globex.test"))
     g1=gb.request.get(MR+"?product=EU").json()["rows"]; g2=gb.request.delete(MR+f"/{rows[0]['id']}"); gb.close()
     left=ctx.request.get(MR+"?product=EU").json()["rows"]
     ok("S62f viewer 는 보지만(200) 못 넣고·못 지운다(403) · 다른 회사는 우리 표를 못 보고(0건) 못 지운다(404) · 우리 표는 그대로",
@@ -1666,9 +1690,9 @@ with sync_playwright() as p:
     inv=i1[0]; w01=[r for r in byk["warehouse"] if r["code"]=="W01"][0]
     y1=ctx.request.delete(EM+f"/{w01['id']}"); y2=ctx.request.delete(EM+f"/{inv['id']}"); y3=ctx.request.delete(EM+f"/{w01['id']}")
     ok("S63d 창고는 재고가 가리키는 동안 409, 재고를 지우면 창고도 지워진다(200)", (y1.status,y2.status,y3.status), (y1.status,y2.status,y3.status)==(409,200,200))
-    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data={"email":"viewer@acme.test"})
+    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data=LOGIN("viewer@acme.test"))
     v0=vw.request.get(EM); v1=vw.request.post(EM,headers=J0,data=j0({"kind":"nation","code":"CN","name":"중국"})); v2=vw.request.patch(EM+f"/{d100['id']}",headers=J0,data=j0({"name":"x"})); v3=vw.request.delete(EM+f"/{d100['id']}"); vw.close()
-    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data={"email":"owner@globex.test"})
+    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data=LOGIN("owner@globex.test"))
     g0=len(em_rows(c=gb)); g1=gb.request.patch(EM+f"/{d100['id']}",headers=J0,data=j0({"name":"hijack"})); g2=gb.request.delete(EM+f"/{e1[0]['id']}"); gb.close()
     still=[r for r in em_rows("department") if r["code"]=="D100"]
     ok("S63e viewer 는 보지만(200) 못 넣고·못 고치고·못 지운다(403) · 다른 회사는 우리 기준정보 0건 · 고치기·지우기 404 · 우리 행 그대로",
@@ -1710,9 +1734,9 @@ with sync_playwright() as p:
     ok("S64d 코드 관계에 없는 하위 코드 400 · 같은 하위 코드 409 · 우선순위 0 은 400 · 없는 제품 404 · 빈 주의사항 400", (e1.status,e2.status,e3.status,e4.status,e5.status),
        (e1.status,e2.status,e3.status,e4.status,e5.status)==(400,409,400,404,400))
     tid=ctx.request.get(DT+"?product=EU").json()["subs"][0]["id"]
-    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data={"email":"viewer@acme.test"})
+    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data=LOGIN("viewer@acme.test"))
     v0=vw.request.get(DT+"?product=EU"); v1=vw.request.post(DT,headers=J0,data=json.dumps({"productCode":"EU","kind":"note","text":"v","priority":1})); v2=vw.request.delete(DT+f"/{tid}"); vw.close()
-    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data={"email":"owner@globex.test"})
+    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data=LOGIN("owner@globex.test"))
     g0=gb.request.get(DT+"?product=EU").json(); g1=gb.request.delete(DT+f"/{tid}"); g2=gb.request.get(DRW+f"/{d1.get('id')}/sheet"); gb.close()
     ok("S64e viewer 는 보지만(200) 못 넣고·못 뺀다(403) · 다른 회사는 우리 템플릿 0건 · 빼기 404 · 우리 도면 시트 404",
        (v0.status,v1.status,v2.status,len(g0.get("subs",[]))+len(g0.get("notes",[])),g1.status,g2.status),
@@ -1759,10 +1783,10 @@ with sync_playwright() as p:
     e7=ctx.request.put(TM,headers=J0,data=json.dumps({"productCode":"EU","tableName":"zzz","tableType":"tech"})); e8=ctx.request.put(TM,headers=J0,data=json.dumps({"productCode":"EU","tableName":"cap","tableType":"tech","variantOf":"opt"}))
     ok("S65d 잘못된 key 400 · 스냅샷 경로 밖(새 계산) 400 · 중복 409 · 그래프 모양·점·표시선 400 · 없는 표 400 · Variant 가 아닌데 변형 원본 400",
        tuple(x.status for x in (e1,e2,e3,e4,e5,e6,e7,e8)), tuple(x.status for x in (e1,e2,e3,e4,e5,e6,e7,e8))==(400,400,409,400,400,400,400,400))
-    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data={"email":"viewer@acme.test"})
+    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data=LOGIN("viewer@acme.test"))
     v0=vw.request.get(OI); v1=vw.request.post(OI,headers=J0,data=json.dumps({"key":"v","label":"v","source":"macro"})); v2=vw.request.put(TM,headers=J0,data=json.dumps({"productCode":"EU","tableName":"cap","tableType":"tech"})); vw.close()
     wid=[o for o in ctx.request.get(OI).json()["rows"] if o["key"]=="width"][0]["id"]
-    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data={"email":"owner@globex.test"})
+    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data=LOGIN("owner@globex.test"))
     g0=len(gb.request.get(OI).json().get("rows",[])); g1=len(gb.request.get(GR).json().get("rows",[])); g2=gb.request.delete(OI+f"/{wid}"); gb.close()
     ok("S65e viewer 는 보지만(200) 못 넣고·못 고친다(403) · 다른 회사는 우리 Output·그래프 0건 · 지우기 404",
        (v0.status,v1.status,v2.status,g0,g1,g2.status), v0.status==200 and (v1.status,v2.status)==(403,403) and g0==0 and g1==0 and g2.status==404)
@@ -1788,8 +1812,8 @@ with sync_playwright() as p:
        dr.status==200 and ahu2["approved"] is None and ahu2["drafts"]==d0+1 and "승인 매크로 없음" in pg.inner_text(f"[data-testid=cl-row-{ahu['stableId']}]"))
     pg.click(f"[data-testid=cl-open-{N4}]"); pg.wait_for_selector("[data-testid=canvas-cmds][data-ready='1']",timeout=60000)
     ok("S66c 행의 노드 이름을 누르면 그 노드의 작업대로", pg.url.replace(BASE,""), pg.url.endswith(f"/workbench?node={N4}"))
-    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data={"email":"viewer@acme.test"}); v0=vw.request.get(CL); vw.close()
-    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data={"email":"owner@globex.test"}); g0=gb.request.get(CL).json().get("rows",[]); gb.close()
+    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data=LOGIN("viewer@acme.test")); v0=vw.request.get(CL); vw.close()
+    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data=LOGIN("owner@globex.test")); g0=gb.request.get(CL).json().get("rows",[]); gb.close()
     ok("S66d 읽기 목록 — viewer 도 본다(200) · 다른 회사 목록에는 우리 노드가 없다", (v0.status, len(g0), any(r["stableId"]==N4 for r in g0)),
        v0.status==200 and not any(r["stableId"] in (N4, ahu["stableId"]) for r in g0))
     # ── S67 H8 · p57 Toolbox Macro — Data Management(목록) · 함수 마법사(식 글자 → 기존 파서·Verify) · 그래프 마법사(H6 그래프를 단계로) ──
@@ -1829,8 +1853,8 @@ with sync_playwright() as p:
     vj=vr.value.json()
     ok("S67d 작업대 Macro 탭의 함수 마법사 → Macro 칸에 넣기 → 기존 Verify 가 그대로 검사한다(저장·승인은 그 탭 한 곳)", (dv, vr.value.status, [d.get("severity") for d in vj.get("diagnostics",[])]),
        dv=="=SUM(Table1(A,4:4))" and vr.value.status==200 and not any(d.get("severity")=="error" for d in vj.get("diagnostics",[])))
-    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data={"email":"viewer@acme.test"}); v0=vw.request.get(DS); vw.close()
-    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data={"email":"owner@globex.test"}); g0=gb.request.get(DS).json().get("rows",[]); gb.close()
+    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data=LOGIN("viewer@acme.test")); v0=vw.request.get(DS); vw.close()
+    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data=LOGIN("owner@globex.test")); g0=gb.request.get(DS).json().get("rows",[]); gb.close()
     bq=ctx.request.get(DS+"?type=zzz")
     ok("S67e Data Management 는 읽기 목록 — viewer 200 · 다른 회사 목록에는 우리 식·그래프가 없다 · 모르는 type 400",
        (v0.status, len(g0), bq.status), v0.status==200 and not any(r["type"] in ("formula","chart") and (r["href"].endswith(N4) or r["name"]=="Monthly orders") for r in g0) and bq.status==400)
@@ -1871,9 +1895,9 @@ with sync_playwright() as p:
     e1=q({"docType":"techdata","elements":[{"kind":"table","x":80,"y":0,"w":30,"h":10}]}); e2=q({"docType":"techdata","elements":[{"kind":"chart","x":0,"y":0,"w":10,"h":10}]})
     e3=q({"docType":"techdata","elements":[]}); e4=q({"docType":"invoice","elements":[{"kind":"title","x":0,"y":0,"w":10,"h":10}]})
     ok("S68d 쪽 밖 400 · 모르는 요소 400 · 빈 양식 400 · 모르는 문서 종류 400", (e1.status,e2.status,e3.status,e4.status), (e1.status,e2.status,e3.status,e4.status)==(400,400,400,400))
-    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data={"email":"viewer@acme.test"})
+    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data=LOGIN("viewer@acme.test"))
     v0=vw.request.get(PL+"?docType=techdata"); v1=vw.request.post(PL,headers=J0,data=json.dumps({"docType":"techdata","elements":l1["elements"]})); vw.close()
-    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data={"email":"owner@globex.test"})
+    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data=LOGIN("owner@globex.test"))
     g0=gb.request.get(PL+"?docType=techdata").json(); g2=gb.request.get(DOCS+f"/{tdA.get('id')}/print"); gb.close()
     ok("S68e viewer 는 보지만(200) 저장 못 한다(403) · 다른 회사는 우리 양식 버전 0 · 우리 발행본 인쇄 404",
        (v0.status, v1.status, len(g0.get("versions",[])), g2.status), v0.status==200 and v1.status==403 and len(g0.get("versions",[]))==0 and g0.get("latest") is None and g2.status==404)
@@ -1920,9 +1944,9 @@ with sync_playwright() as p:
     e1=q({"kind":"text","x1":0,"y1":0}); e2=q({"kind":"circle","x1":0,"y1":0,"x2":10,"y2":10}); e3=q({"kind":"line","x1":5,"y1":5,"x2":5,"y2":5})
     e4=ctx.request.patch(BASE+f"/api/drawing-annotations/{ln1['id']}",headers=J0,data=json.dumps({"kind":"rect"}))
     ok("S69e 글자 없는 글자 주석 400 · 모르는 종류 400 · 두 점이 같은 선 400 · 종류 바꾸기 400", (e1.status,e2.status,e3.status,e4.status), (e1.status,e2.status,e3.status,e4.status)==(400,400,400,400))
-    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data={"email":"viewer@acme.test"})
+    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data=LOGIN("viewer@acme.test"))
     v0=vw.request.get(AN); v1=vw.request.post(AN,headers=J0,data=json.dumps({"kind":"line","x1":0,"y1":0,"x2":100,"y2":0})); v2=vw.request.delete(BASE+f"/api/drawing-annotations/{ln1['id']}"); vw.close()
-    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data={"email":"owner@globex.test"})
+    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data=LOGIN("owner@globex.test"))
     g0=gb.request.get(AN); g1=gb.request.patch(BASE+f"/api/drawing-annotations/{ln1['id']}",headers=J0,data=json.dumps({"dx":10,"dy":0})); g2=gb.request.get(DRW+f"/{DID}?annot=1"); gb.close()
     ok("S69f viewer 는 보지만(200) 못 더하고·못 지운다(403) · 다른 회사는 우리 도면 주석을 못 보고 못 옮긴다(404) · 주석 DXF 도 404",
        (v0.status,v1.status,v2.status,g0.status,g1.status,g2.status), (v0.status,v1.status,v2.status,g0.status,g1.status,g2.status)==(200,403,403,404,404,404))
@@ -1993,8 +2017,8 @@ with sync_playwright() as p:
        xx.status==200 and no71 in vals and bool(qtot) and qtot[0][4]==tot71 and len(irows)==n71 and all(isinstance(r[amt_col],(int,float)) for r in irows)
        and bool(sumrow) and str(sumrow[0][amt_col].value).startswith("=SUM("))
     bad71=ctx.request.get(Q71+"/export?format=pdf")
-    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data={"email":"viewer@acme.test"}); v71=vw.request.get(Q71+"/export?format=xlsx"); vw.close()
-    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data={"email":"owner@globex.test"}); g71=gb.request.get(Q71+"/export?format=docx"); gb.close()
+    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data=LOGIN("viewer@acme.test")); v71=vw.request.get(Q71+"/export?format=xlsx"); vw.close()
+    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data=LOGIN("owner@globex.test")); g71=gb.request.get(Q71+"/export?format=docx"); gb.close()
     ok("S71c 모르는 format 은 400 · viewer 는 내보내기 403 · 다른 회사 문서는 404", (bad71.status, v71.status, g71.status), (bad71.status, v71.status, g71.status)==(400,403,404))
     # S37 은 맨 끝에서 센다 — 중간(옛 자리)에서는 뒤에 찍히는 5장(40·41·42·52·53)이 아직 없어,
     # 빈 폴더에서는 25장이라 실패하고 이전 실행 잔재가 있을 때만 통과했다(2026-09-24 실측).

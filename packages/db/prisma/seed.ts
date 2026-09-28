@@ -1,4 +1,5 @@
 import { adminPrisma } from "../src/client";
+import { hashPassword } from "../src/password";
 
 /**
  * Dev seed. Runs on the admin (RLS-bypassing) connection so it can populate
@@ -22,6 +23,8 @@ export const IDS = {
   ownerB: "10000000-0000-4000-8000-00000000000b",
   // P3-a 플랫폼 관리자 — 테넌트 밖의 주체(멤버십 없음)
   platformAdmin: "30000000-0000-4000-8000-00000000000f",
+  // 0032 · 비밀번호가 없는 옛 계정 예시(열람자) — 개발 모드(EDIM_DEV_LOGIN=1)에서만 이메일로 들어오고 운영에서는 거절된다(e2e S0e)
+  legacyA: "40000000-0000-4000-8000-00000000000a",
   // hierarchy (tenant A)
   a_root: "a0000000-0000-4000-8000-000000000001",
   a_mod: "a0000000-0000-4000-8000-000000000002",
@@ -37,7 +40,11 @@ export const IDS = {
   b_item: "b0000000-0000-4000-8000-000000000003",
 } as const;
 
+/** 샘플 비밀번호 — 공개 데모용 값(README "샘플 계정"). 실제 계정 비밀번호가 아니다. */
+export const DEMO_PASSWORD = "edim-demo-2026";
+
 export async function seedAll(): Promise<void> {
+  const pw = hashPassword(DEMO_PASSWORD);
   // Tenants -------------------------------------------------------------------
   await adminPrisma.tenant.upsert({
     where: { id: IDS.tenantA },
@@ -53,13 +60,13 @@ export async function seedAll(): Promise<void> {
   // Users ---------------------------------------------------------------------
   await adminPrisma.appUser.upsert({
     where: { id: IDS.ownerA },
-    create: { id: IDS.ownerA, email: "owner@acme.test", name: "Acme Owner" },
-    update: { email: "owner@acme.test", name: "Acme Owner" },
+    create: { id: IDS.ownerA, email: "owner@acme.test", name: "Acme Owner", passwordHash: pw },
+    update: { email: "owner@acme.test", name: "Acme Owner", passwordHash: pw },
   });
   await adminPrisma.appUser.upsert({
     where: { id: IDS.viewerA },
-    create: { id: IDS.viewerA, email: "viewer@acme.test", name: "Acme Viewer" },
-    update: { email: "viewer@acme.test", name: "Acme Viewer" },
+    create: { id: IDS.viewerA, email: "viewer@acme.test", name: "Acme Viewer", passwordHash: pw },
+    update: { email: "viewer@acme.test", name: "Acme Viewer", passwordHash: pw },
   });
   await adminPrisma.appUser.upsert({
     where: { id: IDS.ownerB },
@@ -67,14 +74,22 @@ export async function seedAll(): Promise<void> {
       id: IDS.ownerB,
       email: "owner@globex.test",
       name: "Globex Owner",
+      passwordHash: pw,
     },
-    update: { email: "owner@globex.test", name: "Globex Owner" },
+    update: { email: "owner@globex.test", name: "Globex Owner", passwordHash: pw },
+  });
+
+  await adminPrisma.appUser.upsert({
+    where: { id: IDS.legacyA },
+    create: { id: IDS.legacyA, email: "legacy@acme.test", name: "Legacy (no password)" },
+    update: { email: "legacy@acme.test", name: "Legacy (no password)", passwordHash: null },
   });
 
   // Memberships (composite PK) ------------------------------------------------
   const memberships = [
     { tenantId: IDS.tenantA, userId: IDS.ownerA, role: "owner" },
     { tenantId: IDS.tenantA, userId: IDS.viewerA, role: "viewer" },
+    { tenantId: IDS.tenantA, userId: IDS.legacyA, role: "viewer" },
     { tenantId: IDS.tenantB, userId: IDS.ownerB, role: "owner" },
   ];
   for (const m of memberships) {
@@ -199,8 +214,9 @@ export async function seedAll(): Promise<void> {
       id: IDS.platformAdmin,
       email: "platform@edim.test",
       name: "EDIM Platform Admin",
+      passwordHash: pw,
     },
-    update: { email: "platform@edim.test", name: "EDIM Platform Admin" },
+    update: { email: "platform@edim.test", name: "EDIM Platform Admin", passwordHash: pw },
   });
   // platform 스키마는 Prisma 모델이 아니므로(multiSchema 미사용) raw 로 넣는다.
   await adminPrisma.$executeRaw`
@@ -209,7 +225,7 @@ export async function seedAll(): Promise<void> {
     ON CONFLICT (user_id) DO UPDATE SET title = EXCLUDED.title`;
 
   console.log(
-    "Seed complete: 2 tenants, 4 users (1 platform admin), 3 memberships, 7 nodes, 1 project.",
+    "Seed complete: 2 tenants, 5 users (1 platform admin · 1 legacy without password), 4 memberships, 8 nodes, 1 project.",
   );
 }
 

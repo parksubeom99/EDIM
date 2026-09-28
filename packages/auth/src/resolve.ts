@@ -10,8 +10,8 @@ import type { SessionData } from "./session";
  * superuser bootstrap connection), the one sanctioned place to cross tenants.
  * Everything downstream runs tenant-scoped on appPrisma via withTenantSession().
  *
- * Skeleton auth: the email is the credential (no password yet). STEP note in the
- * handoff — a real provider slots in here without changing the shape below.
+ * p11 · 0032: 비밀번호 판정은 credentials.ts(checkPassword) 가 먼저 한다 — 이 파일은
+ * "누구이고 어느 회사 소속인가"만 푼다. SSO 가 붙어도 콜백이 확인한 이메일로 여기를 부른다.
  */
 
 export interface TenantMembership {

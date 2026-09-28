@@ -27,6 +27,8 @@ export {
   type ResolvedUser,
   type TenantMembership,
 } from "./resolve";
+export { checkPassword, devLoginEnabled, loginLimiter } from "./credentials";
+export { LoginLimiter, LOCK_MAX, LOCK_WINDOW_MS } from "./limiter";
 export {
   withTenantSession,
   hasRole,

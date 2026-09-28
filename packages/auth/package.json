@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit",
     "build": "tsc --noEmit",
     "lint": "tsc --noEmit",
-    "test": "dotenv -e ../../.env -- tsx test/auth-tenant.test.ts"
+    "test": "tsx test/password.test.ts && dotenv -e ../../.env -- tsx test/auth-tenant.test.ts"
   },
   "dependencies": {
     "@edim/core-ontology": "workspace:*",

@@ -24,7 +24,7 @@ async function login(email, tenantSlug) {
   const res = await fetch(`${BASE}/api/auth/login`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ email, tenantSlug }),
+    body: JSON.stringify({ email, password: process.env.EDIM_DEMO_PASSWORD ?? "edim-demo-2026", tenantSlug }),  // p11 · 샘플 비밀번호
   });
   return { status: res.status, cookie: cookieFrom(res) };
 }
