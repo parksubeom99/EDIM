@@ -36,7 +36,10 @@ export async function ruleMacroEvaluator(tenantId: string, rules: DesignRule[]):
     if (!("dsl" in got)) return got;
     const parsed = parse(got.dsl);
     if (!parsed.ok) return { ok: false, reason: "error", message: parsed.error.message };
-    const r = dryRun(parsed.value, new InMemoryProvider({ codes: facts }));
+    // 조건에는 코드 기호(L · LMAXPCT …), 셈에는 같은 값의 Var(DIM, …) — 학습 공식이 옮겨 오는 어휘와 같다
+    const vars: Record<string, number> = { "DIM|SECSUM": facts.L ?? 0 };
+    for (const [k, v] of Object.entries(facts)) vars[`DIM|${k}`] = v;
+    const r = dryRun(parsed.value, new InMemoryProvider({ codes: facts, vars }));
     if (!r.ok) return { ok: false, reason: "error", message: r.diagnostic?.message ?? "evaluation failed" };
     return typeof r.value === "number" ? { ok: true, value: r.value } : { ok: false, reason: "error", message: "결과가 숫자가 아님" };
   };

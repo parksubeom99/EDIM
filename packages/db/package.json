@@ -25,7 +25,8 @@
     "backbone:test": "dotenv -e ../../.env -- tsx prisma/code-backbone-test.ts",
     "platform:test": "dotenv -e ../../.env -- tsx prisma/platform-test.ts",
     "drawing:test": "dotenv -e ../../.env -- tsx prisma/drawing-test.ts",
-    "document:test": "dotenv -e ../../.env -- tsx prisma/document-test.ts"
+    "document:test": "dotenv -e ../../.env -- tsx prisma/document-test.ts",
+    "learning:test": "dotenv -e ../../.env -- tsx prisma/learning-test.ts"
   },
   "dependencies": {
     "@edim/core-ontology": "workspace:*",

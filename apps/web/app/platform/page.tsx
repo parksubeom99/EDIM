@@ -94,7 +94,9 @@ export default async function PlatformPage() {
       </p>
 
       <section style={box}>
-        <h2 style={{ fontSize: 15, margin: 0 }}>DB① 학습 DB</h2>
+        <h2 style={{ fontSize: 15, margin: 0, display: "flex", justifyContent: "space-between" }}>DB① 학습 DB
+          <Link href="/platform/learning" data-testid="platform-learning-link" style={{ fontSize: "var(--fs-13)", color: "var(--accent)", fontWeight: 400 }}>학습 →</Link>
+        </h2>
         <p style={{ color: "var(--ink-muted)", fontSize: "var(--fs-13)" }}>
           원천자료 {status.learningSources}건 · 등록된 플랫폼 관리자{" "}
           {status.admins}명
@@ -107,8 +109,8 @@ export default async function PlatformPage() {
           }}
         >
           {status.learningSources === 0
-            ? "비어 있음 — 학습 1수준 입력과 프로젝션은 P3-b(도면+기술문서 하이브리드)에서 채웁니다."
-            : "원천자료가 등록되어 있습니다."}
+            ? "비어 있음 — 학습 탭에서 도면(DXF)·기술문서(CSV)를 올립니다."
+            : "원천자료가 등록되어 있습니다 — 학습 탭에서 작업을 돌리고, 승인한 공식만 회사로 투영합니다."}
         </p>
       </section>
 

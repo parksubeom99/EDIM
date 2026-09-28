@@ -18,6 +18,7 @@ import { withTenant } from "../src/tenant";
 import { createDraft, approve, getApproved } from "../src/macro";
 import { IDS } from "./seed";
 import { seedCatalog } from "./seed-catalog";
+import { seedLearning } from "./seed-learning";
 
 export const DEMO_DSL =
   "=IF(CAP,CAP>25, SUM(Table1(A,4:4))*Var(NS,15)*Var(NS,20), SUM(Table1(A,1:1))*Var(NS,20))";
@@ -84,6 +85,9 @@ export async function seedDemo(opts: { forceCatalog?: boolean } = {}): Promise<v
     await approve(tx, { id, approvedBy: IDS.ownerA, verified: true });
     console.log(`Demo seed: approved verification macro V_SECTION_RATIO (p39 · sample).`);
   });
+  // 0033 · B 학습 AI — DB① 샘플 도면 68 + 기술문서 CSV 1 (샘플 표지)
+  const ln = await seedLearning();
+  if (ln > 0) console.log(`Demo seed: ${ln} sample learning sources (DB① · 샘플).`);
 }
 
 const isMain = process.argv[1]?.endsWith("seed-demo.ts") ?? false;

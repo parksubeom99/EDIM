@@ -148,3 +148,12 @@ export {
 } from "./print";
 
 export { hashPassword, verifyPassword, burnVerify } from "./password";
+export {
+  platformListSources, platformInsertSource, platformSourceContents, platformSetSourceMonitor,
+  platformCreateJob, platformSetJobState, platformStepStart, platformStepFinish, platformGetJob, platformListJobs,
+  platformInsertFeatures, platformDeleteFeatures, platformListFeatures,
+  platformInsertFormula, platformListFormulas, platformDecideFormula, platformProjectFormula, platformListProjections,
+  listSuggestions, setSuggestionState,
+  type LearningSourceRow, type LearningJobRow, type LearningStepRow, type FeatureInsert, type FeatureRow, type FormulaInsert, type FormulaRow,
+  type ProjectionRow, type SuggestionRow,
+} from "./learning";

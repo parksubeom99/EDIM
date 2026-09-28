@@ -63,6 +63,11 @@ export interface DxfInput {
   /** Arrangement: 구획별 길이(mm) + 방향(p36 L0~R270). 없으면 sections.length × L 로 균등 분할. */
   secDims?: { name: string; len: number; dir?: string; components?: { code: string; at: string; level: string }[] }[];
   items?: DrawingItem[];
+  /**
+   * B · 학습 샘플(정면도만) — 케이싱 위·아래의 프레임(베이스 프레임 · 상부 프레임, 같은 높이).
+   * 전고 H = casing + 2 × frame. 제품 도면은 이 값을 넘기지 않으므로 바이트가 그대로다.
+   */
+  frame?: { casing: number; frame: number };
 }
 
 /** 3각법 뷰 — plan=Top(L×W) · front=Front(L×H) · right=Right(W×H) · assembly=조립도 */
@@ -202,6 +207,12 @@ export function buildFrontDxf(input: DxfInput): { dxf: string; meta: DxfMeta } {
     ents += text(offs[i]! + 120, H / 2, 60, s.name.toUpperCase()); n++;
     if (s.dir) { ents += text(offs[i]! + 120, H / 2 - 160, 50, `DIR ${s.dir}`); n++; }
   });
+  if (input.frame) {
+    const f = input.frame.frame;
+    ents += line(0, f, length, f, "OUTLINE"); ents += line(0, H - f, length, H - f, "OUTLINE"); n += 2;
+    ents += text(length + 200, f / 2, 60, `FRAME=${f}`, "DIM"); n++;
+    ents += text(length + 200, H / 2, 60, `CASING H=${input.frame.casing}`, "DIM"); n++;
+  }
   // 기준선(코퍼스 "기준선/중심선 표시") — 바닥에서 H/2
   ents += line(0, H / 2, length, H / 2, "DIM"); n++;
   ents += line(0, -300, length, -300, "DIM"); ents += text(length / 2 - 200, -420, 70, `L=${length}`); n += 2;

@@ -1,0 +1,17 @@
+{
+  "_note": "샘플 정렬 사전(ccmd J B-2) — 원천의 이름을 EDIM 형식 이름으로. 회사 실 도면 어휘가 들어오면 이 파일을 늘린다.",
+  "names": {
+    "overall_length": ["L", "LENGTH", "Overall L", "OVERALL LENGTH", "OAL", "전장"],
+    "overall_width": ["W", "WIDTH", "Overall W", "전폭"],
+    "overall_height": ["H", "HEIGHT", "Overall H", "전고"],
+    "casing_height": ["CASING H", "Casing Height", "CASING HEIGHT", "케이싱 높이"],
+    "base_frame": ["FRAME", "BASE", "Base Frame", "BASE FRAME", "베이스 프레임"],
+    "code.cap": ["code.B"],
+    "coil.rows": ["Rows", "ROWS", "코일 열수"],
+    "coil.fin_pitch": ["Fin Pitch", "FIN PITCH", "핀 피치"],
+    "coil.depth": ["Coil Depth", "COIL DEPTH", "코일 깊이"]
+  },
+  "sections": ["Mixing", "Filter", "Coil", "Fan", "Rotor", "Humid", "Damper", "Silencer", "Heater"],
+  "units": { "mm": 1, "": 1, "in": 25.4, "inch": 25.4, "m": 1000 },
+  "allowed": ["overall_length", "overall_width", "overall_height", "casing_height", "base_frame", "code.cap", "coil.rows", "coil.fin_pitch", "coil.depth"]
+}

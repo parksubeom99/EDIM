@@ -1,7 +1,7 @@
 import type { Role } from "@edim/core-ontology";
 import { withTenant, loadCatalogRows, type CatalogRows } from "@edim/db";
 import { slotDefsFromSubCodes, type SlotDef } from "./rccs";
-import { macroTablesOf, isDirection, isAt, isLevel } from "@edim/bom-code";
+import { macroTablesOf, isDirection, isAt, isLevel, dimsFor, sectionDimsFor, designFacts } from "@edim/bom-code";
 import type { Catalog, Cond, CostBind, QtyBind, SectionDef, ComponentPos, SlotKey, TechTable, Cell } from "@edim/bom-code";
 
 /**
@@ -167,4 +167,24 @@ export async function loadMacroTables(tenantId: string, productCode: string): Pr
   const { catalog } = await loadCatalog(tenantId);
   const p = catalog.productCodes.find((x) => x.code === productCode && x.kind === "product");
   return p ? macroTablesOf(p) : null;
+}
+
+/**
+ * B(ccmd J) · 매크로가 읽는 **도면 치수 어휘** `Var(DIM, …)` — 등록된 치수 표 · 구획에서 그 슬롯 조합의 값(bom-code designFacts).
+ *   L 전장(구획 합) · W · H · SECSUM 구획 길이 합 · SECTIONS · COMPONENTS · LMAX · LMAXPCT
+ * 학습 공식이 π_user 로 이 어휘에 옮겨져 회사 매크로로 돈다. 새 계산이 아니라 BOM Run 이 도면에 쓰는 것과 같은 값이다.
+ * 치수 표가 없는 제품이면 빈 값(그 기호를 읽는 매크로는 '모르는 기호'로 멈춘다 — 추측하지 않는다).
+ */
+export async function loadDesignVars(tenantId: string, slots: Record<string, string | undefined>): Promise<Record<string, number>> {
+  const { catalog } = await loadCatalog(tenantId);
+  const p = catalog.productCodes.find((x) => x.code === (slots.A ?? "") && x.kind === "product");
+  if (!p) return {};
+  const clean: Record<string, string> = {};
+  for (const [k, v] of Object.entries(slots)) if (typeof v === "string") clean[k] = v;
+  const d = dimsFor(p, clean);
+  if (!d.ok) return {};
+  const facts = designFacts(d.dims, sectionDimsFor(p, clean, d.dims.L, null));
+  const out: Record<string, number> = { "DIM|SECSUM": facts.L! };
+  for (const [k, v] of Object.entries(facts)) out[`DIM|${k}`] = v;
+  return out;
 }

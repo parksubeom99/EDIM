@@ -1,0 +1,36 @@
+{
+  "note": "샘플 학습 자료의 정답표 — 보고서에 미리 적어 두고, 학습 작업이 찾아낸 식과 대조한다.",
+  "formulas": [
+    {
+      "target": "overall_length",
+      "expression": "=Var(LRN,section_sum)",
+      "meaning": "전장 = 구획 길이 합"
+    },
+    {
+      "target": "overall_height",
+      "expression": "=Var(LRN,casing_height)+(2*Var(LRN,base_frame))",
+      "meaning": "전고 = 케이싱 높이 + 2 × 프레임"
+    },
+    {
+      "target": "coil.depth",
+      "expression": "=25*Var(LRN,coil_rows)+50",
+      "meaning": "코일 깊이 = 25 × 열수 + 50 (기술문서 CSV)"
+    }
+  ],
+  "noise": [
+    "SAMPLE_ahu_061.dxf",
+    "SAMPLE_ahu_062.dxf",
+    "SAMPLE_ahu_063.dxf"
+  ],
+  "alias": [
+    "SAMPLE_ahu_064.dxf (Overall L)",
+    "SAMPLE_ahu_065.dxf (LENGTH)",
+    "SAMPLE_ahu_066.dxf (전장)",
+    "SAMPLE_ahu_067.dxf (OAL)",
+    "SAMPLE_ahu_068.dxf (LENGTH)"
+  ],
+  "localAi": [
+    "SAMPLE_ahu_017.dxf (BF HT)",
+    "SAMPLE_ahu_043.dxf (BF HT)"
+  ]
+}

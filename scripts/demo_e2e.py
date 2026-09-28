@@ -823,7 +823,9 @@ with sync_playwright() as p:
     plp.goto(BASE+"/platform",wait_until="domcontentloaded"); plp.wait_for_selector("[data-testid=request-queue]",timeout=30000); time.sleep(1.2); nuke(plp)
     body=plp.inner_text("body")
     ok("S16e 플랫폼 콘솔: 테넌트 2곳과 올라온 의뢰가 보인다", (("Acme AHU" in body), ("Globex Air" in body)), "Acme AHU" in body and "Globex Air" in body and subj in body)
-    ok("S16f DB①은 비어 있다 (P3-a는 구조만 — 내용물은 P3-b)", "원천자료 0건" in body, "원천자료 0건" in body)
+    _m16=re.search(r"원천자료 (\d+)건",body)
+    ok("S16f DB① 에는 샘플 학습 자료만 들어 있다(0033 시드 · 회사 자료 0) — 학습 탭으로 간다", (_m16.group(1) if _m16 else None, bool(plp.query_selector("[data-testid=platform-learning-link]"))),
+       bool(_m16) and int(_m16.group(1))>0 and bool(plp.query_selector("[data-testid=platform-learning-link]")))
     ok("S16g 플랫폼 콘솔에 고객사 업무 데이터는 없다 (BOM·프로젝트·코드 0건)", ("Micron" in body, "EU-55" in body), ("Micron" not in body) and ("EU-55" not in body))
     plp.screenshot(path=f"{OUT}/41_platform_console.png",full_page=True)
     # S16h 플랫폼 계정은 회사 업무 화면에 못 들어간다 (반대 방향 차단)
@@ -2020,15 +2022,107 @@ with sync_playwright() as p:
     vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data=LOGIN("viewer@acme.test")); v71=vw.request.get(Q71+"/export?format=xlsx"); vw.close()
     gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data=LOGIN("owner@globex.test")); g71=gb.request.get(Q71+"/export?format=docx"); gb.close()
     ok("S71c 모르는 format 은 400 · viewer 는 내보내기 403 · 다른 회사 문서는 404", (bad71.status, v71.status, g71.status), (bad71.status, v71.status, g71.status)==(400,403,404))
+    # ── S72 B · 학습 AI 1수준 + 이중 프로젝션 (ccmd J) — 플랫폼이 DB① 에만 올리고 · 학습 · 승인 · 한쪽 방향 투영 → 회사가 채택 ──
+    import pathlib as _pl
+    _SD=_pl.Path(__file__).resolve().parent.parent/"packages"/"db"/"prisma"/"learning-samples"
+    ANS=json.loads((_SD/"ANSWERS.json").read_text(encoding="utf-8"))
+    LP=BASE+"/api/platform/learning"
+    lp=b.new_context(viewport={"width":1440,"height":900}); lpp=lp.new_page()
+    lp.request.post(BASE+"/api/auth/login",data=LOGIN("platform@edim.test"))
+    # (a) 새 도면 1장을 DB① 에 올린다 — 이 회사 제품 도면(정면도 DXF)을 동의 받아 받은 것처럼
+    rU=run55("S72"); fdx=ctx.request.get(BASE+f"/api/dxf?runId={rU['runId']}&type=front").body()
+    up=lp.request.post(LP+"/sources",multipart={"file":{"name":"E2E_front_upload.dxf","mimeType":"application/dxf","buffer":fdx},"origin":"tenant-consented"})
+    dup=lp.request.post(LP+"/sources",multipart={"file":{"name":"E2E_front_upload_again.dxf","mimeType":"application/dxf","buffer":fdx}})
+    pdf=lp.request.post(LP+"/sources",multipart={"file":{"name":"spec.pdf","mimeType":"application/pdf","buffer":b"%PDF-1.4"}})
+    lpp.goto(BASE+"/platform/learning",wait_until="domcontentloaded"); lpp.wait_for_selector("[data-testid=learning][data-ready='1']",timeout=60000); nuke(lpp)
+    ai_on=lpp.get_attribute("[data-testid=local-ai]","data-on")=="1"
+    nsrc=len(lpp.query_selector_all("[data-testid=learn-source]")); nsam=len(lpp.query_selector_all("[data-testid=learn-source][data-sample='1']"))
+    with lpp.expect_response(lambda q: q.url.endswith("/api/platform/learning/jobs") and q.request.method=="POST",timeout=300000) as jr:
+        lpp.click("[data-testid=learn-run]")
+    lpp.wait_for_selector("[data-testid=learning][data-job-state=done]",timeout=120000)
+    stp=lpp.eval_on_selector_all("[data-testid=learn-step]","es=>es.map(e=>[e.dataset.tool,e.dataset.state])")
+    nuke(lpp); lpp.screenshot(path=f"{OUT}/81_learning_job.png",full_page=True)
+    ok("S72a 플랫폼이 DB① 에만 올린다(도면 1 · 같은 파일 409 · PDF 400) → 작업 = 계획 4단계(extract→align→mine→verify) 전부 완료 · 원천 = 샘플 69 + 1",
+       (up.status, dup.status, pdf.status, jr.value.status, stp, nsrc, nsam, "로컬 AI 켜짐" if ai_on else "로컬 AI 꺼짐"),
+       up.status==200 and dup.status==409 and pdf.status==400 and jr.value.status==200 and stp==[["extract","done"],["align","done"],["mine","done"],["verify","done"]] and nsrc==70 and nsam==69)
+    # (b) 숨겨 둔 공식이 적합도 합격으로 · 잡음 3장은 어긋남 · 미정렬(로컬 AI 가 켜져 있으면 0, 꺼져 있으면 사전 밖 약어 1종)
+    cards={c["target"]:c for c in lpp.eval_on_selector_all("[data-testid=formula-card]","es=>es.map(e=>({target:e.dataset.target,state:e.dataset.state,expr:e.dataset.expr,n:+e.querySelector('[data-testid=formula-fit]').dataset.n,err:+e.querySelector('[data-testid=formula-fit]').dataset.maxErr,out:[...e.querySelectorAll('[data-testid=formula-outliers]')].map(o=>o.innerText).join(' '),fits:e.querySelector('[data-testid=formula-company]').dataset.fits}))")}
+    want={f["target"]:f["expression"] for f in ANS["formulas"]}
+    found=[(t, cards.get(t,{}).get("expr")==e, cards.get(t,{}).get("state")) for t,e in want.items()]
+    noise_ok=all(nz in cards.get("overall_length",{}).get("out","") for nz in ANS["noise"])
+    una=int(lpp.get_attribute("[data-testid=learn-align]","data-unaligned") or -1); byai=int(lpp.get_attribute("[data-testid=learn-align]","data-by-ai") or 0)
+    nuke(lpp); lpp.locator("[data-testid=formula-card]").first.scroll_into_view_if_needed(); lpp.screenshot(path=f"{OUT}/82_formula_cards.png",full_page=True)
+    ok("S72b 숨겨 둔 공식(전장 = Σ 구획 · 전고 = 케이싱 + 2 × 프레임 · 코일 깊이 = 25 × 열수 + 50)을 다시 찾았다 — 합격 후보 · 잡음 3장은 전장 공식의 어긋남",
+       (found, noise_ok, cards.get("overall_height",{}).get("err")), all(ok_ and st=="proposed" for _,ok_,st in found) and noise_ok and cards.get("overall_height",{}).get("err")==0)
+    ok("S72c 정렬 — 사전으로 맞추고, 사전 밖 약어(BF HT)는 로컬 AI 가 켜져 있으면 허용 목록 안에서 맞추고 아니면 미정렬로 드러난다",
+       (("on" if ai_on else "off"), una, byai), (ai_on and una==0 and byai==2) or ((not ai_on) and una==1 and byai==0))
+    # (c) 승인(라벨) → 회사 A 로 투영 · 미승인은 투영 거절 · B 는 0건
+    fl=lp.request.get(LP).json()["formulas"]; fid={f["target"]:f["id"] for f in fl}
+    notyet=lp.request.post(LP+f"/formulas/{fid['coil.depth']}/project",headers=J0,data=json.dumps({"tenantId":"00000000-0000-4000-8000-00000000000a"}))
+    for t in ("overall_length","overall_height"):
+        with lpp.expect_response(lambda q: "/api/platform/learning/formulas/" in q.url and q.request.method=="POST",timeout=60000):
+            lpp.locator(f"[data-testid=formula-card][data-target='{t}'] [data-testid=formula-approve]").click()
+        lpp.wait_for_selector(f"[data-testid=formula-card][data-target='{t}'][data-state=approved]",timeout=30000)
+    card=lpp.locator("[data-testid=formula-card][data-target='overall_length']")
+    card.locator("[data-testid=formula-tenant]").select_option(label="Acme AHU")
+    with lpp.expect_response(lambda q: q.url.endswith("/project") and q.request.method=="POST",timeout=60000) as pr:
+        card.locator("[data-testid=formula-project]").click()
+    lpp.wait_for_selector("[data-testid=projection-row]",timeout=30000)
+    sA=ctx.request.get(BASE+"/api/learning/suggestions").json()["rows"]
+    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data=LOGIN("owner@globex.test")); sB=gb.request.get(BASE+"/api/learning/suggestions").json()["rows"]; gb.close()
+    ok("S72d 승인한 공식만 π_user 로 회사 A 에 한쪽 방향 투영 — A 제안 1건(회사 형식 · 원천 흔적 없음) · B 0건 · 미승인 공식 투영은 409",
+       (notyet.status, pr.value.status, [(x["target"],x["expression"],x["fitsCompany"]) for x in sA], len(sB), [k for k in (sA[0] if sA else {}) if "source" in k.lower()]),
+       notyet.status==409 and pr.value.status==200 and len(sA)==1 and sA[0]["expression"]=="=Var(DIM,SECSUM)" and sA[0]["fitsCompany"] and len(sB)==0 and not [k for k in sA[0] if "source" in k.lower()])
+    sim=float(lpp.get_attribute("[data-testid=similarity]","data-ratio")); apis=lp.request.get(LP).json()["similarity"]
+    nuke(lpp); lpp.locator("[data-testid=similarity]").scroll_into_view_if_needed(); lpp.screenshot(path=f"{OUT}/83_projection.png",full_page=True)
+    ok("S72e 구조 유사도 계기판 = 투영본 중 DB② 형식에 맞는 비율 — 1/1 = 1.00(목표 0.90) · 전고 공식은 회사 어휘에 없는 이름(케이싱 · 프레임)이라 '옮길 수 없음'",
+       (sim, apis["matched"], apis["total"], cards.get("overall_height",{}).get("fits")), sim==1.0 and apis["ratio"]==1.0 and (apis["matched"],apis["total"])==(1,1) and cards.get("overall_height",{}).get("fits")=="0")
+    # (d) 회사 A 가 채택 → 기존 흐름(Save draft = 검증 → 승인) → 그 매크로로 Run
+    AHU="a0000000-0000-4000-8000-000000000002"
+    pg.goto(BASE+f"/workbench?node={AHU}",wait_until="domcontentloaded"); hydrated(pg); nuke(pg)
+    if pg.get_attribute("[data-testid=toolbox-toggle]","aria-pressed")!="true":
+        pg.click("[data-testid=toolbox-toggle]")
+    pg.wait_for_selector("[data-testid=toolbox-window]",timeout=30000)
+    if pg.query_selector("[data-toolbox-tab=program]"): pg.click("[data-toolbox-tab=program]")
+    pg.wait_for_selector("[data-testid=tb-suggestions][data-ready='1'] [data-testid=tb-sug-adopt]",timeout=60000)
+    pg.click("[data-testid=tb-sug-adopt]"); pg.wait_for_function("()=>(document.querySelector('[data-testid=tb-dsl]')?.value||'')==='=Var(DIM,SECSUM)'",timeout=30000)
+    with pg.expect_response(lambda q: q.url.endswith("/api/macros") and q.request.method=="POST",timeout=60000):
+        pg.click("[data-testid=tb-draft]")
+    wait_text(pg,"[data-testid=tb-msg]","채택",60000)
+    pg.click("[data-testid=tb-approve]"); wait_text(pg,"[data-testid=tb-msg]","승인 완료",60000)
+    sA2=ctx.request.get(BASE+"/api/learning/suggestions").json()["rows"]
+    er=ctx.request.post(BASE+"/api/run/edim",headers=J0,data=json.dumps({"node":AHU,"slots":S55_0})).json()
+    rL=run55("S72L"); lenmm=ctx.request.get(BASE+f"/api/dxf?runId={rL['runId']}&type=plan&meta=1").json().get("lengthMm")
+    pg.click("[data-testid=tb-run]"); pg.wait_for_function("()=>/^[0-9.]+$/.test((document.querySelector('[data-testid=tb-value]')?.innerText||'').trim())",timeout=60000)
+    tbv=pg.inner_text("[data-testid=tb-value]")
+    nuke(pg); pg.screenshot(path=f"{OUT}/84_toolbox_suggestion.png",full_page=True)
+    ok("S72f 회사 A 가 Toolbox '학습 제안'에서 채택 → Save draft(검증) → 승인(회사 2단 승인) → 그 매크로로 Run — 값 = 그 제품 도면의 전장(구획 합)",
+       (sA2[0]["state"] if sA2 else None, bool(sA2 and sA2[0]["adoptedMacroId"]), er.get("dsl"), er.get("value"), lenmm, tbv),
+       bool(sA2) and sA2[0]["state"]=="adopted" and bool(sA2[0]["adoptedMacroId"]) and er.get("dsl")=="=Var(DIM,SECSUM)" and er.get("value")==lenmm and float(tbv)>0)
+    # (e) 운영 감시 — 승인 공식에 어긋나는 새 도면을 올리면 계기판에 1건
+    drift=(_SD/"SAMPLE_ahu_001.dxf").read_text(encoding="utf-8")
+    _mL=re.search(r"\nL=(\d+)\n",drift); drift=drift.replace(f"\nL={_mL.group(1)}\n",f"\nL={int(_mL.group(1))+7}\n")
+    upd=lp.request.post(LP+"/sources",multipart={"file":{"name":"E2E_drift_site_revision.dxf","mimeType":"application/dxf","buffer":drift.encode("utf-8")}}).json()
+    lpp.reload(wait_until="domcontentloaded"); lpp.wait_for_selector("[data-testid=learning][data-ready='1']",timeout=60000)
+    ok("S72g 운영 감시 — 승인 공식(전장 = Σ 구획)에 7 mm 어긋난 새 도면을 올리면 계기판에 어긋남 1건(자동 조치 없음)",
+       (upd.get("monitor",{}).get("mismatched"), lpp.get_attribute("[data-testid=monitor]","data-drift")), upd.get("monitor",{}).get("mismatched")==1 and lpp.get_attribute("[data-testid=monitor]","data-drift")=="1")
+    # (f) 역류 0 — 회사 계정은 DB① API 403 · 플랫폼 계정은 회사 API 에 못 들어간다 · viewer 는 숨기기 403 · 다른 회사 제안 404
+    c1=ctx.request.get(LP); c2=ctx.request.post(LP+"/jobs",headers=J0,data="{}"); c3=ctx.request.post(LP+"/sources",multipart={"file":{"name":"x.dxf","mimeType":"application/dxf","buffer":b"0\nEOF\n"}})
+    p1=lp.request.get(BASE+"/api/learning/suggestions"); p2=lp.request.get(BASE+"/api/setup/catalog")
+    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data=LOGIN("viewer@acme.test")); v1=vw.request.post(BASE+f"/api/learning/suggestions/{sA[0]['id']}",headers=J0,data=json.dumps({"action":"dismiss"})); vw.close()
+    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data=LOGIN("owner@globex.test")); g1=gb.request.post(BASE+f"/api/learning/suggestions/{sA[0]['id']}",headers=J0,data=json.dumps({"action":"dismiss"})); gb.close()
+    lp.close()
+    ok("S72h 역류 0 — 회사 계정은 학습 API 403(읽기 · 작업 · 올리기) · 플랫폼 계정은 회사 API 에 못 들어간다 · viewer 숨기기 403 · 다른 회사 제안 404",
+       (c1.status,c2.status,c3.status,p1.status,p2.status,v1.status,g1.status), (c1.status,c2.status,c3.status)==(403,403,403) and p1.status in (401,403) and p2.status in (401,403) and v1.status==403 and g1.status==404)
     # S37 은 맨 끝에서 센다 — 중간(옛 자리)에서는 뒤에 찍히는 5장(40·41·42·52·53)이 아직 없어,
     # 빈 폴더에서는 25장이라 실패하고 이전 실행 잔재가 있을 때만 통과했다(2026-09-24 실측).
     _want=["00_login","05_project_mgmt","06_module_cpq_stub","10_project_bound","11_code_builder","11b_revisions","12_macro_tab",
            "13_macro_approved","14_edim_run","15_bom_cost","16_design_tab","20_setup_subcode","21_setup_product_table",
            "22_setup_relationship","23_codebuilder_from_subcode","30_toolbox_program","31_toolbox_ui_tool","40_company_admin",
            "41_platform_console","42_user_management","43_drawings","44_document_tab","45_purchasing","46_quotation_print",
-           "47_techdata_print","48_dxf_plan","49_dxf_assembly","51_accepted","52_register","53_schedule","54_toolbar","55_project_mgmt","56_print_setup","57_ui_design","58_material","59_arrangement_code","60_spec_input","61_drawing_purpose","62_company_db","63_input_data","64_viewer3d","65_price_to_cost","66_project_contacts","67_partner_edit","68_spec_import","69_code_approval","70_dwg_view","71_techdata_list","72_mfg_rate","73_erp_master","74_sub_drawing","75_output_template","76_coding_list","77_wizards","78_print_layout","79_draw_module","80_macro_verify"]
+           "47_techdata_print","48_dxf_plan","49_dxf_assembly","51_accepted","52_register","53_schedule","54_toolbar","55_project_mgmt","56_print_setup","57_ui_design","58_material","59_arrangement_code","60_spec_input","61_drawing_purpose","62_company_db","63_input_data","64_viewer3d","65_price_to_cost","66_project_contacts","67_partner_edit","68_spec_import","69_code_approval","70_dwg_view","71_techdata_list","72_mfg_rate","73_erp_master","74_sub_drawing","75_output_template","76_coding_list","77_wizards","78_print_layout","79_draw_module","80_macro_verify","81_learning_job","82_formula_cards","83_projection","84_toolbox_suggestion"]
     _miss=[w for w in _want if not os.path.exists(f"{OUT}/{w}.png") or os.path.getmtime(f"{OUT}/{w}.png")<T0]
-    ok("S37 캡처 57장이 이번 실행에서 전부 나온다 (잔재 파일은 세지 않음)", _miss or len(_want), not _miss)
+    ok("S37 캡처 61장이 이번 실행에서 전부 나온다 (잔재 파일은 세지 않음)", _miss or len(_want), not _miss)
     b.close()
 n=sum(1 for v in R.values() if v[0]); print(f"\n[demo_e2e] {n}/{len(R)} steps passed"); json.dump(R,open(f"{OUT}/demo_e2e_result.json","w",encoding="utf-8"),ensure_ascii=False,indent=1)
 sys.exit(0 if n==len(R) else 1)

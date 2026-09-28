@@ -160,6 +160,8 @@ function UiTool({ commands, onCommands, onRun, busyKind, runDisabled, canEdit }:
   );
 }
 
+interface Suggestion { id: string; target: string | null; expression: string | null; learnedTarget: string; learnedExpression: string; fit: { n: number; maxAbsErr: number }; description: string; plain: string; state: string; adoptedMacroId: string | null; fitsCompany: boolean; why: string | null }
+
 /* ───────────── Program Tool — p27 Prompt · Macro · Flowchart · Description ───────────── */
 function ProgramTool({ nodeStable, canEdit, canDecide, onRun, runs, busyKind, runDisabled }: { nodeStable: string | null; canEdit: boolean; canDecide: boolean; onRun: (k: string) => void; runs: RunResult[]; busyKind: string | null; runDisabled: boolean }) {
   const [prompt, setPrompt] = useState("");
@@ -171,6 +173,11 @@ function ProgramTool({ nodeStable, canEdit, canDecide, onRun, runs, busyKind, ru
   const [draftId, setDraftId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const lastRun = runs.find((r) => r.kind === "edim");
+  // B(ccmd J) · 학습 제안 — 플랫폼이 승인해 투영한 공식. [채택] = 식을 편집기에 올린다 → 기존 Save draft(검증) → 승인(회사 2단 승인)
+  const [sugs, setSugs] = useState<Suggestion[] | null>(null);
+  const [adopting, setAdopting] = useState<string | null>(null);
+  const loadSugs = async () => { const r = await fetch("/api/learning/suggestions"); setSugs(r.ok ? (((await r.json()) as { rows: Suggestion[] }).rows) : []); };
+  useEffect(() => { void loadSugs(); }, []);
 
   useEffect(() => { // live 역번역 (debounced) — every keystroke re-describes; no LLM involved
     const t = setTimeout(async () => {
@@ -195,7 +202,13 @@ function ProgramTool({ nodeStable, canEdit, canDecide, onRun, runs, busyKind, ru
     const j = (await r.json()) as { macroId: string | null; diagnostics: Diag[]; error?: string };
     setBusy(false); setDiags(j.diagnostics ?? []);
     if (j.error) setMsg(j.error);
-    else if (mode === "draft") { setDraftId(j.macroId); setMsg(j.macroId ? `초안 저장됨 (${j.macroId.slice(0, 8)})` : "오류가 있어 초안 저장 안 됨"); }
+    else if (mode === "draft") {
+      setDraftId(j.macroId); setMsg(j.macroId ? `초안 저장됨 (${j.macroId.slice(0, 8)})` : "오류가 있어 초안 저장 안 됨");
+      if (j.macroId && adopting) {   // 채택 중인 학습 제안이면 이 초안을 가리키게 한다
+        const a = await fetch(`/api/learning/suggestions/${adopting}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "adopt", macroId: j.macroId }) });
+        if (a.ok) { setMsg(`초안 저장됨 (${j.macroId.slice(0, 8)}) · 학습 제안 채택 — 승인하면 Run`); setAdopting(null); void loadSugs(); }
+      }
+    }
     else setMsg((j.diagnostics ?? []).some((d) => d.severity === "error") ? "검증 실패" : "검증 통과");
   }
   async function approve() {
@@ -231,6 +244,25 @@ function ProgramTool({ nodeStable, canEdit, canDecide, onRun, runs, busyKind, ru
           {!nodeStable && <span style={muted}>프로젝트 노드를 선택하면 매크로가 그 노드에 묶입니다.</span>}
           {msg && <span data-testid="tb-msg" style={muted}>{msg}</span>}
           {diags && diags.length > 0 && <ul style={{ margin: 0, paddingLeft: 18, fontSize: "var(--fs-12)" }}>{diags.map((d, i) => <li key={i} style={{ color: d.severity === "error" ? "var(--warn)" : "var(--ink-muted)" }}>[{d.severity}] {d.message}</li>)}</ul>}
+        </div>
+      </div>
+
+      <div style={pane} data-testid="tb-suggestions" data-ready={sugs ? "1" : "0"}>
+        <div style={paneHead}>학습 제안<span style={muted}>플랫폼 학습 AI 가 찾고 플랫폼이 승인한 공식 · 채택하면 회사 매크로 승인을 한 번 더</span></div>
+        <div style={{ padding: 8, display: "grid", gap: 6 }}>
+          {sugs && sugs.filter((x) => x.state !== "dismissed").length === 0 && <span style={muted}>아직 없음</span>}
+          {(sugs ?? []).filter((x) => x.state !== "dismissed").map((x) => (
+            <div key={x.id} data-testid="tb-suggestion" data-state={x.state} data-fits={x.fitsCompany ? "1" : "0"} style={{ border: "1px solid var(--line)", borderRadius: 4, padding: 6 }}>
+              <div style={{ ...mono, fontSize: "var(--fs-12)" }}>{x.target ?? x.learnedTarget} {x.expression ?? x.learnedExpression}</div>
+              <div style={muted}>{x.plain || x.description} · 근거 {x.fit.n}건 · 최대 오차 {x.fit.maxAbsErr} mm</div>
+              {!x.fitsCompany && <div style={{ ...muted, color: "var(--warn)" }}>이 회사 형식에 맞지 않음 — {x.why}</div>}
+              <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
+                {x.state === "offered" && canEdit && x.fitsCompany && <button type="button" data-testid="tb-sug-adopt" onClick={() => { setDsl(x.expression!); setAdopting(x.id); setMsg("제안 식을 편집기에 올렸습니다 — Save draft(검증) → 승인"); }} style={btn(true, false)}>채택</button>}
+                {x.state === "offered" && canEdit && <button type="button" data-testid="tb-sug-dismiss" onClick={async () => { await fetch(`/api/learning/suggestions/${x.id}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "dismiss" }) }); void loadSugs(); }} style={btn(false, false)}>숨기기</button>}
+                {x.state === "adopted" && <span style={muted}>채택됨 · 매크로 {x.adoptedMacroId?.slice(0, 8)}</span>}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 

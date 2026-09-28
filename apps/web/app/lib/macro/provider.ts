@@ -41,10 +41,11 @@ export function codesFromSlots(slots: SlotValues): Record<string, number> {
 }
 
 /** `tables` = the tenant's registered tables (Set-Up ▸ Product Code ▸ Table); samples only when none are registered. */
-export function providerFromSlots(slots: SlotValues, tables?: Record<string, Record<number, number>> | null): DataProvider {
+export function providerFromSlots(slots: SlotValues, tables?: Record<string, Record<number, number>> | null, designVars?: Record<string, number>): DataProvider {
   return new InMemoryProvider({
     tables: tables ?? (SAMPLE_TABLES as unknown as Record<string, Record<number, number>>),
-    vars: SAMPLE_VARS as unknown as Record<string, number>,
+    // B(ccmd J): 도면 치수 어휘 Var(DIM, …) — catalog.loadDesignVars 가 등록 표에서 낸 값(없으면 없음)
+    vars: { ...(SAMPLE_VARS as unknown as Record<string, number>), ...(designVars ?? {}) },
     codes: codesFromSlots(slots),
   });
 }

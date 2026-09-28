@@ -75,7 +75,9 @@ async function main(): Promise<void> {
   const admin = await findPlatformAdmin(IDS.platformAdmin);
   check("플랫폼 관리자 등록이 조회된다", admin !== null);
   const status = await platformDbStatus();
-  check("DB① 은 비어 있다(P3-a 범위)", status.learningSources === 0, String(status.learningSources));
+  // 0033(ccmd J) 부터 DB① 에 **샘플** 학습 자료가 시드로 들어간다 — 회사에서 온 자료(비샘플)는 없어야 한다.
+  const nonSample = await platformDb.$queryRaw<{ n: bigint }[]>`SELECT count(*) AS n FROM platform.learning_source WHERE NOT is_sample`;
+  check("DB① 원천자료는 샘플뿐이다(회사 자료 0 · 0033 시드)", Number(nonSample[0]?.n ?? -1) === 0 && status.learningSources >= 0, `${status.learningSources} / 비샘플 ${nonSample[0]?.n}`);
 
   // --- 4) 요청 통로 ----------------------------------------------------------
   const reqA = await withTenant(IDS.tenantA, (tx) =>
