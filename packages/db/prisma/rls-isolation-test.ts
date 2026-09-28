@@ -42,8 +42,8 @@ async function main() {
     const foreign = all.filter((n) => n.tenantId !== IDS.tenantA);
     check(
       "A context returns only A rows",
-      // seed now has 4 tenant-A nodes (a_proj was added with the project step); the literal 3 was stale
-      all.length === 4 && foreign.length === 0,
+      // seed has 5 tenant-A nodes: a_proj (project step) + a_vmacro (E6 · p39 verification macro V_SECTION_RATIO)
+      all.length === 5 && foreign.length === 0,
       `count=${all.length}, foreign=${foreign.length}`,
     );
 

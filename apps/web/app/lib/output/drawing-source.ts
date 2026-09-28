@@ -57,6 +57,7 @@ export async function dxfSourceFromRun(tenantId: string, runId: string): Promise
   if (Array.isArray(vio) && vio.length > 0) {
     const why = vio.map((v) => {
       const o2 = v as Record<string, unknown>;
+      if (o2.op === "macro") return `${String(o2.name)}(매크로 ${String(o2.limit)} → ${String(o2.actual)})`;
       return `${String(o2.name)}(${String(o2.target)} ${String(o2.op)} ${String(o2.limit)} · 지금 ${String(o2.actual)})`;
     }).join(", ");
     return { ok: false, status: 422, error: `설계 검증 위반이라 도면을 뜰 수 없습니다: ${why} — 치수·구획을 고치고 BOM Run 을 다시 하십시오` };

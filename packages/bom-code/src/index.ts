@@ -249,10 +249,15 @@ export function buyItemOf(code: ProductCode, slots: SlotValues = {}): string | n
  * role="rule" 표의 한 행 = 규칙 하나. 열 이름으로 읽는다 — target · op · value (· name 은 선택).
  *   target: L(전장=구획 길이 합) · W · H · SECTIONS(구획 수) · COMPONENTS(배치된 부품 수)
  *   op: max(이하) · min(이상)
+ *   op: macro(p39 "설계 검증 [Macro]") — value = **승인된 매크로 이름**, target 은 비워도 된다.
+ *       그 매크로를 스냅샷 값으로 결정론 실행해 1 이면 통과 · 0 이면 위반(문구 = 규칙 name).
+ *       매크로 실행은 이 패키지 밖(주입된 evalMacro)이 한다 — 이 엔진은 순수 함수로 남는다.
  * 규칙이 없으면 검사도 없다 — 없는 규칙을 지어내지 않는다.
  */
-export interface DesignRule { name: string; target: string; op: "max" | "min"; value: number }
-export interface RuleViolation { name: string; target: string; op: "max" | "min"; limit: number; actual: number }
+export type DesignRule =
+  | { name: string; target: string; op: "max" | "min"; value: number }
+  | { name: string; target: "MACRO"; op: "macro"; macro: string };
+export interface RuleViolation { name: string; target: string; op: "max" | "min" | "macro"; limit: number | string; actual: number | string }
 
 const RULE_TARGETS = ["L", "W", "H", "SECTIONS", "COMPONENTS"] as const;
 
@@ -266,6 +271,12 @@ export function designRulesOf(product: ProductCode): DesignRule[] {
   for (const r of t.rows) {
     const target = String(r.cells[kT] ?? "").toUpperCase();
     const op = String(r.cells[kO] ?? "").toLowerCase();
+    if (op === "macro") {
+      const macro = String(r.cells[kV] ?? "").trim();
+      if (!macro) continue;
+      out.push({ name: String(r.cells[kN ?? ""] ?? r.item ?? macro), target: "MACRO", op: "macro", macro });
+      continue;
+    }
     const value = Number(r.cells[kV]);
     if (!(RULE_TARGETS as readonly string[]).includes(target)) continue;
     if (op !== "max" && op !== "min") continue;
@@ -275,22 +286,48 @@ export function designRulesOf(product: ProductCode): DesignRule[] {
   return out;
 }
 
-/** 규칙을 지금 치수·구획에 대 본다. 통과면 빈 배열. */
+/** 검증 매크로가 읽는 스냅샷 값(코드 기호). 새 계산이 아니라 이미 뜬 치수·구획을 세고 나눈 것뿐이다. */
+export function designFacts(dims: { W: number; H: number; L: number }, secDims: SectionDim[]): Record<string, number> {
+  const totalL = secDims.length > 0 ? secDims.reduce((a, s) => a + s.len, 0) : dims.L;
+  const lmax = secDims.reduce((a, s) => Math.max(a, s.len), 0);
+  return {
+    L: totalL,
+    W: dims.W,
+    H: dims.H,
+    SECTIONS: secDims.length,
+    COMPONENTS: secDims.reduce((a, s) => a + (s.components?.length ?? 0), 0),
+    LMAX: lmax,
+    LMAXPCT: totalL > 0 ? Math.round((lmax / totalL) * 100) : 0,
+  };
+}
+
+/** 매크로 규칙 실행기(주입). 승인 안 됨 · 없음 · 실행 오류는 통과로 치지 않는다. */
+export type MacroRuleOutcome =
+  | { ok: true; value: number }
+  | { ok: false; reason: "missing" | "unapproved" | "error"; message?: string };
+export type MacroRuleEval = (macro: string, facts: Record<string, number>) => MacroRuleOutcome;
+
+const MACRO_FAIL: Record<"missing" | "unapproved" | "error", string> = { missing: "검증 매크로 없음", unapproved: "검증 매크로 미승인", error: "검증 매크로 오류" };
+
+/** 규칙을 지금 치수·구획에 대 본다. 통과면 빈 배열. evalMacro 가 없으면 매크로 규칙은 "없음" 위반이다(조용히 통과시키지 않는다). */
 export function checkDesign(
   rules: DesignRule[],
   dims: { W: number; H: number; L: number },
   secDims: SectionDim[],
+  evalMacro?: MacroRuleEval,
 ): RuleViolation[] {
-  const totalL = secDims.length > 0 ? secDims.reduce((a, s) => a + s.len, 0) : dims.L;
-  const actualOf = (target: string): number =>
-    target === "L" ? totalL
-    : target === "W" ? dims.W
-    : target === "H" ? dims.H
-    : target === "SECTIONS" ? secDims.length
-    : secDims.reduce((a, s) => a + (s.components?.length ?? 0), 0);
+  const facts = designFacts(dims, secDims);
   const out: RuleViolation[] = [];
   for (const r of rules) {
-    const actual = actualOf(r.target);
+    if (r.op === "macro") {
+      const res: MacroRuleOutcome = evalMacro ? evalMacro(r.macro, facts) : { ok: false, reason: "missing" };
+      if (!res.ok) out.push({ name: `${MACRO_FAIL[res.reason]}: ${r.macro}`, target: "MACRO", op: "macro", limit: r.macro, actual: res.message ?? "—" });
+      else if (res.value === 1) continue;
+      else if (res.value === 0) out.push({ name: r.name, target: "MACRO", op: "macro", limit: r.macro, actual: 0 });
+      else out.push({ name: `${MACRO_FAIL.error}: ${r.macro}`, target: "MACRO", op: "macro", limit: r.macro, actual: `결과 ${res.value} — 1(통과)·0(위반)이 아님` });
+      continue;
+    }
+    const actual = facts[r.target] ?? 0;
     const bad = r.op === "max" ? actual > r.value : actual < r.value;
     if (bad) out.push({ name: r.name, target: r.target, op: r.op, limit: r.value, actual });
   }

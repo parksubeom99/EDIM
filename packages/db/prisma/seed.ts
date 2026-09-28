@@ -27,6 +27,8 @@ export const IDS = {
   a_mod: "a0000000-0000-4000-8000-000000000002",
   a_item: "a0000000-0000-4000-8000-000000000003",
   a_proj: "a0000000-0000-4000-8000-000000000004",
+  // E6 · p39 설계 검증 매크로가 걸리는 노드 — 매크로 이름 = 노드 이름(V_SECTION_RATIO)
+  a_vmacro: "a0000000-0000-4000-8000-000000000005",
   // project detail (tenant A)
   projectA: "c0000000-0000-4000-8000-000000000001",
   // hierarchy (tenant B)
@@ -124,6 +126,15 @@ export async function seedAll(): Promise<void> {
       kind: "project",
       label: "PS-61313-5 Micron",
       position: 1,
+      createdBy: IDS.ownerA,
+    },
+    {
+      stableId: IDS.a_vmacro,
+      tenantId: IDS.tenantA,
+      parentStable: IDS.a_root,
+      kind: "item",
+      label: "V_SECTION_RATIO",
+      position: 2,
       createdBy: IDS.ownerA,
     },
     // tenant B: 3-level tree

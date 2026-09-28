@@ -24,7 +24,7 @@ export interface RunResult {
     W: number; H: number; L: number; item: string; sections: number;
     /** p36 Design Verification — 등록된 규칙 수와 위반 목록(스냅샷에 박힌 판정) */
     rules?: number;
-    violations?: { name: string; target: string; op: string; limit: number; actual: number }[];
+    violations?: { name: string; target: string; op: string; limit: number | string; actual: number | string }[];
   } | null;
 }
 

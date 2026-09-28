@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getServerSession } from "@/app/lib/session";
 import { canEditProject } from "@/app/lib/project-perms";
 import { runApprovedForSession } from "@/app/lib/macro/run";
+import { ruleMacroEvaluator } from "@/app/lib/macro/rule-macros";
 import type { SlotValues } from "@/app/lib/rccs";
 import { buildEbom, buildCost } from "@/app/lib/output/bom";
 import { runBomCode, toBomLine, catalogFingerprint, dimsFor, sectionDimsFor, designRulesOf, checkDesign, buyItemOf } from "@edim/bom-code";
@@ -127,7 +128,8 @@ export async function POST(
     // 설계 검증(p36 Design Verification) — 규칙은 등록된 role="rule" 표에서 오고, 결과를 **스냅샷에 박는다**.
     // 지금 규칙을 나중에 고쳐도 이미 뜬 스냅샷의 판정은 그대로다(0011 과 같은 원칙).
     const rules = productForDims ? designRulesOf(productForDims) : [];
-    const violations = drSnap && drSnap.ok ? checkDesign(rules, drSnap.dims, secDims) : [];
+    // E6 · p39 — op=macro 규칙은 승인된 매크로를 스냅샷 값으로 돌려 판정한다(판정도 스냅샷에 박혀, 매크로를 나중에 고쳐도 불변).
+    const violations = drSnap && drSnap.ok ? checkDesign(rules, drSnap.dims, secDims, await ruleMacroEvaluator(session.tenantId, rules)) : [];
     const dimsSnap = drSnap && drSnap.ok
       ? { ...drSnap.dims, item: drSnap.item, tableName: drSnap.tableName, sections: secDims, rules: rules.length, violations }
       : null;

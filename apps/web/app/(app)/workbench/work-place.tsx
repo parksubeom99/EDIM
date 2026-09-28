@@ -863,12 +863,12 @@ function DrawingRegister({ runId, nodeStable, canEdit, verify }: { runId: string
           if (!d || !d.rules) return null;
           const v = d.violations ?? [];
           return (
-            <span data-testid="design-verify" data-ok={v.length === 0}
+            <span data-testid="design-verify" data-ok={v.length === 0} data-macro-fail={v.some((x) => x.op === "macro") ? "1" : undefined}
               style={{ fontSize: "var(--fs-12)", padding: "5px 10px", borderRadius: "var(--radius-sm)", border: "1px solid var(--line)",
                 background: v.length === 0 ? "var(--surface-2)" : "#fdecec", color: v.length === 0 ? "var(--ink-muted)" : "#b4232a" }}>
               {v.length === 0
                 ? `설계 검증 통과 · 규칙 ${d.rules}`
-                : `설계 검증 위반 ${v.length} — ${v.map((x) => `${x.name}(${x.target} ${x.op} ${x.limit} · 지금 ${x.actual})`).join(", ")} · 도면은 뜨지 않습니다`}
+                : `설계 검증 위반 ${v.length} — ${v.map((x) => x.op === "macro" ? `${x.name}(매크로 ${x.limit} → ${x.actual})` : `${x.name}(${x.target} ${x.op} ${x.limit} · 지금 ${x.actual})`).join(", ")} · 도면은 뜨지 않습니다`}
             </span>
           );
         })()}

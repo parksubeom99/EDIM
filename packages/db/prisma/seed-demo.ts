@@ -22,6 +22,12 @@ import { seedCatalog } from "./seed-catalog";
 export const DEMO_DSL =
   "=IF(CAP,CAP>25, SUM(Table1(A,4:4))*Var(NS,15)*Var(NS,20), SUM(Table1(A,1:1))*Var(NS,20))";
 
+/**
+ * E6 · p39 "설계 검증 [Macro]" 샘플 — 규칙 표(ahu-demo.json rule R4)의 op=macro 가 이 이름을 부른다.
+ * 스냅샷 기호: LMAXPCT = 가장 긴 구획 ÷ 전장 × 100 · SECTIONS = 구획 수. 1 = 통과 · 0 = 위반.
+ */
+export const VERIFY_MACRO_DSL = "=AND(LMAXPCT<=50, SECTIONS>=2)";
+
 /** 0021 · Company DB 데모 — 고객 1 · 공급처 1. 데모 프로젝트의 client_name("Micron")은 연결하지 않고 둔다(옛 데이터 보존을 보이려고). */
 export const DEMO_PARTNERS = [
   { kind: "customer", code: "C-MICRON", name: "Micron", contact: "FAB 설비팀", nation: "KR" },
@@ -70,6 +76,13 @@ export async function seedDemo(opts: { forceCatalog?: boolean } = {}): Promise<v
     await approve(tx, { id, approvedBy: IDS.ownerA, verified: true });
     const after = await getApproved(tx, IDS.a_proj);
     console.log(`Demo seed: approved macro r${after?.revision} on ${IDS.a_proj} (PS-61313-5).`);
+  });
+  await withTenant(IDS.tenantA, async (tx) => {
+    const current = await getApproved(tx, IDS.a_vmacro);
+    if (current && current.dsl === VERIFY_MACRO_DSL) return;
+    const id = await createDraft(tx, { stableId: IDS.a_vmacro, dsl: VERIFY_MACRO_DSL, createdBy: IDS.ownerA });
+    await approve(tx, { id, approvedBy: IDS.ownerA, verified: true });
+    console.log(`Demo seed: approved verification macro V_SECTION_RATIO (p39 · sample).`);
   });
 }
 
