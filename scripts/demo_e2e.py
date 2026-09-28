@@ -1961,6 +1961,41 @@ with sync_playwright() as p:
     rR=run55("S70R")
     ok("S70d 되돌리면 새 Run 은 다시 통과 · 앞 두 스냅샷의 판정은 그대로(통과 200 · 위반 422 — 판정도 스냅샷)",
        (rR.get("dims",{}).get("violations"), dP2.status, dB2.status), rR.get("dims",{}).get("violations")==[] and dP2.status==200 and dB2.status==422)
+    # ── S71 E7 · p48 인쇄본 Office 내보내기 — 같은 스냅샷 body 를 .docx · .xlsx 로 (숫자는 값 · 합계는 엑셀이 다시 낼 수 있게) ──
+    import docx as _docx, openpyxl as _xl, io as _io
+    from urllib.parse import unquote as _unq
+    r71=run55("S71"); q71=ctx.request.post(DOCS,headers=J0,data=json.dumps({"runId":r71["runId"],"type":"quotation"})).json()
+    Q71=DOCS+f"/{q71.get('id')}"
+    h71=ctx.request.get(Q71+"/print").text()
+    no71=re.search(r"<title>(\S+) Rev",h71).group(1)
+    tot71=int(re.search(r'data-testid="quote-total">([^<]+)<',h71).group(1).replace(",",""))
+    at71=re.search(r'data-testid="applied-table">(.*?)</table>',h71,re.S)
+    n71=len(re.findall(r"<tr>",at71.group(1)))-2 if at71 else -1   # 머리 줄 · 합계 줄 제외
+    btn71=('data-testid="export-docx"' in h71, 'data-testid="export-xlsx"' in h71)
+    xd=ctx.request.get(Q71+"/export?format=docx"); xx=ctx.request.get(Q71+"/export?format=xlsx")
+    cd71=xd.headers.get("content-disposition","")
+    open(f"{OUT}/office_{no71}.docx","wb").write(xd.body()); open(f"{OUT}/office_{no71}.xlsx","wb").write(xx.body())
+    D=_docx.Document(_io.BytesIO(xd.body()))
+    dtxt="\n".join(p.text for p in D.paragraphs)+"\n"+"\n".join(c.text for t in D.tables for r in t.rows for c in r.cells)
+    dit=[t for t in D.tables if t.rows and t.rows[0].cells[1].text=="Code No."]
+    dn=len(dit[0].rows)-2 if dit else -1
+    ok("S71a 인쇄본 상단 Word · Excel → .docx 가 열리고(python-docx) 문서 번호 · 견적 합계 · 품목 수가 인쇄본 HTML 과 같다 (한글 파일명 filename*=UTF-8)",
+       (xd.status, btn71, no71 in dtxt, format(tot71,",") in dtxt, dn, n71, _unq(cd71.split("UTF-8''")[-1]) if "UTF-8''" in cd71 else cd71),
+       xd.status==200 and all(btn71) and no71 in dtxt and format(tot71,",") in dtxt and dn==n71 and n71>0 and "UTF-8''" in cd71 and "견적서" in _unq(cd71))
+    W=_xl.load_workbook(_io.BytesIO(xx.body()))
+    ws=W["문서"]; vals=[c.value for r in ws.iter_rows() for c in r]
+    it=W["품목"]; irows=[r for r in it.iter_rows(min_row=2,values_only=True) if r[0]!="합계"]
+    amt_col=[c.value for c in it[1]].index(next(h for h in [c.value for c in it[1]] if str(h).startswith("금액")))
+    sumrow=[r for r in it.iter_rows(min_row=2) if r[0].value=="합계"]
+    qtot=[r for r in ws.iter_rows(values_only=True) if r and r[0]=="합계" and isinstance(r[4] if len(r)>4 else None,(int,float))]
+    ok("S71b .xlsx 가 열리고(openpyxl) 문서 번호 · 견적 합계(숫자 값) · 품목 수가 같다 — 품목 금액은 숫자라 합계 줄이 SUM 식",
+       (xx.status, no71 in vals, qtot[0][4] if qtot else None, len(irows), sumrow[0][amt_col].value if sumrow else None),
+       xx.status==200 and no71 in vals and bool(qtot) and qtot[0][4]==tot71 and len(irows)==n71 and all(isinstance(r[amt_col],(int,float)) for r in irows)
+       and bool(sumrow) and str(sumrow[0][amt_col].value).startswith("=SUM("))
+    bad71=ctx.request.get(Q71+"/export?format=pdf")
+    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data={"email":"viewer@acme.test"}); v71=vw.request.get(Q71+"/export?format=xlsx"); vw.close()
+    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data={"email":"owner@globex.test"}); g71=gb.request.get(Q71+"/export?format=docx"); gb.close()
+    ok("S71c 모르는 format 은 400 · viewer 는 내보내기 403 · 다른 회사 문서는 404", (bad71.status, v71.status, g71.status), (bad71.status, v71.status, g71.status)==(400,403,404))
     # S37 은 맨 끝에서 센다 — 중간(옛 자리)에서는 뒤에 찍히는 5장(40·41·42·52·53)이 아직 없어,
     # 빈 폴더에서는 25장이라 실패하고 이전 실행 잔재가 있을 때만 통과했다(2026-09-24 실측).
     _want=["00_login","05_project_mgmt","06_module_cpq_stub","10_project_bound","11_code_builder","11b_revisions","12_macro_tab",

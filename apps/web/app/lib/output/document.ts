@@ -409,13 +409,19 @@ ${p.color === "mono" ? "html { filter: grayscale(1); }" : ""}
 /** H9 · 0030 인쇄 양식(버전 · 요소 배치) + 그 스냅샷으로 뜬 도면 SVG(있으면). 양식이 없으면 기존 인쇄본 그대로. */
 export interface PrintLayoutUse { version: number; elements: LayoutElement[]; pinned: boolean; drawingSvg?: string | null }
 
-export function renderDocumentHtml(doc: { docNo: string; currentRev: string; status: string; docType: string; body: unknown }, look?: PrintLook, layout?: PrintLayoutUse): string {
+/** E7 · p48 — 인쇄본 상단 "Word · Excel"(같은 body 를 .docx · .xlsx 로). viewer 에게는 버튼이 없다(API 도 403). */
+function exportBar(id: string): string {
+  const a = (f: string, label: string) => `<a data-testid="export-${f}" href="/api/documents/${encodeURIComponent(id)}/export?format=${f}" download style="display:inline-block;margin-left:6px;padding:3px 10px;border:1px solid #9aa7b3;border-radius:4px;color:#14202b;text-decoration:none;font-size:12px">${label}</a>`;
+  return `<p class="noprint" data-testid="export-bar" style="margin:0 0 8px;text-align:right;font-size:12px;color:#44525f">내려받기${a("docx", "Word")}${a("xlsx", "Excel")}</p>`;
+}
+
+export function renderDocumentHtml(doc: { docNo: string; currentRev: string; status: string; docType: string; body: unknown }, look?: PrintLook, layout?: PrintLayoutUse, opts?: { exportId?: string }): string {
   const b = doc.body as QuotationBody | TechDataBody;
   const title = b.kind === "quotation" ? "견 적 서" : "TECH DATA";
   const inner = layout ? layoutInner(doc, b, title, layout) : b.kind === "quotation" ? quotationHtml(b) : `${techDataHtml(b)}${techGraphsHtml(b)}`;
   return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(doc.docNo)} Rev ${esc(doc.currentRev)}</title><style>${PRINT_CSS}${layout ? LAYOUT_CSS : ""}${look ? setupCss(look) : ""}</style></head><body${look ? ` data-print-setup="${esc(`${look.paper}-${look.orientation}-${look.color}`)}"` : ""}>${look?.watermark ? `<div class="wm" data-testid="print-watermark">${esc(look.watermark)}</div>` : ""}<div class="sheet">
-${look?.header ? `<div class="ph" data-testid="print-header">${esc(look.header)}</div>` : ""}<div class="top"><h1>${title}</h1><div class="meta"><span class="mono">${esc(doc.docNo)}</span> · Rev ${esc(doc.currentRev)} · <span class="status" data-testid="doc-status">${esc(STATUS_LABEL[doc.status] ?? doc.status)}</span><br>${esc(b.date)}</div></div>
+${opts?.exportId ? exportBar(opts.exportId) : ""}${look?.header ? `<div class="ph" data-testid="print-header">${esc(look.header)}</div>` : ""}<div class="top"><h1>${title}</h1><div class="meta"><span class="mono">${esc(doc.docNo)}</span> · Rev ${esc(doc.currentRev)} · <span class="status" data-testid="doc-status">${esc(STATUS_LABEL[doc.status] ?? doc.status)}</span><br>${esc(b.date)}</div></div>
 ${inner}
 ${footOf(b.source)}
 ${look?.footer ? `<div class="pf" data-testid="print-footer">${esc(look.footer)}</div>` : ""}<p class="noprint" style="margin-top:14px"><button onclick="window.print()">인쇄 / PDF 저장</button></p>
