@@ -369,7 +369,7 @@ def s_sections():
         bars += f'<div class="bar"><div class="bn">{esc(name)}</div><div class="bt">{seg}</div><div class="bv">{c["L"]} · {c["P"]} · {c["N"]} · {c["C"]}</div></div>'
     return f'''<section class="slide"><div class="stage"><header><span class="no">02</span><h2>절마다 — 어디가 두껍고 어디가 비었나</h2></header>
 <div class="bars">{bars}<div class="bar bl"><div class="bn"></div><div class="bt lg"><span><i class="L"></i>실동</span><span><i class="P"></i>부분</span><span><i class="N"></i>미착수</span><span><i class="C"></i>개념·표지</span></div><div class="bv">실동·부분·미착수·표지</div></div></div>
-<footer>두꺼운 곳: <b>Form(작업대)</b> · <b>BOM Code Set-Up</b> · <b>Product Selection(산출물)</b>. 빈 곳: <b>Arrangement</b>(p13·35·36·46) · <b>Drawing Data Set-Up</b>(p42~44) · <b>AI 학습 DB</b>(p23). <span class="src">빈 곳 셋은 각각 회장님 우선순위 결정 · CAD 담당 입력 · DXF 연구 결과를 기다린다.</span></footer></div></section>'''
+<footer>두꺼운 곳: <b>Form(작업대)</b> · <b>BOM Code Set-Up</b> · <b>Product Selection(산출물)</b>. 빈 곳: <b>Arrangement</b>(p13·35·36·46) · <b>Drawing Data Set-Up</b>(p42~44) · <b>AI 학습 DB</b>(p23 — 학습 1수준 · 샘플 자료뿐이라 부분 <i>CC 초안</i>). <span class="src">빈 곳 셋은 각각 회장님 우선순위 결정 · CAD 담당 입력 · DXF 연구 결과를 기다린다.</span></footer></div></section>'''
 
 def s_page(p):
     m = PAGES[p]; st = m["st"]
@@ -481,6 +481,6 @@ def page_map_md():
 if __name__ == "__main__":
     os.makedirs(OUTDIR, exist_ok=True)
     for theme, name in (("dark", f"EDIM_청사진70장_대조_{DATE.replace('-', '')}.html"), ("light", "_print.html")):
-        open(os.path.join(OUTDIR, name), "w", encoding="utf-8").write(build(theme))
-    open(os.path.join(OUTDIR, "page-map.md"), "w", encoding="utf-8").write(page_map_md())
+        open(os.path.join(OUTDIR, name), "w", encoding="utf-8", newline="\n").write(build(theme))
+    open(os.path.join(OUTDIR, "page-map.md"), "w", encoding="utf-8", newline="\n").write(page_map_md())
     c = counts(); print("pages 70 ·", " · ".join(f"{ST[k]} {c[k]}" for k in "LPNC"), "· slides", 70 + 5)
