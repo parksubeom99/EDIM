@@ -96,6 +96,7 @@ export function MainFormShell({
   const [canvasCmd, setCanvasCmd] = useState<{ cmd: CanvasCmd; seq: number } | null>(null);
   const [canvasSel, setCanvasSel] = useState<string | null>(null);
   const [canvasMoving, setCanvasMoving] = useState(false);
+  const [canvasSelLocked, setCanvasSelLocked] = useState(false);
   const [dwgView, setDwgView] = useState<string | null>(null);   // F6 · DWG View 뷰어
   const sendCmd = (cmd: CanvasCmd) => {
     if (cmd === "approval") {
@@ -147,6 +148,7 @@ export function MainFormShell({
         canEdit={canEdit}
         runId={runs.find((r) => r.kind === "bom" && r.runId)?.runId ?? null}
         selected={canvasSel}
+        selectedLocked={!!canvasSel && canvasSelLocked}
         moving={canvasMoving}
         hasProject={!!project}
         onDwgView={setDwgView}
@@ -255,7 +257,7 @@ export function MainFormShell({
             canDecide={canDecide}
             rev={rev}
             onRev={setRev}
-            canvas={{ cmd: canvasCmd, done: () => setCanvasCmd(null), sel: canvasSel, onSel: setCanvasSel, moving: canvasMoving, onMoving: setCanvasMoving }}
+            canvas={{ cmd: canvasCmd, done: () => setCanvasCmd(null), sel: canvasSel, onSel: setCanvasSel, moving: canvasMoving, onMoving: setCanvasMoving, onSelLocked: setCanvasSelLocked }}
           />
         </main>
 

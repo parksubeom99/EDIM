@@ -671,12 +671,16 @@ with sync_playwright() as p:
     r1=arr_rows()
     ok("S41e Copy — 고른 구획 바로 뒤에 Fan-2 가 초안으로 생기고 선택이 새 구획으로 옮겨 간다", r1,
        r1.index("Fan-2")==r1.index("Fan")+1 and "Fan-2" in pg.inner_text("[data-testid=canvas-selected]"))
+    del_on=pg.eval_on_selector("[data-cmd=delete]","e=>!e.disabled && !e.dataset.locked")
     pg.click("[data-cmd=delete]"); pg.wait_for_selector("[data-testid=arr-row-Fan-2]",state="detached",timeout=30000)
-    ok("S41f Delete — 관계 없는 구획(Fan-2)은 초안에서 지워진다", arr_rows(), arr_rows()==base_rows)
+    ok("S41f Delete — 관계 없는 구획(Fan-2)은 버튼이 풀려 있고, 누르면 초안에서 지워진다", (del_on, arr_rows()), del_on and arr_rows()==base_rows)
     pg.click("[data-testid=canvas-sec-Coil]"); pg.wait_for_function("()=>document.querySelector('[data-testid=canvas-sec-Coil]')?.dataset.selected==='1'",timeout=30000)
-    pg.click("[data-cmd=delete]")
-    pg.wait_for_function("()=>(document.querySelector('[data-testid=arrangement-panel]')?.innerText||'').includes('지울 수 없습니다')",timeout=30000)
-    ok("S41g Delete 거부 — BOM 관계가 걸린 구획(Coil)은 툴바로도 못 지운다 (API 409 와 같은 규칙)", "Coil" in arr_rows(), "Coil" in arr_rows())
+    # E8(p58) — 표의 Delete 와 같은 판정으로 툴바 Delete 가 **미리** 잠긴다. 서버 409(S32f)는 그대로 둔 이중 방어.
+    pg.wait_for_function("()=>{const b=document.querySelector('[data-cmd=delete]'); return b && b.disabled && b.dataset.locked==='1';}",timeout=30000)
+    dl=pg.eval_on_selector("[data-cmd=delete]","e=>[e.disabled,e.title]")
+    tbl=pg.eval_on_selector("[data-testid=arr-del-Coil]","e=>e.disabled")
+    ok("S41g Delete 미리 잠금 — BOM 관계가 걸린 구획(Coil)을 고르면 툴바 Delete 가 표의 Delete 처럼 눌리지 않고 이유를 적는다 (서버 409 는 S32f)",
+       (dl, tbl, "Coil" in arr_rows()), dl[0] and "BOM 관계" in dl[1] and tbl and "Coil" in arr_rows())
     first=base_rows[0]
     pg.click("[data-testid=canvas-sec-Fan]"); pg.wait_for_function("()=>document.querySelector('[data-testid=canvas-sec-Fan]')?.dataset.selected==='1'",timeout=30000)
     pg.click("[data-cmd=move]"); pg.wait_for_function("()=>document.querySelector('[data-testid=canvas-selected]')?.dataset.moving==='1'",timeout=30000)

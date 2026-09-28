@@ -299,6 +299,8 @@ export interface CanvasLink {
   onSel: (s: string | null) => void;
   moving: boolean;
   onMoving: (m: boolean) => void;
+  /** 고른 구획이 BOM 관계로 잠겼는가 — 툴바 Delete 가 표의 Delete 와 같은 판정으로 미리 잠근다(E8). */
+  onSelLocked?: (locked: boolean) => void;
 }
 
 /** Copy 이름: 같은 이름이 없을 때까지 -2, -3 … (API 상한 24자). */
@@ -376,6 +378,8 @@ function DesignCanvas({ code, slots, runs, nodeStable, canEdit, link }: { code: 
   useEffect(() => {
     if (sel && loaded && !secs.some((s) => s.name === sel)) link?.onSel(null);  // 코드가 바뀌어 사라진 구획
   }, [secs, sel, loaded, link]);
+  const selLocked = !!selRow?.locked;
+  useEffect(() => { link?.onSelLocked?.(selLocked); }, [selLocked, link]);
   useEffect(() => () => link?.onMoving(false), []);  // eslint-disable-line react-hooks/exhaustive-deps
   const cmd = link?.cmd ?? null;
   useEffect(() => {

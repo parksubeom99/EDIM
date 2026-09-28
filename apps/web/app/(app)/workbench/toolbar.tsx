@@ -78,6 +78,7 @@ export function Toolbar({
   canEdit = false,
   runId = null,
   selected = null,
+  selectedLocked = false,
   moving = false,
   hasProject = false,
   onDwgView,
@@ -93,6 +94,8 @@ export function Toolbar({
   runId?: string | null;
   /** Design 개념도에서 고른 구획(Move·Delete·Copy 의 대상). */
   selected?: string | null;
+  /** 고른 구획에 BOM 관계가 걸렸다 — 표의 Delete 와 같은 판정으로 Delete 를 미리 잠근다(서버 409 는 그대로 둔다). */
+  selectedLocked?: boolean;
   moving?: boolean;
   hasProject?: boolean;
   /** F6 · DWG View — 도면을 화면에 띄운다(없으면 예전처럼 내려받는다) */
@@ -217,11 +220,12 @@ export function Toolbar({
             Arrangement ▼
           </button>
           {EDIT_CMDS.map(({ cmd, label, needsSel }) => {
-            const off = !canEdit || (needsSel && !selected);
+            const lockedDel = cmd === "delete" && !!selected && selectedLocked;
+            const off = !canEdit || (needsSel && !selected) || lockedDel;
             const on = cmd === "move" && moving;
             return (
-              <button key={cmd} type="button" data-cmd={cmd} disabled={off} aria-pressed={on || undefined}
-                title={!canEdit ? "편집 권한이 없습니다" : off ? "먼저 Design 개념도에서 구획을 고르십시오" : selected ? `대상: ${selected}` : ""}
+              <button key={cmd} type="button" data-cmd={cmd} disabled={off} aria-pressed={on || undefined} data-locked={lockedDel ? "1" : undefined}
+                title={!canEdit ? "편집 권한이 없습니다" : lockedDel ? `${selected} 은 BOM 관계가 걸린 구획이라 지울 수 없습니다` : off ? "먼저 Design 개념도에서 구획을 고르십시오" : selected ? `대상: ${selected}` : ""}
                 onClick={() => onCmd?.(cmd)} style={cmdBtn(on, off)}>
                 {label}
               </button>
