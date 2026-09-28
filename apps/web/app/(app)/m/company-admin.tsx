@@ -40,6 +40,11 @@ export function CompanyAdmin({ myRole }: { myRole: string }) {
   const [error, setError] = useState<string | null>(null);
   const [subject, setSubject] = useState("");
   const [detail, setDetail] = useState("");
+  // C · Special 프로그램(첫 사례: 팬 선정)과 그 입력 폼(Toolbox UI Form) — 폼은 회사가 만든 것 그대로 Special 이 쓴다
+  const [program, setProgram] = useState("");
+  const [formId, setFormId] = useState("");
+  const [forms, setForms] = useState<{ id: string; name: string }[]>([]);
+  const [loaded, setLoaded] = useState(false);   // 첫 목록을 받았다(하이드레이션 뒤) — e2e 가 이것을 기다린다
   const [busy, setBusy] = useState(false);
   const isOwner = myRole === "owner";
 
@@ -48,6 +53,9 @@ export function CompanyAdmin({ myRole }: { myRole: string }) {
       fetch("/api/company/members").then((x) => x.json()),
       fetch("/api/platform-requests").then((x) => x.json()),
     ]);
+    const f = await fetch("/api/ui-forms").then((x) => (x.ok ? x.json() : { rows: [] })).catch(() => ({ rows: [] }));
+    setForms(((f.rows ?? []) as { id: string; name: string; isTemplet?: boolean }[]).filter((x) => !x.isTemplet));
+    setLoaded(true);
     setMembers((m.rows ?? []) as Member[]);
     setRequests((r.rows ?? []) as RequestRow[]);
   }
@@ -80,7 +88,7 @@ export function CompanyAdmin({ myRole }: { myRole: string }) {
     const res = await fetch("/api/platform-requests", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ kind: "special", subject, detail }),
+      body: JSON.stringify({ kind: "special", subject, detail, ...(program ? { program, formId: formId || undefined } : {}) }),
     });
     setBusy(false);
     if (!res.ok) {
@@ -90,6 +98,8 @@ export function CompanyAdmin({ myRole }: { myRole: string }) {
     }
     setSubject("");
     setDetail("");
+    setProgram("");
+    setFormId("");
     await load();
   }
 
@@ -173,7 +183,7 @@ export function CompanyAdmin({ myRole }: { myRole: string }) {
         </table>
       </section>
 
-      <section style={box} data-testid="platform-requests">
+      <section style={box} data-testid="platform-requests" data-ready={loaded ? "1" : "0"}>
         <h2 style={{ fontSize: 15, marginTop: 0 }}>Special 의뢰 · 문의</h2>
         <p style={{ color: "var(--ink-muted)", fontSize: "var(--fs-13)" }}>
           매크로로 안 되는 계산·기능은 플랫폼에 의뢰합니다. 이것이 회사에서
@@ -195,6 +205,18 @@ export function CompanyAdmin({ myRole }: { myRole: string }) {
               placeholder="내용"
               style={input}
             />
+            <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
+              <select data-testid="request-program" value={program} onChange={(e) => setProgram(e.target.value)} style={{ ...input, marginTop: 0 }}>
+                <option value="">자유 의뢰</option>
+                <option value="fan-select">Special 프로그램: 팬 선정</option>
+              </select>
+              {program && (
+                <select data-testid="request-form" value={formId} onChange={(e) => setFormId(e.target.value)} style={{ ...input, marginTop: 0 }}>
+                  <option value="">입력 폼(UI Form) 고르기</option>
+                  {forms.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+                </select>
+              )}
+            </div>
             <button
               type="button"
               data-testid="request-submit"

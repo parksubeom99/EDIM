@@ -148,7 +148,9 @@ export default async function PlatformPage() {
       </section>
 
       <section style={box}>
-        <h2 style={{ fontSize: 15, marginTop: 0 }}>요청 대기열</h2>
+        <h2 style={{ fontSize: 15, marginTop: 0, display: "flex", justifyContent: "space-between" }}>요청 대기열
+          <Link href="/platform/special" data-testid="platform-special-link" style={{ fontSize: "var(--fs-13)", color: "var(--accent)", fontWeight: 400 }}>Special Tool Box →</Link>
+        </h2>
         <p style={{ color: "var(--ink-muted)", fontSize: "var(--fs-13)" }}>
           회사에서 플랫폼으로 올라오는 유일한 통로입니다. 지금 올라오는 종류는
           Special 의뢰/문의뿐입니다(회장님 결정 Q1 = 좁게).

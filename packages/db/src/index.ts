@@ -157,3 +157,8 @@ export {
   type LearningSourceRow, type LearningJobRow, type LearningStepRow, type FeatureInsert, type FeatureRow, type FormulaInsert, type FormulaRow,
   type ProjectionRow, type SuggestionRow,
 } from "./learning";
+export {
+  platformListPrograms, platformGrantSpecial, platformGrantsWithBilling,
+  listSpecialGrants, fanCandidates, tenantFanCurves, insertSpecialRun, listSpecialRuns,
+  type SpecialProgramRow, type GrantBillingRow, type SpecialGrantRow, type FanSegmentRow, type SpecialRunInsert, type SpecialRunRow,
+} from "./special";

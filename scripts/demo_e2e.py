@@ -41,7 +41,9 @@ with sync_playwright() as p:
     wr=[t0.request.post(BASE+"/api/auth/login",data=d) for d in (LOGIN("owner@acme.test","edim-demo-2025"), LOGIN("nobody@acme.test"), {"email":"owner@acme.test"}, LOGIN("platform@edim.test","x"))]
     ok("S0b 틀린 비밀번호 · 없는 이메일 · 비밀번호 빠짐 · 플랫폼 관리자 틀린 비밀번호 — 모두 401 · 같은 문장(계정이 있는지 흘리지 않는다)",
        [(x.status, x.json().get("error")) for x in wr], all(x.status==401 and x.json().get("error")==BAD_LOGIN for x in wr))
-    lk=[t0.request.post(BASE+"/api/auth/login",data=LOGIN("lock-test@acme.test","bad")).status for _ in range(6)]
+    # 잠금 카운터는 서버 메모리라, 같은 서버로 e2e 를 연달아 돌리면 앞 실행의 잠금이 남는다 — 실행마다 새 이메일
+    _lk=f"lock-{int(time.time()*1000)}@acme.test"
+    lk=[t0.request.post(BASE+"/api/auth/login",data=LOGIN(_lk,"bad")).status for _ in range(6)]
     ok("S0c 같은 이메일로 10분 안에 5번 틀리면 잠시 잠금 — 여섯 번째는 429", lk, lk==[401]*5+[429])
     cfg=t0.request.get(BASE+"/api/auth/login").json(); lg=t0.request.post(BASE+"/api/auth/login",data={"email":"legacy@acme.test"}).status; t0.close()
     ok("S0d 비밀번호 해시가 없는 옛 계정 — 개발 모드(EDIM_DEV_LOGIN=1)에서만 이메일로 들어오고, 운영 모드(기본 0)에서는 거절(401)",
@@ -2114,15 +2116,85 @@ with sync_playwright() as p:
     lp.close()
     ok("S72h 역류 0 — 회사 계정은 학습 API 403(읽기 · 작업 · 올리기) · 플랫폼 계정은 회사 API 에 못 들어간다 · viewer 숨기기 403 · 다른 회사 제안 404",
        (c1.status,c2.status,c3.status,p1.status,p2.status,v1.status,g1.status), (c1.status,c2.status,c3.status)==(403,403,403) and p1.status in (401,403) and p2.status in (401,403) and v1.status==403 and g1.status==404)
+    # ── S74 C · Special Tool Box 첫 사례 — 팬 선정 (ccmd J) — 회사 UI Form → 의뢰 → 플랫폼 승인·부여 → Toolbox 버튼 → 결정론 계산 → 사용 기록·과금 ──
+    UF=BASE+"/api/ui-forms"
+    cf=ctx.request.post(UF,headers=J0,data=json.dumps({"name":"팬 선정 입력(E2E)","scope":"Technical"})).json(); FID=cf.get("id")
+    spec74={"widgets":[{"id":"label1","type":"label","x":0,"y":0,"w":12,"h":1,"label":"팬 선정 — 설계 조건"},
+        {"id":"number1","type":"number","x":0,"y":1,"w":6,"h":3,"label":"풍량","param":"q_cmh","unit":"CMH"},
+        {"id":"number2","type":"number","x":6,"y":1,"w":6,"h":3,"label":"기외정압","param":"p_pa","unit":"Pa"},
+        {"id":"number3","type":"number","x":12,"y":1,"w":6,"h":3,"label":"밀도","param":"rho","unit":"kg/m³"}]}
+    pu=ctx.request.put(UF+f"/{FID}",headers=J0,data=json.dumps({"name":"팬 선정 입력(E2E)","scope":"Technical","spec":spec74}))
+    # (a) 회사 A 가 Special 의뢰(프로그램 = 팬 선정 · 입력 폼 = 방금 만든 UI Form) — 화면에서
+    pg.goto(BASE+"/m/company",wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=platform-requests][data-ready='1']",timeout=60000); nuke(pg)
+    pg.fill("[data-testid=request-subject]","팬 선정 Special 요청(E2E)"); pg.fill("[data-testid=request-detail]","풍량·정압으로 팬 모델·모터 선정")
+    pg.select_option("[data-testid=request-program]","fan-select"); pg.wait_for_selector(f"[data-testid=request-form] option[value='{FID}']",state="attached",timeout=30000)
+    pg.select_option("[data-testid=request-form]",FID)
+    with pg.expect_response(lambda q: q.url.endswith("/api/platform-requests") and q.request.method=="POST",timeout=30000) as rq:
+        pg.click("[data-testid=request-submit]")
+    pg.wait_for_function("()=>[...document.querySelectorAll('[data-testid=my-request]')].some(e=>e.innerText.includes('팬 선정 Special 요청(E2E)'))",timeout=30000)
+    nuke(pg); pg.screenshot(path=f"{OUT}/85_special_request.png",full_page=True)
+    sp=b.new_context(viewport={"width":1440,"height":900}); spp=sp.new_page(); sp.request.post(BASE+"/api/auth/login",data=LOGIN("platform@edim.test"))
+    spp.goto(BASE+"/platform/special",wait_until="domcontentloaded"); spp.wait_for_selector("[data-testid=special-console][data-ready='1']",timeout=60000); nuke(spp)
+    row=spp.locator("[data-testid=special-request][data-program=fan-select]").filter(has_text="팬 선정 Special 요청(E2E)").first
+    with spp.expect_response(lambda q: q.url.endswith("/api/platform/special") and q.request.method=="POST",timeout=30000) as gr:
+        row.locator("[data-testid=special-grant]").click()
+    gA=ctx.request.get(BASE+"/api/special").json()["grants"]
+    gbx=b.new_context(); gbx.request.post(BASE+"/api/auth/login",data=LOGIN("owner@globex.test")); gB=gbx.request.get(BASE+"/api/special").json()["grants"]
+    rB74=gbx.request.post(BASE+"/api/special/fan-select/run",headers=J0,data=json.dumps({"inputs":{"q_cmh":12000,"p_pa":600}})); gbx.close()
+    ok("S74a 회사 A 가 UI Form 을 붙여 Special(팬 선정) 의뢰 → 플랫폼이 승인 + 부여(한 번에) → A 에만 부여 · B 는 부여 없음 · B 실행 403",
+       (rq.value.status, gr.value.status, [(g["programKey"], (g.get("form") or {}).get("id")==FID) for g in gA], len(gB), rB74.status),
+       pu.status==200 and rq.value.status==200 and gr.value.status==200 and len(gA)==1 and gA[0]["programKey"]=="fan-select" and (gA[0].get("form") or {}).get("id")==FID and len(gB)==0 and rB74.status==403)
+    # (b) Toolbox 에 'Special: 팬 선정' — 회사가 만든 폼 그대로 · 12,000 CMH · 600 Pa → 단위 테스트 기대값(EDIM-PF-560 · 2600 rpm · 모터 3.7 kW)
+    pg.goto(BASE+"/workbench?node=a0000000-0000-4000-8000-000000000004",wait_until="domcontentloaded"); hydrated(pg); nuke(pg)
+    if pg.get_attribute("[data-testid=toolbox-toggle]","aria-pressed")!="true": pg.click("[data-testid=toolbox-toggle]")
+    pg.wait_for_selector("[data-testid=special-tab]",timeout=60000); pg.click("[data-testid=special-tab]")
+    pg.wait_for_selector("[data-testid=special-panel][data-ready='1'] [data-testid=special-in-q_cmh]",timeout=30000)
+    wids=pg.eval_on_selector_all("[data-testid=special-form] [data-widget]","es=>es.map(e=>[e.dataset.widget,e.dataset.type,e.dataset.param])")
+    formdef=[[w["id"],w["type"],w.get("param","")] for w in [f for f in ctx.request.get(UF).json()["rows"] if f["id"]==FID][0]["spec"]["widgets"]]
+    ok("S74b Special 입력 화면 = 회사가 Toolbox UI Form 으로 만든 그 폼(위젯 id · 종류 · 입력 이름이 같다)", (wids, formdef), wids==formdef and len(wids)==4)
+    pg.fill("[data-testid=special-in-q_cmh]","12000"); pg.fill("[data-testid=special-in-p_pa]","600")
+    with pg.expect_response(lambda q: q.url.endswith("/api/special/fan-select/run") and q.request.method=="POST",timeout=60000) as sr:
+        pg.click("[data-testid=special-run]")
+    pg.wait_for_selector("[data-testid=special-result]",timeout=30000)
+    res=pg.eval_on_selector("[data-testid=special-result]","e=>[e.dataset.ok,e.dataset.model,e.dataset.rpm,e.dataset.motor,e.dataset.price]")
+    bind=pg.inner_text("[data-testid=special-binding]")
+    nuke(pg); pg.screenshot(path=f"{OUT}/86_fan_result.png",full_page=True)
+    ok("S74c 12,000 CMH · 600 Pa → EDIM-PF-560 · 2600 rpm · 모터 3.7 kW (= 단위 테스트 기대값 · 손 계산 대조) · 가져온 자료 한 줄(원자료는 안 보임) · '샘플 성능표 기준'",
+       (sr.value.status, res, bind[:60]), sr.value.status==200 and res==["1","EDIM-PF-560 (샘플)","2600","3.7","5000"] and "special_fan_candidates" in bind and "샘플" in pg.inner_text("[data-testid=special-result]"))
+    # (c) 사용 기록 1행 · 요금 = 샘플 단가 · 범위 밖 입력은 '적합한 팬 없음' + 기록은 남되 요금 0
+    pg.fill("[data-testid=special-in-q_cmh]","100000")
+    with pg.expect_response(lambda q: q.url.endswith("/api/special/fan-select/run") and q.request.method=="POST",timeout=60000):
+        pg.click("[data-testid=special-run]")
+    pg.wait_for_selector("[data-testid=special-result][data-ok='0']",timeout=30000)
+    none_txt=pg.inner_text("[data-testid=special-result]")
+    pg.wait_for_selector("[data-testid=special-meter][data-today='2']",timeout=30000)
+    meter=pg.eval_on_selector("[data-testid=special-meter]","e=>[e.dataset.today,e.dataset.amount]")
+    ok("S74d 범위 밖(100,000 CMH) → '적합한 팬 없음 — 이유' · 기록은 남되 요금 0 → 오늘 2회 · 요금 합계 5,000(샘플 단가 1회분)",
+       (none_txt[:40], meter), "적합한 팬 없음" in none_txt and meter==["2","5000"])
+    # (d) source=tenant — 회사 자체 팬 표로 같은 계산(바인딩 지도가 다른 표를 가리킨다)
+    pg.fill("[data-testid=special-in-q_cmh]","12000"); pg.select_option("[data-testid=special-source]","tenant")
+    with pg.expect_response(lambda q: q.url.endswith("/api/special/fan-select/run") and q.request.method=="POST",timeout=60000):
+        pg.click("[data-testid=special-run]")
+    pg.wait_for_selector("[data-testid=special-result][data-ok='1']",timeout=30000)
+    tmodel=pg.get_attribute("[data-testid=special-result]","data-model"); tbind=pg.inner_text("[data-testid=special-binding]")
+    ok("S74e 바인딩 source=tenant — 회사 자체 팬 표(tenant_fan_curve)로 실행하면 그 표의 팬이 선정되고, 가져온 자료 줄도 회사 표를 가리킨다",
+       (tmodel, tbind[:50]), tmodel=="ACME 자체 팬 (샘플)" and "tenant_fan_curve" in tbind)
+    # (e) viewer 실행 403 · 다른 회사 사용 기록 0 · 플랫폼 과금(금액 칸만) = 3회 · 10,000
+    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data=LOGIN("viewer@acme.test")); v74=vw.request.post(BASE+"/api/special/fan-select/run",headers=J0,data=json.dumps({"inputs":{"q_cmh":12000,"p_pa":600}})); vg=vw.request.get(BASE+"/api/special").json()["grants"]; vw.close()
+    spp.reload(wait_until="domcontentloaded"); spp.wait_for_selector("[data-testid=special-console][data-ready='1']",timeout=60000); nuke(spp)
+    bill=spp.eval_on_selector_all("[data-testid=special-grant-row]","es=>es.map(e=>[e.dataset.runs,e.dataset.amount])")
+    spp.screenshot(path=f"{OUT}/87_special_meter.png",full_page=True); sp.close()
+    ok("S74f viewer 는 보기만(부여 목록 200) · 실행 403(실행 = 과금이라 편집 권한) · 플랫폼 과금은 사용 기록의 금액 칸만 — 3회 · 10,000(샘플)",
+       (v74.status, len(vg), bill), v74.status==403 and len(vg)==1 and bill==[["3","10000"]])
     # S37 은 맨 끝에서 센다 — 중간(옛 자리)에서는 뒤에 찍히는 5장(40·41·42·52·53)이 아직 없어,
     # 빈 폴더에서는 25장이라 실패하고 이전 실행 잔재가 있을 때만 통과했다(2026-09-24 실측).
     _want=["00_login","05_project_mgmt","06_module_cpq_stub","10_project_bound","11_code_builder","11b_revisions","12_macro_tab",
            "13_macro_approved","14_edim_run","15_bom_cost","16_design_tab","20_setup_subcode","21_setup_product_table",
            "22_setup_relationship","23_codebuilder_from_subcode","30_toolbox_program","31_toolbox_ui_tool","40_company_admin",
            "41_platform_console","42_user_management","43_drawings","44_document_tab","45_purchasing","46_quotation_print",
-           "47_techdata_print","48_dxf_plan","49_dxf_assembly","51_accepted","52_register","53_schedule","54_toolbar","55_project_mgmt","56_print_setup","57_ui_design","58_material","59_arrangement_code","60_spec_input","61_drawing_purpose","62_company_db","63_input_data","64_viewer3d","65_price_to_cost","66_project_contacts","67_partner_edit","68_spec_import","69_code_approval","70_dwg_view","71_techdata_list","72_mfg_rate","73_erp_master","74_sub_drawing","75_output_template","76_coding_list","77_wizards","78_print_layout","79_draw_module","80_macro_verify","81_learning_job","82_formula_cards","83_projection","84_toolbox_suggestion"]
+           "47_techdata_print","48_dxf_plan","49_dxf_assembly","51_accepted","52_register","53_schedule","54_toolbar","55_project_mgmt","56_print_setup","57_ui_design","58_material","59_arrangement_code","60_spec_input","61_drawing_purpose","62_company_db","63_input_data","64_viewer3d","65_price_to_cost","66_project_contacts","67_partner_edit","68_spec_import","69_code_approval","70_dwg_view","71_techdata_list","72_mfg_rate","73_erp_master","74_sub_drawing","75_output_template","76_coding_list","77_wizards","78_print_layout","79_draw_module","80_macro_verify","81_learning_job","82_formula_cards","83_projection","84_toolbox_suggestion","85_special_request","86_fan_result","87_special_meter"]
     _miss=[w for w in _want if not os.path.exists(f"{OUT}/{w}.png") or os.path.getmtime(f"{OUT}/{w}.png")<T0]
-    ok("S37 캡처 61장이 이번 실행에서 전부 나온다 (잔재 파일은 세지 않음)", _miss or len(_want), not _miss)
+    ok("S37 캡처 64장이 이번 실행에서 전부 나온다 (잔재 파일은 세지 않음)", _miss or len(_want), not _miss)
     b.close()
 n=sum(1 for v in R.values() if v[0]); print(f"\n[demo_e2e] {n}/{len(R)} steps passed"); json.dump(R,open(f"{OUT}/demo_e2e_result.json","w",encoding="utf-8"),ensure_ascii=False,indent=1)
 sys.exit(0 if n==len(R) else 1)

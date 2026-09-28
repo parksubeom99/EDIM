@@ -4,7 +4,7 @@
  */
 export const GRID_W = 24;
 export const GRID_H = 16;
-export const WIDGET_TYPES = ["button", "combo", "table", "label"] as const;
+export const WIDGET_TYPES = ["button", "combo", "table", "label", "number"] as const;   // number = 숫자 입력(C · Special 입력 폼 — param 으로 계산 입력에 잇는다)
 export type WidgetType = (typeof WIDGET_TYPES)[number];
 export const ACTIONS = ["find", "reset", "copy"] as const;   // 찾기 · 초기화 · 복사 (저장·삭제·등록은 아직 — 대상 데이터의 쓰기 규칙이 먼저 필요)
 export type Action = (typeof ACTIONS)[number];
@@ -15,15 +15,17 @@ export type Source = { kind: "subcode"; itemKey: string } | { kind: "table"; cod
 export interface Widget {
   id: string; type: WidgetType; x: number; y: number; w: number; h: number; label: string;
   source?: Source; action?: Action; target?: string; filterBy?: string;
+  /** number 위젯 — 계산이 읽는 입력 이름(예: q_cmh · p_pa · rho) · 단위 표시 */
+  param?: string; unit?: string;
 }
 export interface UiSpec { widgets: Widget[] }
 
-const DEFAULT_SIZE: Record<WidgetType, [number, number]> = { button: [4, 2], combo: [5, 2], table: [12, 6], label: [6, 1] };
+const DEFAULT_SIZE: Record<WidgetType, [number, number]> = { button: [4, 2], combo: [5, 2], table: [12, 6], label: [6, 1], number: [6, 3] };
 export function newWidget(type: WidgetType, x: number, y: number, taken: Set<string>): Widget {
   let n = 1; while (taken.has(`${type}${n}`)) n++;
   const [w, h] = DEFAULT_SIZE[type];
   return { id: `${type}${n}`, type, x: Math.max(0, Math.min(GRID_W - w, x)), y: Math.max(0, Math.min(GRID_H - h, y)), w, h,
-    label: type === "button" ? "찾기" : type === "combo" ? `S-${n}` : type === "table" ? "동작 대상 Data" : "Label",
+    label: type === "button" ? "찾기" : type === "combo" ? `S-${n}` : type === "table" ? "동작 대상 Data" : type === "number" ? `입력 ${n}` : "Label",
     ...(type === "button" ? { action: "find" as const } : {}) };
 }
 
@@ -52,6 +54,11 @@ export function parseSpec(v: unknown): { ok: true; spec: UiSpec } | { ok: false;
       if (wd.type !== "button" || !(ACTIONS as readonly string[]).includes(raw.action as string)) return { ok: false, reason: `${id}: 동작` };
       wd.action = raw.action as Action;
     }
+    if (raw.param !== undefined && raw.param !== "") {
+      if (wd.type !== "number" || typeof raw.param !== "string" || !/^[a-z][a-z0-9_]{0,30}$/.test(raw.param)) return { ok: false, reason: `${id}: 입력 이름(param)은 숫자 위젯의 소문자·숫자·밑줄` };
+      wd.param = raw.param;
+    }
+    if (typeof raw.unit === "string" && raw.unit && wd.type === "number") wd.unit = raw.unit.slice(0, 10);
     if (typeof raw.target === "string" && raw.target) wd.target = raw.target;
     if (typeof raw.filterBy === "string" && raw.filterBy) wd.filterBy = raw.filterBy;
     out.push(wd);

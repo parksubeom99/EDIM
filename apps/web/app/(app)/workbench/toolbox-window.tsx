@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent as RPointerEvent } from "react";
+import { SpecialPanel, type SpecialGrantView } from "./special-panel";
 import type { RunResult } from "./action-bar";
 
 /**
@@ -54,7 +55,12 @@ export function ToolboxWindow({
   nodeStable: string | null; canEdit: boolean; canDecide: boolean; runDisabled: boolean;
 }) {
   const [geo, setGeo] = useState<Geo | null>(null);
-  const [tab, setTab] = useState<"ui" | "program">("program");
+  const [tab, setTab] = useState<"ui" | "program" | "special">("program");
+  // C · Special — 플랫폼이 이 회사에 부여한 프로그램만 탭이 생긴다(없으면 버튼도 없다)
+  const [specials, setSpecials] = useState<SpecialGrantView[]>([]);
+  const loadSpecials = useCallback(async () => { const r = await fetch("/api/special"); if (r.ok) setSpecials(((await r.json()) as { grants: SpecialGrantView[] }).grants); }, []);
+  useEffect(() => { if (open) void loadSpecials(); }, [open, loadSpecials]);
+  const fan = specials.find((g) => g.programKey === "fan-select");
   const drag = useRef<{ dx: number; dy: number } | null>(null);
   const size = useRef<{ sx: number; sy: number; w: number; h: number } | null>(null);
 
@@ -106,6 +112,7 @@ export function ToolboxWindow({
           {(["ui", "program"] as const).map((k) => (
             <button key={k} type="button" data-toolbox-tab={k} onClick={() => setTab(k)} style={{ ...btn(tab === k), padding: "3px 8px", whiteSpace: "nowrap" }}>{k === "ui" ? "UI Tool" : "Program Tool"}</button>
           ))}
+          {fan && <button type="button" data-toolbox-tab="special" data-testid="special-tab" onClick={() => setTab("special")} style={{ ...btn(tab === "special"), padding: "3px 8px", whiteSpace: "nowrap" }}>Special: 팬 선정</button>}
         </nav>
         <span style={{ marginLeft: "auto", display: "flex", gap: 3, flexShrink: 0 }} onPointerDown={(e) => e.stopPropagation()}>
           <button type="button" data-testid="toolbox-dock" title={geo.docked ? "창으로 띄우기" : "오른쪽에 붙이기"} onClick={() => save({ ...geo, docked: !geo.docked })} aria-label={geo.docked ? "float" : "dock"} style={{ ...btn(), padding: "3px 7px" }}>{geo.docked ? "⧉" : "⇥"}</button>
@@ -114,7 +121,9 @@ export function ToolboxWindow({
         </span>
       </div>
       <div style={{ flex: 1, minHeight: 0, overflow: "auto", padding: 10, display: "grid", gap: 10, alignContent: "start" }}>
-        {tab === "ui"
+        {tab === "special" && fan
+          ? <SpecialPanel grant={fan} canRun={canEdit} onUsage={() => void loadSpecials()} />
+          : tab === "ui"
           ? <UiTool commands={commands} onCommands={onCommands} onRun={onRun} busyKind={busyKind} runDisabled={runDisabled} canEdit={canEdit} />
           : <ProgramTool nodeStable={nodeStable} canEdit={canEdit} canDecide={canDecide} onRun={onRun} runs={runs} busyKind={busyKind} runDisabled={runDisabled} />}
       </div>

@@ -42,7 +42,12 @@ export async function POST(req: NextRequest) {
     createPlatformRequest(tx, {
       kind,
       subject,
-      payload: { detail },
+      // C · Special 프로그램 의뢰면 그 프로그램과 입력 폼(UI Form id)을 함께 — 플랫폼 부여(grant_special)가 폼 id 를 옮긴다
+      payload: {
+        detail,
+        ...(b.program === "fan-select" ? { program: "fan-select" } : {}),
+        ...(typeof b.formId === "string" && /^[0-9a-f-]{36}$/i.test(b.formId) ? { formId: b.formId } : {}),
+      },
       requestedBy: session.userId,
     }),
   );

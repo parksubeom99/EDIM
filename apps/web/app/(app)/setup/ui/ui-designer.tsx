@@ -29,7 +29,7 @@ const btn = (primary = false, off = false): CSSProperties => ({
   fontSize: "var(--fs-12)", fontWeight: 600, padding: "4px 10px", borderRadius: 4, cursor: off ? "not-allowed" : "pointer", opacity: off ? 0.5 : 1,
   border: primary ? "none" : "1px solid var(--line)", background: primary ? "var(--accent)" : "var(--surface-2)", color: primary ? "var(--accent-contrast)" : "var(--ink)",
 });
-const TYPE_LABEL: Record<WidgetType, string> = { button: "Button", combo: "Combo box", table: "Table", label: "Label" };
+const TYPE_LABEL: Record<WidgetType, string> = { button: "Button", combo: "Combo box", table: "Table", label: "Label", number: "Number" };
 
 export function UiDesigner({ canEdit }: { canEdit: boolean }) {
   const [forms, setForms] = useState<FormRow[]>([]);
@@ -181,7 +181,7 @@ export function UiDesigner({ canEdit }: { canEdit: boolean }) {
                       border: `${q.id === pick ? 2 : 1}px solid ${q.id === pick ? "var(--accent)" : "var(--line)"}`, borderRadius: 4, background: "var(--surface-1)",
                       padding: 4, fontSize: 11, overflow: "hidden", cursor: canEdit ? "move" : "default" }}>
                     <b style={{ color: "var(--accent)" }}>{TYPE_LABEL[q.type]}</b> <span style={{ fontFamily: "var(--font-mono)" }}>{q.id}</span>
-                    <div>{q.label}</div>
+                    <div>{q.label}{q.type === "number" && q.param ? ` · ${q.param}${q.unit ? ` [${q.unit}]` : ""}` : ""}</div>
                     <div style={{ color: "var(--ink-muted)" }}>
                       {q.source?.kind === "subcode" ? `Data: Sub Code ${q.source.itemKey}` : q.source?.kind === "table" ? `Data: ${q.source.code}.${q.source.table}` : ""}
                       {q.action ? `동작: ${ACTION_LABEL[q.action]}` : ""}{q.target ? ` → ${q.target}` : ""}{q.filterBy ? ` · Active: ${q.filterBy}` : ""}
@@ -238,6 +238,14 @@ export function UiDesigner({ canEdit }: { canEdit: boolean }) {
                     <option key={`${c.code}|${t}`} value={`${c.code}|${t}`}>{c.code}.{t} · Item = Sub Code {tt.by} · {tt.cols.length}열</option>
                   )))}
                 </select>
+              </>
+            )}
+            {w.type === "number" && (
+              <>
+                <span style={lab}>입력 이름(param) — 계산이 읽는 이름 · 예: q_cmh · p_pa · rho</span>
+                <input data-testid="ui-w-param" value={w.param ?? ""} disabled={!canEdit} onChange={(e) => upd(w.id, { param: e.target.value.trim().toLowerCase().slice(0, 31) || undefined })} style={inp} />
+                <span style={lab}>단위</span>
+                <input data-testid="ui-w-unit" value={w.unit ?? ""} disabled={!canEdit} onChange={(e) => upd(w.id, { unit: e.target.value.slice(0, 10) || undefined })} style={inp} />
               </>
             )}
             {w.type === "button" && (
@@ -302,6 +310,7 @@ function UiRun({ spec, subCodes, codes }: { spec: UiSpec; subCodes: SubCode[]; c
         {spec.widgets.map((q) => (
           <div key={q.id} data-run-widget={q.id} style={{ position: "absolute", left: q.x * CELL, top: q.y * CELL, width: q.w * CELL - 4, height: q.h * CELL - 4, margin: 2, overflow: "auto", fontSize: 12 }}>
             {q.type === "label" && <span>{q.label}</span>}
+            {q.type === "number" && <label style={{ display: "grid", gap: 2 }}><span style={lab}>{q.label}{q.unit ? ` [${q.unit}]` : ""}{q.param ? ` · ${q.param}` : ""}</span><input data-run-number={q.id} inputMode="decimal" value={val[q.id] ?? ""} onChange={(e) => setVal((v) => ({ ...v, [q.id]: e.target.value }))} style={inp} /></label>}
             {q.type === "button" && <button type="button" data-run-button={q.id} onClick={() => void press(q)} style={{ ...btn(true), width: "100%", height: "100%" }}>{q.label || ACTION_LABEL[q.action ?? "find"]}</button>}
             {q.type === "combo" && (
               <label style={{ display: "grid", gap: 2 }}>
