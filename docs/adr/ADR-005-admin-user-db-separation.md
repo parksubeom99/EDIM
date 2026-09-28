@@ -6,7 +6,7 @@
 플랫폼(학습 AI · Special)은 데이터가 많을수록 좋지만, 고객사 업무 데이터가 플랫폼으로 흘러가면 데이터 주권과 신뢰가 깨진다. 설계 청사진도 'AI 학습은 플랫폼 제공자만', 'System DB 에 영향을 주는 것은 플랫폼 승인'을 요구한다.
 
 ## 결정
-`platform` 스키마 + `edim_platform` 역할. 플랫폼은 회사 업무 테이블에 GRANT 가 없다. 회사 → 플랫폼 통로는 요청서 테이블 하나(`platform_request`), 플랫폼 → 회사 통로는 승인된 결과만 넣는 `SECURITY DEFINER` 함수 하나(학습 투영 · 진행 중). 통합 학습 1회 + 이중 투영(π_admin → DB①, π_user → DB②)으로 구조 유사도 90 % 를 노린다.
+`platform` 스키마 + `edim_platform` 역할. 플랫폼은 회사 업무 테이블에 GRANT 가 없다. 회사 → 플랫폼 통로는 요청서 테이블 하나(`platform_request`), 플랫폼 → 회사 통로는 승인된 결과만 넣는 `SECURITY DEFINER` 함수 하나(학습 투영 `platform.project_formula` · 0033). 통합 학습 1회 + 이중 투영(π_admin → DB①, π_user → DB②)으로 구조 유사도 90 % 를 노린다.
 
 ## 검토한 대안
 - 한 스키마에 권한 플래그

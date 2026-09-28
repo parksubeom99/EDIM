@@ -8,7 +8,7 @@
 | 문서 | 내용 |
 |---|---|
 | 이 문서 | 3대 원리 · 매크로 컴파일러 파이프라인 · 구현 현황 |
-| [`learning-ai.md`](learning-ai.md) | 학습 AI 1수준 — 도면에서 공식을 찾는 에이전트 하네스 (진행 중) |
+| [`learning-ai.md`](learning-ai.md) | 학습 AI 1수준 — 도면에서 공식을 찾는 에이전트 하네스 (1수준 완료 · 숨긴 공식 3/3 복원) |
 | [`agentic-development.md`](agentic-development.md) | AI 코딩 에이전트와 함께 개발한 방식 — 인계 · 게이트 · 재측정 |
 
 ---
@@ -87,5 +87,5 @@ flowchart LR
 | DSL 파서 · 실행기 · 검증기 · 역번역 · 등록부 | ✅ 동작 | 단위 101 · `macro:test` · e2e 매크로 단계 |
 | 설계 검증에 매크로 사용 | ✅ 동작 | 승인된 매크로만 규칙으로 인정 · 위반 시 도면 발행 422 |
 | 자연어 → DSL 번역 | 🟡 경로 · 인터페이스만 | 실모델 호출 0회 (공급자 키 결정 대기) |
-| 학습 AI 1수준 | 🔄 구현 중 | [`learning-ai.md`](learning-ai.md) |
-| Special Tool Box 첫 사례(팬 선정) | 🔄 구현 중 | 결정론 계산 · 원자료는 DB① 에만 |
+| 학습 AI 1수준 | ✅ 2026-09-29 | [`learning-ai.md`](learning-ai.md) · 로컬 AI(Ollama) 선택 |
+| Special Tool Box 첫 사례(팬 선정) | ✅ 2026-09-29 | 결정론 계산 · 원자료는 DB① 에만(교점 구간만 함수로) · 손 계산 대조 |

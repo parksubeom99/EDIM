@@ -14,4 +14,4 @@
 | [008](ADR-008-production-mode-gate.md) | 운영 모드 e2e 를 머지 게이트에 | 확정 (2026-09-27) |
 | [009](ADR-009-business-date.md) | '오늘'은 회사 시간대 한 곳에서만 | 확정 |
 | [010](ADR-010-auth-scrypt.md) | 비밀번호 = Node 내장 scrypt · SSO 는 자리만 | 확정 (0032) |
-| [011](ADR-011-learning-ai-level1.md) | 학습 AI 1수준 = 결정론 공식 탐구 + 사람 승인 라벨 | 진행 중 (2026-09-29) |
+| [011](ADR-011-learning-ai-level1.md) | 학습 AI 1수준 = 결정론 공식 탐구 + 사람 승인 라벨 | 확정 (0033) |
