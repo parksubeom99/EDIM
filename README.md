@@ -8,7 +8,7 @@
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)
 ![Prisma](https://img.shields.io/badge/Prisma-6-2D3748?logo=prisma&logoColor=white)
 
-> 상태(2026-09-28 · main): 발표 시나리오 e2e **334/334** — 개발 모드 · 운영 모드(`next build → start`) · 배포 킷 컨테이너 각각 · 단위 테스트 **270**(vitest) + auth · DB 검증 **9종** PASS · 청사진 70쪽 중 **실동 34 · 부분 12 · 미착수 5**(개념·표지 19 — 엘 확정판 3)
+> 상태(2026-09-28 · main): 발표 시나리오 e2e **334/334** — 개발 모드 · 운영 모드(`next build → start`) · 배포 킷 컨테이너 각각 · 단위 테스트 **270**(vitest) + auth · DB 검증 **9종** PASS · 청사진 70쪽 중 **실동 34 · 부분 12 · 미착수 5**(개념·표지 19 — 엘 확정판 3 · ccmd I 초안은 **37 · 9 · 5**, 엘 재측정 전)
 
 ## 왜 만들었나
 

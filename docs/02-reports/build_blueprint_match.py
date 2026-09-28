@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""EDIM 청사진 70장 대조 보고서 (엘 확정판) — 생성기
+"""EDIM 청사진 70장 대조 보고서 (엘 확정판 3 + CC 초안 — 엘 재측정 전: p11 · p39 · p48 · p58, ccmd I 2026-09-28) — 생성기
 
 왼쪽: 청사진(EDIM.pdf) 원본 쪽  /  오른쪽: 지금 실제로 도는 화면(demo_e2e 산출 스크린샷)
 판정 데이터 PAGES 하나에서 세 가지가 나온다: 다크 HTML(화면용) · 흰 HTML(→ A4 가로 PDF) · docs/00-corpus/page-map.md
@@ -18,7 +18,7 @@ from PIL import Image
 
 CORPUS, SHOTS, OUTDIR = sys.argv[1], sys.argv[2], sys.argv[3]
 MAIN = sys.argv[4] if len(sys.argv) > 4 else "p6"
-DATE = "2026-09-27"
+DATE = "2026-09-28"
 HERE = os.path.dirname(os.path.abspath(__file__))
 DECK = os.path.join(HERE, "..", "deck")
 
@@ -62,10 +62,11 @@ PAGES = {
        "rls:test · platform:test 25 · e2e S16g", "41_platform_console", "배포는 80% 완성·발표 이후 결정 사안"),
  10: pg("C", "간지 + 흐름", "Project Registration ▶ Product Selection ▶ Document ▷ ERP",
         ["이 네 단계가 얇게 한 줄로 이어져 돈다: 프로젝트 노드 → 코드 조립 → BOM·도면·견적·Tech Data → 구매 요청"], [], "e2e S1 → S2 → S6 → S25 → S26", "44_document_tab"),
- 11: pg("P", "Log in", "로그인",
-        ["이메일 로그인 → 세션 → 테넌트 결정 → 역할(RBAC) 가드 ✓", "권한 없는 역할의 등록 시도는 403"],
-        ["**비밀번호가 없다** — 베타용 최소 인증(화면에 'sign in (dev)'라고 적혀 있다)", "NOVA Solution 브랜딩 · SSO 없음"],
-        "auth 테스트 PASS · e2e S0 · S11", "00_login", "실 인증은 배포 결정과 함께"),
+ 11: pg("L", "Log in", "로그인",
+        ["**이메일 + 비밀번호**(0032 · scrypt 해시 · timingSafeEqual) → 세션 → 테넌트 결정 → 역할(RBAC) 가드 ✓", "권한 없는 역할의 등록 시도는 403",
+         "틀리면 한 문장('이메일 또는 비밀번호가 맞지 않습니다' — 계정 존재를 흘리지 않음) · **5회/10분 잠금 429** · 비밀번호 없는 옛 계정은 운영 모드에서 거절 · 플랫폼 관리자도 같은 판정"],
+        ["SSO — 필요한 입력: 고객사 IdP 주소 · client id (EDIM_OIDC_ISSUER 가 있으면 버튼 자리만 보인다 · docs/DEPLOY.md)", "NOVA Solution 브랜딩 — 회사 로고·문구"],
+        "auth password.test · auth-tenant.test · e2e S0 · S0a~e · S11", "00_login", "SSO 는 고객사 IdP 가 들어오면(CC 초안 — 엘 재측정 전)"),
  12: pg("L", "ERP / Sale / Project Management", "프로젝트 등록·관리",
         ["/m/project — 등록(Registration Process) · 헤더(Type·Client·담당자·Remarks·Description) 수정 · **영업 단계 전이** · 접수 자료(File) 등록·내려받기(②)",
          "Client 를 **Company DB 고객 목록**에서 고르면 id 와 이름이 함께 남는다(⑧ · 옛 글자 데이터 보존)",
@@ -179,11 +180,12 @@ PAGES = {
         ["Key Dimension 표(W·H·L) → DXF. 한 칸 2472→2600 이면 **폭만** 따라 바뀐다(ezdxf 로 파싱해 확인)", "한 번의 저장으로 BOM 수량·원가·구매 수량·도면 폭이 **함께** 바뀌고 앞 스냅샷은 그대로(S30)", "평면도·조립도 2종 · 번호·개정·상태·발행 잠금", "**치수가 BOM 스냅샷에 박힌다(0011)** — 도면은 스냅샷 치수만 읽고, 09-21 의 임시 가드(409)는 걷어냈다(옛 스냅샷은 422)", "**한 칸이 둘 다에 닿는다**: 사양 문자열이 cap.face 대신 dim.W/H 를 읽어, W 한 칸을 고치면 BOM 사양·도면·원가가 함께 바뀐다(S30b2 — 09-21 의 중복 해소)"],
         ["도면은 아직 **선과 글자** 수준 — 제작도가 아니다", "Detail Dimension · 부품도 · KAD-□ 슬롯 문법 없음", "구획별 치수는 길이 한 축(p36)"],
         "e2e S18a~S18f · S19a~S19e · S30a~g · S31 · S40(설계 검증 422) · drawing:test 23", "43_drawings", "DXF 연구 결과와 CAD 담당의 Drawing Set-Up 입력이 필요"),
- 39: pg("P", "Set-Up / PLM / Work Process / Design", "도면 Templet 호출 설정 6단계",
+ 39: pg("L", "Set-Up / PLM / Work Process / Design", "도면 Templet 호출 설정 6단계",
         ["1) Product Item 호출 ✓ · 도면 치수 ✓ · 사용 승인 절차(상태 4단계) ✓", "**용도별 구분**(⑦) — 승인도·제작도·견적도 · 발행 전까지만 용도 변경",
-         "**도면 템플릿**(H5) — 제품마다 **하부 도면(Sub Drawing) 호출** · **설계 우선순위**(작을수록 먼저, 같으면 코드 순) · 도면을 뜨는 순간 스냅샷에 있는 하위 코드만 도면에 박힌다"],
-        ["설계 검증은 규칙 표로 돈다(p36) — **Macro 로 쓰는 검증**은 아직(소프트웨어 몫)"],
-        "e2e S7 · S18a · S48a~d · S64a~e", "74_sub_drawing"),
+         "**도면 템플릿**(H5) — 제품마다 **하부 도면(Sub Drawing) 호출** · **설계 우선순위**(작을수록 먼저, 같으면 코드 순) · 도면을 뜨는 순간 스냅샷에 있는 하위 코드만 도면에 박힌다",
+         "**Macro 로 쓰는 설계 검증**(E6) — 규칙 표 op=macro(값 = 승인 매크로 이름) → 승인 매크로를 스냅샷 값으로 결정론 실행 · 0 이면 위반 → 도면 422 · 없음/미승인/오류도 위반 · 판정은 스냅샷에 박힘"],
+        [],
+        "e2e S7 · S18a · S48a~d · S64a~e · S70a~d", "80_macro_verify", "CC 초안 — 엘 재측정 전"),
  40: pg("L", "Work Process / Design", "Call Sub Drawing · Assembling · Detail Design",
         ["조립도 1장에 Item 표 + 풍선번호", "**분해도(Exploded)** — 조립 순서 번호(Arrangement 구획 순서 그대로 · 0013)",
          "**Call Sub Drawing**(H5) — 도면 시트에 하부 도면 표(Item · Description · Q'ty · Remarks · 코드에 첨부한 DWG) · **Detail Design 주의사항** 목록 · 템플릿을 고쳐도 뜬 도면은 그대로"],
@@ -205,12 +207,13 @@ PAGES = {
          "**Output Data 템플릿 · 그래프 전용 data · 그래프 · Table List**(H6) — Tech Data 를 만들 때 값·그래프가 문서에 박힌다",
          "**Coding List**(H7) — 노드마다 승인 매크로 1개 · 마지막 BOM 이 쓴 개정 · Inspector 에서 이동"],
         ["Output 계산식(밀도 등) — 필요한 입력: 회사 계산식"], "e2e S5 · S10d · S50 · S65a~e · S66a~d", "76_coding_list"),
- 48: pg("P", "S-3-4 · Print Set-up", "인쇄",
+ 48: pg("L", "S-3-4 · Print Set-up", "인쇄",
         ["견적서·Tech Data **인쇄본(흰 A4)** ✓ — 브라우저에서 PDF 저장",
          "**Print Set-up Form**(③) — 용지 · 여백 · 글꼴 · 머리글/바닥글 · 워터마크(숫자는 그대로)",
-         "**인쇄 양식 편집기**(H9) — 제목 · 필드 · 표 · 도면 · 그래프 · 서명칸 · 로고 · 글상자를 끌어 배치·크기 조절 → 새 버전 · 인쇄본이 배치를 따르고 **발행본은 발행 순간 버전에 고정**"],
-        ["File 내보내기(Office .docx · .xlsx) 없음 — 인쇄본은 브라우저 PDF 저장뿐(소프트웨어 몫)"],
-        "e2e S22c · S43 · S68a~e", "78_print_layout"),
+         "**인쇄 양식 편집기**(H9) — 제목 · 필드 · 표 · 도면 · 그래프 · 서명칸 · 로고 · 글상자를 끌어 배치·크기 조절 → 새 버전 · 인쇄본이 배치를 따르고 **발행본은 발행 순간 버전에 고정**",
+         "**File 내보내기(Office)**(E7) — 인쇄본 상단 Word · Excel → 같은 스냅샷 body 를 .docx · .xlsx 로(양식 순서 · 엑셀은 숫자 값 · 합계 SUM 식 · 한글 파일명) · viewer 403"],
+        [],
+        "e2e S22c · S43 · S68a~e · S71a~c(python-docx · openpyxl 로 열어 인쇄본과 대조)", "78_print_layout", "CC 초안 — 엘 재측정 전"),
  49: pg("C", "간지", "User Set-Up"),
  50: pg("L", "Set-Up / User ERP / Sale / Project Management", "프로젝트 관리(사용자 ERP)",
         ["p12 와 같은 화면(②) — 등록 · 헤더 · 담당자 · 영업 단계 전이 · 접수 자료(File)", "Client = Company DB 고객(⑧)",
@@ -242,9 +245,9 @@ PAGES = {
  58: pg("P", "E-2 · Toolbar Module", "Main Work place Toolbar",
         ["**명령 버튼이 돈다**: Arrangement ▼ · Move · Delete · Add · Copy · DWG View ▼ · 승인(Module)",
          "개념도에서 구획을 고르면 Move·Delete·Copy 가 풀리고, 편집은 Design 초안 → 기존 '저장' 한 곳으로만 반영된다",
+         "**Delete 미리 잠금**(E8) — BOM 관계가 걸린 구획을 고르면 툴바 Delete 도 표의 Delete 처럼 눌리지 않고 이유를 적는다(서버 409 는 그대로)",
          "**그림 제작 Module 1단계**(H10) — 도면 위 주석(선 · 사각형 · 글자 · 치수선) 추가·이동·삭제 · 원 도면 불변 · DXF 내보내기에 ANNOT 레이어 · 발행 도면은 잠김"],
-        ["Free CAD · 설계 심볼은 잠긴 자리 — 필요한 결정: EDIM 안 CAD 편집기(M4 · M5)",
-         "Delete 는 선택이 잠긴 구획이어도 눌리고 거부 문구로 막는다(표 쪽 Delete 는 미리 잠김) — 소프트웨어 몫"],
+        ["Free CAD · 설계 심볼은 잠긴 자리 — 필요한 결정: EDIM 안 CAD 편집기(M4 · M5)"],
         "e2e S41a~l · S69a~f", "79_draw_module", "Free CAD 는 실제 CAD 편집기 결정 후"),
  59: pg("L", "E-3 · Key Work Place", "Hierarchy 와 Run 심볼",
         ["Work Hierarchy 트리에서 노드를 고르면 작업 대상이 호출된다", "EDIM Run · BOM Run · EBOM Run · Cost · Approval Request ✓"], ["Hierarchy(Edit) · Data Up-Load · DWG 폴더 없음"],
@@ -383,13 +386,11 @@ def s_page(p):
 def s_remaining():
     return '''<section class="slide"><div class="stage"><header><span class="no">끝1</span><h2>남은 작업 — 엘·CC 가 지시만 받으면 하는 것</h2></header>
 <div class="own"><table class="ot"><thead><tr><th>#</th><th>작업</th><th>왜 엘·CC 가 할 수 있나</th><th>선행 조건</th><th>나오는 것</th></tr></thead><tbody>
-<tr><td>E2</td><td><b>배포 환경 점검</b> — 연결 고갈 수리본은 main 에 들어갔다(09-27 밤 · 운영 모드 e2e 연결 15~16). 남은 것: 배포 대상 환경의 DB·비밀값·도메인 점검</td><td>머지 게이트에 운영 모드 e2e 가 상시로 들어갔다</td><td>배포 결정(M5) 뒤</td><td>p9 선행</td></tr>
+<tr><td>E2</td><td><b>클라우드 배포</b> — 배포 킷(Dockerfile · docker-compose.prod.yml · DEPLOY.md)은 끝, 킷 컨테이너 e2e 334/334(09-28 밤). 남은 것: 대상 환경의 DB 백업 · 도메인/HTTPS · 연결 풀</td><td>킷과 체크리스트가 repo 에 있다</td><td>배포 결정(M5) 뒤</td><td>p9</td></tr>
 <tr><td>E4</td><td>EDIM 안 CAD 편집기 · 설계 심볼 · 제작도 수준 도면 — 주석 레이어 1단계(H10)는 끝, 실제 도형 편집은 아직</td><td>도면 선·치수 전파는 결정론으로 돈다</td><td>회사 CAD 규칙(M4) · 편집기 결정(M5)</td><td>p58 · 38</td></tr>
-<tr><td>E5</td><td>발표 덱 · 진행현황 보고서를 이번 main 반영본으로 재생성</td><td>생성기가 repo 에 있다</td><td>이 판정을 회장님이 조정한 뒤</td><td>덱 · 진행현황 새 판</td></tr>
-<tr><td>E6</td><td>Macro 로 쓰는 설계 검증(p39) — 지금은 규칙 표(p36)</td><td>매크로 실행기·검증 규칙 표가 이미 돈다</td><td>없음 — 지시만</td><td>p39 부분 → 실동</td></tr>
-<tr><td>E7</td><td>인쇄본 Office 내보내기(.docx · .xlsx) — 지금은 브라우저 PDF</td><td>인쇄본은 스냅샷 body 에서만 나온다(그대로 옮기면 된다)</td><td>없음 — 지시만</td><td>p48 부분 → 실동</td></tr>
-<tr><td>E8</td><td>툴바 Delete — 잠긴 구획이면 미리 잠그기(표 쪽과 같게)</td><td>작은 화면 일관성 수정</td><td>없음 — 지시만</td><td>p58 gap 하나</td></tr>
+<tr><td>E5</td><td>발표 덱 · 진행현황 보고서를 이번 main 반영본으로 재생성</td><td>생성기가 repo 에 있다</td><td>이 판정을 엘이 재측정·확정한 뒤</td><td>덱 · 진행현황 새 판</td></tr>
 </tbody></table>
+<p class="onote">09-28 밤(ccmd I) 끝낸 것: E6 Macro 설계 검증(p39) · E7 Office 내보내기(p48) · E8 툴바 Delete 미리 잠금(p58) · 비밀번호 로그인(p11 · 0032) · 배포 킷 · CI 배선(M6 → 초록) · 저장소 공개 → 3쪽 부분 → 실동(CC 초안 — 엘 재측정 전).</p>
 <p class="onote">09-27 밤(ccmd H) 끝낸 것: 연결 고갈 수리 머지 · 시연 안전판 태그 · H4 ERP 기준정보 6종 · H5 Sub Drawing·주의사항 · H6 Output·그래프·Table List · H7 Coding List · H8 함수·그래프 마법사·Data Management · H9 인쇄 양식 편집기 · H10 도면 주석 → 5쪽 부분 → 실동(엘 확정).</p>
 </div></div></section>
 
@@ -399,8 +400,7 @@ def s_remaining():
 <tr><td>M2</td><td>DXF 추출 연구 결과 → 학습 DB(DB①)</td><td>회장님이 직접 연구 중인 자료</td><td>p21 · 23</td><td>결과 파일·정리</td></tr>
 <tr><td>M3</td><td><b>사장님</b> D1 — Special Tool Box 첫 사례</td><td>사장님 영역</td><td>Special 슬롯</td><td>사례 1건</td></tr>
 <tr><td>M4</td><td>회사 CAD 규칙 — mm 배치 · 기준점 · KAD-□ 슬롯 문법 · 코드 Group 분류</td><td>CAD 담당 자료다</td><td>p28 · 30 · 35 · 36 · 38 · 42</td><td>규칙 문서·예시 도면</td></tr>
-<tr><td>M5</td><td>결정 — 배포 여부 · 비밀번호/SSO 방향 · AI 키</td><td>결정·비용은 회장님 권한</td><td>p9 · 11 · 25 · 26</td><td>한 줄 결정 · 키 1개</td></tr>
-<tr><td>M6</td><td>CI 워크플로 배선 — <code>docs/ci/ci.yml</code> → <code>.github/workflows/</code></td><td>토큰에 Workflows 권한이 없다</td><td>—</td><td>GitHub 웹에서 파일 추가(2분)</td></tr>
+<tr><td>M5</td><td>결정 — 배포 대상 · SSO(고객사 IdP) · AI 키</td><td>결정·비용은 회장님 권한</td><td>p9 · 11 · 25 · 26</td><td>한 줄 결정 · 키 1개</td></tr>
 </tbody></table>
 <p class="onote">범위 밖(회장님 확정): p43·p44 생산·MES · p69 파트너·모바일·QR — EDIM 완료 후 확장 단계(ERP → Digital Twin → AR·XR).</p>
 </div></div></section>'''
