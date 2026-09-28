@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""EDIM 청사진 70장 대조 보고서 (엘 확정판 3 + CC 초안 — 엘 재측정 전: p11 · p39 · p48 · p58, ccmd I 2026-09-28) — 생성기
+"""EDIM 청사진 70장 대조 보고서 (엘 확정판 3 + CC 초안 — 엘 재측정 전: p11 · p39 · p48 · p58(ccmd I) · p21 · p23 · p25 · p26(ccmd J 2026-09-29)) — 생성기
 
 왼쪽: 청사진(EDIM.pdf) 원본 쪽  /  오른쪽: 지금 실제로 도는 화면(demo_e2e 산출 스크린샷)
 판정 데이터 PAGES 하나에서 세 가지가 나온다: 다크 HTML(화면용) · 흰 HTML(→ A4 가로 PDF) · docs/00-corpus/page-map.md
@@ -18,7 +18,7 @@ from PIL import Image
 
 CORPUS, SHOTS, OUTDIR = sys.argv[1], sys.argv[2], sys.argv[3]
 MAIN = sys.argv[4] if len(sys.argv) > 4 else "p6"
-DATE = "2026-09-28"
+DATE = "2026-09-29"
 HERE = os.path.dirname(os.path.abspath(__file__))
 DECK = os.path.join(HERE, "..", "deck")
 
@@ -111,26 +111,34 @@ PAGES = {
  19: pg("C", "간지", "Detail Process"),  # 글자가 이미지로 들어 있어 텍스트 추출본은 비어 있다 — 쪽 이미지를 보고 확인(2026-09-21)
  20: pg("C", "간지", "System tool — 사용자가 직접 필요한 System Customizing"),
  21: pg("P", "EDIM Toolbox", "UI Tool · Program Tool · 학습 DB",
-        ["MainForm 옆에 뜨는 플로팅 창 · UI Tool / Program Tool 탭 · 드래그·도킹·상태 유지 ✓", "Program Tool: Prompt · Macro · Flowchart · Description · Coding 다섯 갈래"],
-        ["UI Tool 은 Command button 한 가지뿐(→ p25)", "3. 사내 정보 학습 DB화 없음(P3-b)"],
-        "e2e S13a · S15a~S15c", "31_toolbox_ui_tool", "P3-b 는 회장님 DXF 추출 연구 결과 후"),
+        ["MainForm 옆에 뜨는 플로팅 창 · UI Tool / Program Tool 탭 · 드래그·도킹·상태 유지 ✓", "Program Tool: Prompt · Macro · Flowchart · Description · Coding 다섯 갈래",
+         "**3. 사내 정보 학습 DB화**(ccmd J · 1수준) — 플랫폼 학습 AI 가 찾아 승인·투영한 공식이 Program Tool '학습 제안'으로 오고, 채택 → 초안(검증) → 승인 → Run",
+         "**Special 탭**(ccmd J) — 부여된 회사만 'Special: 팬 선정' · 입력 화면은 회사가 만든 UI Form 그대로"],
+        ["UI Tool 탭 자체는 Command button 한 가지뿐(UI Form 은 Set-Up 작업장 · → p25)"],
+        "e2e S13a · S15a~S15c · S72f · S74b", "31_toolbox_ui_tool", "CC 초안 — 엘 재측정 전"),
  22: pg("L", "EDIM Tool programming Process", "① Data Set-up → … → ⑥ Programming → ⑦ 검증·승인",
         ["① 표 등록 → ③ Item 호출 → ④ 작업 대상 호출 → ⑤ Toolbox 호출 → ⑥ 매크로 작성 → ⑦ 검증·승인이 이어져 돈다", "Toolbox 의 Run 이 곧 MainForm 의 Run(같은 값)"],
         ["② 사용자 제작 UI 는 Command button 수준"], "e2e S13a~S13f · S4a~S4c", "30_toolbox_program"),
- 23: pg("N", "EDIM AI Tool", "AI 학습 자료 DB — 도면·문서 학습",
-        [], ["DB①(platform 스키마)은 **구조만 있고 비어 있다**", "메타데이터 추출(하) · 2D 도면 객체 이해(중) · 3D 형상(상) 어느 단계도 없다"],
-        "e2e S16f(DB① 비어 있음을 단언)", None, "P3-b — 회장님 DXF 추출 연구 결과가 입력. D4 하이브리드로 결정됨"),
+ 23: pg("P", "EDIM AI Tool", "AI 학습 자료 DB — 도면·문서 학습",
+        ["**학습 AI 1수준**(ccmd J) — 플랫폼 관리자가 도면(DXF)·기술문서(표 CSV)를 **DB① 에만** 올리면 추출(치수 글자 · 선 · 레이어 · 코드) → 정렬화(사전 + 로컬 AI) → 공식 탐구(결정론) → 검증 → 사람 승인",
+         "**AI 학습 계산식** — 샘플 도면 68장에서 숨겨 둔 공식 3개(전장 = Σ 구획 · 전고 = 케이싱 + 2 × 프레임 · 코일 깊이 = 25 × 열수 + 50)를 적합도(허용 1 mm · 어긋남 ≤ 5 %)와 함께 다시 찾는다 · 잡음 도면 3장을 어긋남으로",
+         "**이중 프로젝션** — 승인 공식만 π_user 로 회사 착지 표에 한쪽 방향(SECURITY DEFINER 함수) · 구조 유사도 계기판 · 운영 감시(새 도면이 승인 공식에 어긋나면 계기판)",
+         "역류 0 을 DB 권한으로 — learning:test 24"],
+        ["3D 형상 학습(상) · 스캔 도면 OCR · PDF → DXF — 필요한 입력: 회사 3D/스캔 자료 · 도면 표준", "일반 서류(ERP 연동 문서) 학습 · PDF 문서 해석 — 필요한 입력: 문서 양식", "실제 회사 도면 — 지금은 전부 샘플(M2 회장님 DXF 연구 결과)"],
+        "learning:test · e2e S72a~h", "82_formula_cards", "CC 초안 — 엘 재측정 전"),
  24: pg("L", "EDIM AI Tool · 도면 DB", "Projects · Drawings · Revisions",
         ["Revisions: 개정 번호(A,B,…)·사유·개정자, **append-only**(앱 역할에 UPDATE/DELETE 권한 없음)", "개정 = **슬롯 A~F 전체 코드**(2026-09-22 회장님 결정) — F 가 붙은 실행도 자기 근거 개정으로 추적된다", "Drawings: 번호·유형·현재 개정·상태(작성중/검토/승인/발행), 발행은 DB 트리거가 잠근다"],
         ["Parts · BOM · Material 테이블은 코드 카탈로그 + BOM 스냅샷 구조로 대체(GAP1 결정)", "scale · size 열 없음"],
         "revision:test · drawing:test 18 · e2e S2b~S2d · S19 · S28e", "11b_revisions"),
  25: pg("P", "S-2 · EDIM Toolbox UI", "사용자 UI Form — Command button · Combo box · Templet",
         ["Command button set-up ✓ — 보이기·순서 변경이 MainForm Action Bar 에 **즉시 반영**, 기본값 복원",
-         "**UI Form**(④) — Combo box(=Sub Code) · Table(=제품 표) · Button(찾기·초기화·복사) 을 끌어다 놓고 Set-up, Templet 호출 = 복사해 고치기, Run 은 실제 카탈로그 데이터"],
-        ["UI 개발 AI(설명을 주면 UI 자동 설계) 없음", "Form 을 MainForm 작업 흐름에 끼워 넣는 연결은 Toolbox 링크까지"],
-        "e2e S14a · S14b · S44a~f", "57_ui_design"),
+         "**UI Form**(④) — Combo box(=Sub Code) · Table(=제품 표) · Button(찾기·초기화·복사) 을 끌어다 놓고 Set-up, Templet 호출 = 복사해 고치기, Run 은 실제 카탈로그 데이터",
+         "**Number 입력 위젯**(ccmd J) — 입력 이름(param)·단위 · 회사가 만든 폼이 Special '팬 선정'의 입력 화면으로 그대로 쓰인다(같은 위젯 id)"],
+        ["UI 개발 AI(설명을 주면 UI 자동 설계) 없음", "Form 을 MainForm 작업 흐름에 끼워 넣는 연결은 Toolbox(링크 · Special 입력)까지"],
+        "e2e S14a · S14b · S44a~f · S74b", "57_ui_design"),
  26: pg("P", "S-2-1 · Set-Up / EDIM UI Design", "UI Design 작업장",
-        ["**/setup/ui 작업장**(④) — 팔레트에서 24×16 캔버스로 끌어다 놓기(겹침 없는 자리 자동) · 위젯별 Set-up · Sample Templet 호출(복사) · 저장·Run"],
+        ["**/setup/ui 작업장**(④) — 팔레트에서 24×16 캔버스로 끌어다 놓기(겹침 없는 자리 자동) · 위젯별 Set-up · Sample Templet 호출(복사) · 저장·Run",
+         "Number 위젯 set-up(입력 이름 · 단위) · Run 에서 숫자 입력(ccmd J)"],
         ["Work Hierarchy 노드별로 다른 UI 를 붙이는 연결 없음", "UI 개발 AI 없음"],
         "e2e S44a~f", "57_ui_design"),
  27: pg("L", "S-2-2 · EDIM Toolbox Macro", "매크로 — 제안 → 검토 → 승인",
@@ -390,6 +398,7 @@ def s_remaining():
 <tr><td>E4</td><td>EDIM 안 CAD 편집기 · 설계 심볼 · 제작도 수준 도면 — 주석 레이어 1단계(H10)는 끝, 실제 도형 편집은 아직</td><td>도면 선·치수 전파는 결정론으로 돈다</td><td>회사 CAD 규칙(M4) · 편집기 결정(M5)</td><td>p58 · 38</td></tr>
 <tr><td>E5</td><td>발표 덱 · 진행현황 보고서를 이번 main 반영본으로 재생성</td><td>생성기가 repo 에 있다</td><td>이 판정을 엘이 재측정·확정한 뒤</td><td>덱 · 진행현황 새 판</td></tr>
 </tbody></table>
+<p class="onote">09-29(ccmd J) 끝낸 것: 학습 AI 1수준 + 이중 프로젝션(로컬 AI 선택) · Special 첫 사례 팬 선정 → p23 미착수 → 부분(CC 초안 — 엘 재측정 전).</p>
 <p class="onote">09-28 밤(ccmd I) 끝낸 것: E6 Macro 설계 검증(p39) · E7 Office 내보내기(p48) · E8 툴바 Delete 미리 잠금(p58) · 비밀번호 로그인(p11 · 0032) · 배포 킷 · CI 배선(M6 → 초록) · 저장소 공개 → 3쪽 부분 → 실동(CC 초안 — 엘 재측정 전).</p>
 <p class="onote">09-27 밤(ccmd H) 끝낸 것: 연결 고갈 수리 머지 · 시연 안전판 태그 · H4 ERP 기준정보 6종 · H5 Sub Drawing·주의사항 · H6 Output·그래프·Table List · H7 Coding List · H8 함수·그래프 마법사·Data Management · H9 인쇄 양식 편집기 · H10 도면 주석 → 5쪽 부분 → 실동(엘 확정).</p>
 </div></div></section>
@@ -397,8 +406,8 @@ def s_remaining():
 <section class="slide"><div class="stage"><header><span class="no">끝2</span><h2>남은 작업 — 회장님·사장님 자료와 결정이 필요한 것</h2></header>
 <div class="own"><table class="ot"><thead><tr><th>#</th><th>작업</th><th>왜 엘이 못 하나</th><th>여는 쪽</th><th>주시면 되는 것</th></tr></thead><tbody>
 <tr><td>M1</td><td><b>회사 실 단가 · 표 · 계산서 양식</b></td><td>회사 자료다 — 지금 수치는 전부 샘플</td><td>p15 · 62 · 66 · 67</td><td>엑셀·표 파일</td></tr>
-<tr><td>M2</td><td>DXF 추출 연구 결과 → 학습 DB(DB①)</td><td>회장님이 직접 연구 중인 자료</td><td>p21 · 23</td><td>결과 파일·정리</td></tr>
-<tr><td>M3</td><td><b>사장님</b> D1 — Special Tool Box 첫 사례</td><td>사장님 영역</td><td>Special 슬롯</td><td>사례 1건</td></tr>
+<tr><td>M2</td><td>실제 회사 도면 · 기술문서 → 학습 DB(DB①) — 1수준 파이프라인은 샘플로 돈다(ccmd J)</td><td>회사 자료다 · 공개 동의</td><td>p21 · 23</td><td>DXF · 표 파일</td></tr>
+<tr><td>M3</td><td>Special 팬 선정 — 실제 제조사 팬 성능표 · 단가(지금은 샘플 곡선 · 샘플 단가)</td><td>제조사 자료 · 가격 결정</td><td>Special</td><td>성능표 · 단가</td></tr>
 <tr><td>M4</td><td>회사 CAD 규칙 — mm 배치 · 기준점 · KAD-□ 슬롯 문법 · 코드 Group 분류</td><td>CAD 담당 자료다</td><td>p28 · 30 · 35 · 36 · 38 · 42</td><td>규칙 문서·예시 도면</td></tr>
 <tr><td>M5</td><td>결정 — 배포 대상 · SSO(고객사 IdP) · AI 키</td><td>결정·비용은 회장님 권한</td><td>p9 · 11 · 25 · 26</td><td>한 줄 결정 · 키 1개</td></tr>
 </tbody></table>
