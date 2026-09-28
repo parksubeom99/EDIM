@@ -1,0 +1,54 @@
+# EDIM 운영 모드 한 줄 실행 (docs/DEPLOY.md):
+#   AUTH_SECRET=$(openssl rand -base64 32) docker compose -f docker-compose.prod.yml up -d --build
+# db(PG16) → migrate(1회성: 마이그레이션 + 샘플 시드) → web(next start · 운영 모드) · 포트 3000.
+# 개발 DB(docker-compose.yml, 5433)와 겹치지 않게 이 킷의 DB 는 밖으로 열지 않는다.
+name: edim-prod
+
+x-db-urls: &db-urls
+  DATABASE_URL: postgresql://edim:${EDIM_DB_PASSWORD:-edim}@db:5432/edim?schema=public
+  APP_DATABASE_URL: postgresql://edim_app:edim_app@db:5432/edim?schema=public
+  PLATFORM_DATABASE_URL: postgresql://edim_platform:edim_platform@db:5432/edim?schema=public
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: edim
+      POSTGRES_PASSWORD: ${EDIM_DB_PASSWORD:-edim}
+      POSTGRES_DB: edim
+    volumes:
+      - edim-prod-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U edim -d edim"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  migrate:
+    build: { context: ., dockerfile: apps/web/Dockerfile, target: builder }
+    image: edim-migrate:local
+    environment:
+      <<: *db-urls
+      EDIM_SEED_DEMO: ${EDIM_SEED_DEMO:-1}
+    command: >-
+      sh -c "pnpm --filter @edim/db exec prisma migrate deploy &&
+             if [ \"$$EDIM_SEED_DEMO\" = 1 ]; then pnpm --filter @edim/db exec tsx prisma/seed.ts && pnpm --filter @edim/db exec tsx prisma/seed-demo.ts; fi"
+    depends_on:
+      db: { condition: service_healthy }
+    restart: "no"
+
+  web:
+    build: { context: ., dockerfile: apps/web/Dockerfile, target: runner }
+    image: edim-web:local
+    environment:
+      <<: *db-urls
+      AUTH_SECRET: ${AUTH_SECRET:?AUTH_SECRET 를 넣으십시오 — openssl rand -base64 32}
+      EDIM_DEV_LOGIN: "0"
+    ports:
+      - "3000:3000"
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    restart: unless-stopped
+
+volumes:
+  edim-prod-pgdata:

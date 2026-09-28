@@ -15,10 +15,10 @@ import { findPlatformAdmin } from "@edim/db";
  * 재확인과 같은 이유).
  */
 export async function getPlatformSession(): Promise<PlatformSessionData | null> {
+  const store = await cookies();   // 먼저 — dynamic 표지(getServerSession 과 같은 이유)
   const secret = process.env.AUTH_SECRET;
   if (!secret) return null;
 
-  const store = await cookies();
   const raw = store.get(PLATFORM_SESSION_COOKIE)?.value;
   if (!raw) return null;
 
