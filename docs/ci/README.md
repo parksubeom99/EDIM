@@ -1,3 +1,7 @@
+# CI 워크플로 — 배선 완료
+
+원본은 [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) 이다(2026-09-28 배선). 아래는 배선 전 기록.
+
 # CI 워크플로 (배치 대기)
 
 `ci.yml`은 `.github/workflows/ci.yml`로 옮겨야 동작한다.

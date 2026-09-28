@@ -1,0 +1,40 @@
+# EDIM CI — 원본(ccmd I STEP 7 에서 docs/ci/ci.yml 에서 옮겨 배선). typecheck · 단위 · DB 검증 9종.
+name: CI
+on:
+  push:
+    branches: [main, "feat/**"]
+  pull_request:
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: postgres:16-alpine
+        env: { POSTGRES_USER: edim, POSTGRES_PASSWORD: edim, POSTGRES_DB: edim }
+        ports: ["5433:5432"]
+        options: >-
+          --health-cmd "pg_isready -U edim -d edim" --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4   # 버전은 package.json packageManager(pnpm@9.15.4)를 따른다
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: cp .env.example .env    # AUTH_SECRET 은 .env.example 의 개발용 값(비밀 아님)
+      - run: pnpm db:generate
+      - run: pnpm db:migrate
+      - run: pnpm db:seed
+      - run: pnpm db:seed:demo
+      - run: pnpm typecheck
+      - run: pnpm -r --workspace-concurrency=1 test
+      # DB 가 직접 막는 규칙들 — 앱을 우회해도 거부되는지(RLS · append-only · 발행/발주 잠금 · 플랫폼 열람 차단)
+      - run: pnpm --filter @edim/db rls:test
+      - run: pnpm --filter @edim/db revision:test
+      - run: pnpm --filter @edim/db backbone:test
+      - run: pnpm --filter @edim/db platform:test
+      - run: pnpm --filter @edim/db drawing:test
+      - run: pnpm --filter @edim/db document:test
+      - run: pnpm --filter @edim/db project:test
+      # 아래 둘은 시드를 다시 깔고(macro 는 매크로를 전부 지운다) 돌기 때문에 맨 끝에 둔다
+      - run: pnpm --filter @edim/db hierarchy:test
+      - run: pnpm --filter @edim/db macro:test
