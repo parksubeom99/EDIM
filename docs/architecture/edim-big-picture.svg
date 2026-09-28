@@ -1,0 +1,50 @@
+<svg viewBox="0 0 1100 830" xmlns="http://www.w3.org/2000/svg" font-family="Pretendard, Noto Sans KR, Noto Sans CJK KR, sans-serif">
+<rect width="1100" height="830" rx="24" fill="#ffffff"/>
+<text x="30" y="44" font-size="22" font-weight="800" fill="#17202b">EDIM 전체 구조 — 무엇이 어디로 흐르고, 어디서 막히나</text>
+<defs>
+<marker id="a1" markerUnits="userSpaceOnUse" markerWidth="16" markerHeight="16" refX="14" refY="8" orient="auto"><path d="M0,0 L16,8 L0,16 z" fill="#0e7c6b"/></marker>
+<marker id="a2" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto"><path d="M0,0 L12,6 L0,12 z" fill="#566273"/></marker>
+<marker id="a3" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" refX="2" refY="6" orient="auto"><path d="M12,0 L0,6 L12,12 z" fill="#566273"/></marker>
+</defs>
+<g transform="translate(0,50)">
+<rect x="18" y="18" width="440" height="470" rx="26" fill="#f5f8fb" stroke="#c9d3de" stroke-width="2" stroke-dasharray="6 6"/>
+<text x="40" y="50" font-size="15" font-weight="700" fill="#566273">※③ 관리자 영역 — 플랫폼 소유 · DB 권한으로 격리</text>
+<rect x="478" y="18" width="604" height="704" rx="26" fill="#f5f8fb" stroke="#c9d3de" stroke-width="2" stroke-dasharray="6 6"/>
+<text x="500" y="50" font-size="15" font-weight="700" fill="#566273">사용자 영역 — 회사 관리자 → 하부 조직 (회사별 RLS)</text>
+<path d="M70,610 C20,520 20,300 60,262" fill="none" stroke="#0e7c6b" stroke-width="5" marker-end="url(#a1)"/>
+<path d="M210,215 L210,150" fill="none" stroke="#0e7c6b" stroke-width="5" marker-end="url(#a1)"/>
+<path d="M360,100 C440,70 500,90 560,140" fill="none" stroke="#0e7c6b" stroke-width="3" marker-end="url(#a1)"/>
+<text x="330" y="80" font-size="13.5" fill="#566273">π_user 단방향 투영 · 구조 유사도 90% 목표</text>
+<path d="M560,172 C500,200 440,190 380,140" fill="none" stroke="#c0392b" stroke-width="3" stroke-dasharray="3 5"/>
+<text x="455" y="205" font-size="26" font-weight="900" fill="#c0392b">✕</text><text x="372" y="232" font-size="13.5" fill="#566273">DB② → DB① 역류 없음 (DB 권한)</text>
+<path d="M725,184 L725,258" fill="none" stroke="#0e7c6b" stroke-width="5" marker-end="url(#a1)"/>
+<path d="M725,324 L725,398" fill="none" stroke="#0e7c6b" stroke-width="5" marker-end="url(#a1)"/>
+<path d="M830,464 C880,500 910,520 930,556" fill="none" stroke="#0e7c6b" stroke-width="5" marker-end="url(#a1)"/>
+<path d="M362,392 C430,370 430,150 364,118" fill="none" stroke="#566273" stroke-width="2" marker-start="url(#a3)" marker-end="url(#a2)"/>
+<text x="382" y="300" font-size="13.5" fill="#566273">Special ↔ DB①</text>
+<path d="M600,640 C510,560 500,240 560,176" fill="none" stroke="#566273" stroke-width="2" marker-start="url(#a3)" marker-end="url(#a2)"/>
+<text x="492" y="470" font-size="13.5" fill="#566273">Toolbox ↔ DB②</text>
+<path d="M210,426 C260,560 380,660 500,672" fill="none" stroke="#566273" stroke-width="2" stroke-dasharray="7 6"/>
+<text x="250" y="560" font-size="13.5" fill="#566273">UI 커스터마이징 공유</text>
+<path d="M985,368 C1040,420 1040,500 1000,556" fill="none" stroke="#566273" stroke-width="2" stroke-dasharray="7 6"/>
+<text x="905" y="400" font-size="13.5" fill="#566273">한 화면에 전부</text>
+<rect x="40" y="610" width="270" height="64" rx="16" fill="#ffffff" stroke="#b07400" stroke-width="3"/><text x="54" y="637" font-size="17" font-weight="800" fill="#17202b">회사 원천 자료</text><text x="54" y="660" font-size="14" fill="#566273">도면 DXF · 기술문서 · 표</text><rect x="218" y="597" width="92" height="26" rx="13" fill="#b07400"/><text x="264" y="615" font-size="13" font-weight="800" fill="#fff" text-anchor="middle">진행 중</text>
+<rect x="60" y="215" width="300" height="66" rx="16" fill="#ffffff" stroke="#b07400" stroke-width="3"/><text x="74" y="242" font-size="17" font-weight="800" fill="#17202b">학습 AI → DB①</text><text x="74" y="265" font-size="14" fill="#566273">발췌 · 정렬화 · 공식 탐구 · 승인</text><rect x="268" y="202" width="92" height="26" rx="13" fill="#b07400"/><text x="314" y="220" font-size="13" font-weight="800" fill="#fff" text-anchor="middle">진행 중</text>
+<rect x="60" y="84" width="300" height="66" rx="16" fill="#ffffff" stroke="#0e7c6b" stroke-width="3"/><text x="74" y="111" font-size="17" font-weight="800" fill="#17202b">DB① 관리자 학습 DB</text><text x="74" y="134" font-size="14" fill="#566273">platform 스키마 · edim_platform 역할</text>
+<rect x="60" y="360" width="300" height="66" rx="16" fill="#ffffff" stroke="#b07400" stroke-width="3"/><text x="74" y="387" font-size="17" font-weight="800" fill="#17202b">Special Tool Box</text><text x="74" y="410" font-size="14" fill="#566273">매크로 이상의 계산 = SI · 별도 과금</text><rect x="268" y="347" width="92" height="26" rx="13" fill="#b07400"/><text x="314" y="365" font-size="13" font-weight="800" fill="#fff" text-anchor="middle">진행 중</text>
+<rect x="560" y="118" width="330" height="66" rx="16" fill="#ffffff" stroke="#0e7c6b" stroke-width="3"/><text x="574" y="145" font-size="17" font-weight="800" fill="#17202b">DB② 메인 DB</text><text x="574" y="168" font-size="14" fill="#566273">코드 · 표 · BOM 스냅샷 · RLS FORCE</text>
+<rect x="560" y="258" width="330" height="66" rx="16" fill="#ffffff" stroke="#0e7c6b" stroke-width="3"/><text x="574" y="285" font-size="17" font-weight="800" fill="#17202b">※① PLM 코드·드로잉 셋업</text><text x="574" y="308" font-size="14" fill="#566273">Sub/Product 코드 · 관계 · 치수 · 도면</text>
+<rect x="560" y="398" width="330" height="66" rx="16" fill="#ffffff" stroke="#0e7c6b" stroke-width="3"/><text x="574" y="425" font-size="17" font-weight="800" fill="#17202b">CPQ 함축 코드 산출</text><text x="574" y="448" font-size="14" fill="#566273">BOM · 원가 · 도면 · 견적 · Tech Data</text>
+<rect x="860" y="556" width="210" height="66" rx="16" fill="#ffffff" stroke="#0e7c6b" stroke-width="3"/><text x="874" y="583" font-size="17" font-weight="800" fill="#17202b">※④ ERP</text><text x="874" y="606" font-size="14" fill="#566273">구매 요청 → 견적 → 발주</text>
+<rect x="500" y="640" width="270" height="66" rx="16" fill="#ffffff" stroke="#0e7c6b" stroke-width="3"/><text x="514" y="667" font-size="17" font-weight="800" fill="#17202b">※② EDIM Toolbox</text><text x="514" y="690" font-size="14" fill="#566273">UI Tool + 매크로 · 플로팅 창</text>
+<rect x="905" y="300" width="165" height="66" rx="16" fill="#ffffff" stroke="#0e7c6b" stroke-width="3"/><text x="919" y="327" font-size="17" font-weight="800" fill="#17202b">※⑤ MainForm</text><text x="919" y="350" font-size="14" fill="#566273">통합 작업대</text>
+</g>
+<g transform="translate(30,812)" font-size="13" fill="#566273">
+<rect x="0" y="-11" width="16" height="12" rx="3" fill="none" stroke="#0e7c6b" stroke-width="3"/><text x="22" y="0">동작 중</text>
+<rect x="90" y="-11" width="16" height="12" rx="3" fill="none" stroke="#b07400" stroke-width="3"/><text x="112" y="0">구현 진행 중</text>
+<line x1="210" y1="-5" x2="250" y2="-5" stroke="#0e7c6b" stroke-width="5"/><text x="256" y="0">주흐름</text>
+<line x1="320" y1="-5" x2="360" y2="-5" stroke="#566273" stroke-width="2"/><text x="366" y="0">양방향 교류</text>
+<line x1="450" y1="-5" x2="490" y2="-5" stroke="#566273" stroke-width="2" stroke-dasharray="7 6"/><text x="496" y="0">UI 공유</text>
+<line x1="560" y1="-5" x2="600" y2="-5" stroke="#c0392b" stroke-width="3" stroke-dasharray="3 5"/><text x="606" y="0">✕ 차단 경계</text>
+</g>
+</svg>
