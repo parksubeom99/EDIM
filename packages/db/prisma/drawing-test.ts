@@ -102,6 +102,26 @@ async function main(): Promise<void> {
   check("P6 승인 전에는 발행이 거부된다 (도메인)", noAp instanceof BomNotApprovedError);
   const noApRaw = await throws(() => withTenant(IDS.tenantA, (tx) => tx.drawing.update({ where: { id: d1.id }, data: { status: "issued" } })));
   check("P6 앱을 우회해 발행해도 DB 가 거부한다", noApRaw !== null && /not approved/.test(String(noApRaw)));
+
+  // 0036 · ccmd K · KC-3 — 설계 심볼 배치: 발행 전에는 놓인다 · 다른 회사 도면 · 심볼을 가리키면 DB 가 막는다
+  const symA = await withTenant(IDS.tenantA, (tx) => tx.designSymbol.findFirst({ where: { key: "fan" } }));
+  check("0036: 샘플 심볼(팬)이 회사 A 라이브러리에 있다", !!symA && symA.isSample);
+  const placed = await withTenant(IDS.tenantA, (tx) =>
+    tx.drawingSymbol.create({ data: { tenantId: IDS.tenantA, drawingId: d1.id, symbolId: symA!.id, x: 100, y: 200, createdBy: IDS.ownerA } }));
+  check("0036: 발행 전 도면에는 심볼이 놓인다", !!placed.id);
+  const crossB = await throws(() => withTenant(IDS.tenantB, async (tx) => {
+    const sb = await tx.designSymbol.findFirst({ where: { key: "fan" } });
+    return tx.drawingSymbol.create({ data: { tenantId: IDS.tenantB, drawingId: d1.id, symbolId: sb!.id, x: 0, y: 0, createdBy: IDS.ownerB } });
+  }));
+  // 외래 키 검사(FORCE RLS 아래)나 트리거 중 먼저 걸리는 쪽이 막는다 — 어느 쪽이든 행은 생기지 않는다
+  check("0036: 회사 B 는 A 의 도면에 심볼을 놓지 못한다(외래 키 · 트리거)", crossB !== null && /not found in this tenant|Foreign key constraint/i.test(String(crossB)), String(crossB).slice(-200));
+  const symB = await adminPrisma.designSymbol.findFirst({ where: { tenantId: IDS.tenantB, key: "fan" } });
+  const crossSym = await throws(() => withTenant(IDS.tenantA, (tx) =>
+    tx.drawingSymbol.create({ data: { tenantId: IDS.tenantA, drawingId: d1.id, symbolId: symB!.id, x: 0, y: 0, createdBy: IDS.ownerA } })));
+  check("0036: 다른 회사 심볼 id 로는 놓지 못한다", crossSym !== null && /not found in this tenant/.test(String(crossSym)), String(crossSym).slice(0, 120));
+  const libWrite = await throws(() => withTenant(IDS.tenantA, (tx) => tx.designSymbol.update({ where: { id: symA!.id }, data: { name: "x" } })));
+  check("0036: 앱 역할은 심볼 라이브러리를 고치지 못한다(SELECT 만)", libWrite !== null && /permission denied/i.test(String(libWrite)), String(libWrite).slice(0, 120));
+
   await approveRun(d1.bomRunId);
 
   const issued = await withTenant(IDS.tenantA, (tx) => setDrawingStatus(tx, { id: d1.id, status: "issued", actorId: IDS.ownerA }));
@@ -121,6 +141,13 @@ async function main(): Promise<void> {
     withTenant(IDS.tenantA, (tx) => tx.drawing.delete({ where: { id: d1.id } })),
   );
   check("발행된 도면은 삭제도 거부된다", del !== null && /issued/.test(String(del)));
+  const symIns = await throws(() => withTenant(IDS.tenantA, (tx) =>
+    tx.drawingSymbol.create({ data: { tenantId: IDS.tenantA, drawingId: d1.id, symbolId: symA!.id, x: 1, y: 1, createdBy: IDS.ownerA } })));
+  const symUpd = await throws(() => withTenant(IDS.tenantA, (tx) => tx.drawingSymbol.update({ where: { id: placed.id }, data: { x: 999 } })));
+  const symDel = await throws(() => withTenant(IDS.tenantA, (tx) => tx.drawingSymbol.delete({ where: { id: placed.id } })));
+  check("0036: 발행된 도면의 심볼은 놓기 · 옮기기 · 지우기 모두 DB 가 거부한다(앱 우회)", [symIns, symUpd, symDel].every((e) => e !== null && /issued/.test(String(e))));
+  const seenSymB = await withTenant(IDS.tenantB, (tx) => tx.drawingSymbol.count({ where: { drawingId: d1.id } }));
+  check("0036: RLS — 회사 B 에게 A 도면의 심볼은 0건", seenSymB === 0);
 
   // --- 5) 테넌트 경계 --------------------------------------------------------
   const seenByB = await withTenant(IDS.tenantB, (tx) => listDrawings(tx));
@@ -165,6 +192,9 @@ async function main(): Promise<void> {
 
   // 정리 (발행 잠금 때문에 트리거를 내리고 지운다 — 검증용 잔재만)
   await adminPrisma.$executeRawUnsafe(`ALTER TABLE "drawing" DISABLE TRIGGER USER`);
+  await adminPrisma.$executeRawUnsafe(`ALTER TABLE "drawing_symbol" DISABLE TRIGGER USER`);
+  await adminPrisma.drawingSymbol.deleteMany({ where: { drawingId: d1.id } });
+  await adminPrisma.$executeRawUnsafe(`ALTER TABLE "drawing_symbol" ENABLE TRIGGER USER`);
   await adminPrisma.drawing.deleteMany({ where: { drawingNo: { in: ["TEST-PLN", "TEST-FRT", "TEST-RHT", "TEST-ISO", "TEST-EXPLODED"] } } });
   await adminPrisma.$executeRawUnsafe(`ALTER TABLE "drawing" ENABLE TRIGGER USER`);
   await adminPrisma.projectApproval.deleteMany({ where: { note: { contains: "· test" } } });

@@ -49,18 +49,21 @@ export function parseTables(v: unknown): Record<string, TechTable> | "invalid" {
   const nos = new Set<number>();
   let dimSeen = false;
   let specialSeen = false;
+  let detailSeen = false;
   for (const [name, t] of Object.entries(v)) {
     if (!/^\w+$/.test(name) || !isObj(t) || !isSlot(t.by) || typeof t.default !== "string") return "invalid";
     if (typeof t.no !== "number" || !Number.isInteger(t.no) || t.no < 1 || nos.has(t.no)) return "invalid"; // TableN must be unique
     nos.add(t.no);
     // p16/p51 Table Type — 기본은 tech. dim(Key Dimension)은 제품 코드당 하나만.
-    let role: "tech" | "dim" | "buy" | "rule" | "special" | undefined;
+    let role: "tech" | "dim" | "buy" | "rule" | "special" | "detail" | undefined;
     if (t.role !== undefined && t.role !== null) {
       // buy = p32 구매 속성 · rule = p36 설계 검증 · special = Special 호출 선언(ccmd K · KA — 제품 코드당 하나)
-      if (t.role !== "tech" && t.role !== "dim" && t.role !== "buy" && t.role !== "rule" && t.role !== "special") return "invalid";
+      // detail = Detail Dimension(ccmd K · KC-1 — 제품 코드당 하나)
+      if (t.role !== "tech" && t.role !== "dim" && t.role !== "buy" && t.role !== "rule" && t.role !== "special" && t.role !== "detail") return "invalid";
       role = t.role;
       if (role === "dim") { if (dimSeen) return "invalid"; dimSeen = true; }
       if (role === "special") { if (specialSeen) return "invalid"; specialSeen = true; }
+      if (role === "detail") { if (detailSeen) return "invalid"; detailSeen = true; }
     }
     // ccmd K · KA — 행을 Special 결과 필드로 고르는 표(예: motorKw). 이름 형식만 본다.
     if (t.bySpecial !== undefined && t.bySpecial !== null && !(typeof t.bySpecial === "string" && /^\w+$/.test(t.bySpecial))) return "invalid";

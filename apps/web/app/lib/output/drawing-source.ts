@@ -1,6 +1,6 @@
 import { withTenant, getBomRun } from "@edim/db";
-import type { Dims } from "@edim/bom-code";
-import type { DxfInput, DrawingItem } from "./dxf";
+import { parseCadRules, detailFacts, type Dims, type DetailDim } from "@edim/bom-code";
+import type { DxfInput, DrawingItem, DxfCad } from "./dxf";
 
 /**
  * P4-a — **산출물의 단 하나의 입구**.
@@ -46,6 +46,31 @@ function parseDims(v: unknown): { dims: Dims; item: string; secDims: { name: str
   return { dims: { W, H, L }, item: o.item, secDims };
 }
 
+/**
+ * 스냅샷의 dims.detail · dims.cadRules → 조립도가 그릴 CAD 입력. 둘 다 없으면 null(기존 스냅샷 · 기존 제품 — 도면 바이트 그대로).
+ * 규칙서가 박혔는데 지금 검사기로 읽을 수 없으면(옛 형식) 추측하지 않고 422 — 0011 의 옛 스냅샷 처리와 같다.
+ */
+function parseCad(v: unknown, d: { dims: Dims; secDims: { len: number }[] }): DxfCad | { error: string } | null {
+  const o = (v && typeof v === "object" ? v : {}) as Record<string, unknown>;
+  if (!("cadRules" in o) && !("detail" in o)) return null;
+  const snap = (o.cadRules && typeof o.cadRules === "object" ? o.cadRules : null) as { version?: unknown; fingerprint?: unknown; sample?: unknown; rules?: unknown } | null;
+  const p = snap ? parseCadRules(snap.rules) : null;
+  if (!snap || !p || !p.ok || typeof snap.fingerprint !== "string")
+    return { error: `이 BOM 스냅샷의 CAD 규칙서(${String(snap?.version ?? "없음")} #${String(snap?.fingerprint ?? "—")})를 지금 도면 생성기로 읽을 수 없습니다${p && !p.ok ? ` — ${p.error}` : ""} — BOM Run 을 다시 하십시오` };
+  const details: DetailDim[] = Array.isArray(o.detail)
+    ? (o.detail as unknown[]).flatMap((x) => {
+        const r = (x && typeof x === "object" ? x : {}) as Record<string, unknown>;
+        return typeof r.target === "string" && typeof r.label === "string" && typeof r.value === "number"
+          ? [{ target: r.target, label: r.label, value: r.value, source: typeof r.source === "string" ? r.source : "" }] : [];
+      })
+    : [];
+  const total = d.secDims.length > 0 ? d.secDims.reduce((a, s) => a + s.len, 0) : d.dims.L;
+  const facts: Record<string, number | string> = { "dim.W": d.dims.W, "dim.H": d.dims.H, "dim.L": total, ...detailFacts(details) };
+  const sp = (o.special && typeof o.special === "object" ? (o.special as { result?: Record<string, unknown> }).result : null) ?? null;
+  if (sp) for (const [k, val] of Object.entries(sp)) if (typeof val === "number" || typeof val === "string") facts[`special.${k}`] = val;
+  return { version: String(snap.version ?? ""), fingerprint: snap.fingerprint, sample: String(snap.sample ?? ""), rules: p.rules, details, facts };
+}
+
 export async function dxfSourceFromRun(tenantId: string, runId: string): Promise<DxfSource> {
   const run = await withTenant(tenantId, (tx) => getBomRun(tx, runId));
   if (!run) return { ok: false, status: 404, error: "BOM 스냅샷을 찾을 수 없습니다" };
@@ -80,10 +105,13 @@ export async function dxfSourceFromRun(tenantId: string, runId: string): Promise
     const s = typeof l.section === "string" ? l.section : "";
     if (s && !sections.includes(s)) sections.push(s);
   }
+  // ccmd K · KC-1 · KC-2 — 세부 치수 · CAD 규칙서는 스냅샷에 박힌 것만 읽는다(지금 파일 · 지금 표를 다시 읽지 않는다 — 0011).
+  const cad = parseCad(run.dims, d);
+  if (cad && "error" in cad) return { ok: false, status: 422, error: cad.error };
 
   return {
     ok: true,
-    input: { code: run.code, dims: d.dims, dimItem: d.item, sections, secDims: d.secDims, items },
+    input: { code: run.code, dims: d.dims, dimItem: d.item, sections, secDims: d.secDims, items, ...(cad ? { cad } : {}) },
     run: { id: run.id, code: run.code, stableId: run.hierarchyStable, codeRevisionId: run.codeRevisionId, parentCode: run.parentCode },
   };
 }

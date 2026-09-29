@@ -5,7 +5,8 @@ import { runApprovedForSession } from "@/app/lib/macro/run";
 import { ruleMacroEvaluator } from "@/app/lib/macro/rule-macros";
 import type { SlotValues } from "@/app/lib/rccs";
 import { buildEbom, buildCost } from "@/app/lib/output/bom";
-import { runBomCode, toBomLine, catalogFingerprint, dimsFor, sectionDimsFor, designRulesOf, checkDesign, buyItemOf, specialCallOf, type SpecialValues } from "@edim/bom-code";
+import { runBomCode, toBomLine, catalogFingerprint, dimsFor, sectionDimsFor, designRulesOf, checkDesign, buyItemOf, specialCallOf, detailDimsOf, type SpecialValues } from "@edim/bom-code";
+import { loadCadRules, type CadRulesSnap } from "@/app/lib/cad-rules";
 import { applyPriceHistory, type PriceRowLike } from "@/app/lib/price";
 import { businessToday, dateOnly } from "@/app/lib/today";
 import { loadCatalog } from "@/app/lib/catalog";
@@ -145,9 +146,20 @@ export async function POST(
     // 지금 규칙을 나중에 고쳐도 이미 뜬 스냅샷의 판정은 그대로다(0011 과 같은 원칙).
     const rules = productForDims ? designRulesOf(productForDims) : [];
     // E6 · p39 — op=macro 규칙은 승인된 매크로를 스냅샷 값으로 돌려 판정한다(판정도 스냅샷에 박혀, 매크로를 나중에 고쳐도 불변).
-    const violations = drSnap && drSnap.ok ? checkDesign(rules, drSnap.dims, secDims, await ruleMacroEvaluator(session.tenantId, rules)) : [];
+    // ccmd K · KC-1 · KC-2 — Detail Dimension(role detail 표)이 있는 제품만: 세부 치수 + CAD 규칙서(샘플)를 스냅샷에 박는다.
+    // 기존 제품 코드(EU · ER · EC)에는 detail 표가 없다 → 이 블록을 지나지 않는다(도면 바이트 · 시연 수치 그대로).
+    const detailRes = productForDims ? detailDimsOf(productForDims, slots) : null;
+    if (detailRes && !detailRes.ok) return NextResponse.json({ error: detailRes.message }, { status: 422 });
+    let cadRules: CadRulesSnap | null = null;
+    if (detailRes) {
+      const cr = loadCadRules();
+      if (!cr.ok) return NextResponse.json({ error: cr.error }, { status: 422 });
+      cadRules = cr.snap;
+    }
+    const details = detailRes && detailRes.ok ? detailRes.dims : undefined;
+    const violations = drSnap && drSnap.ok ? checkDesign(rules, drSnap.dims, secDims, await ruleMacroEvaluator(session.tenantId, rules), details) : [];
     const dimsSnap = drSnap && drSnap.ok
-      ? { ...drSnap.dims, item: drSnap.item, tableName: drSnap.tableName, sections: secDims, rules: rules.length, violations, ...(call ? { special } : {}) }
+      ? { ...drSnap.dims, item: drSnap.item, tableName: drSnap.tableName, sections: secDims, rules: rules.length, violations, ...(call ? { special } : {}), ...(detailRes ? { detail: details, cadRules } : {}) }
       : null;
     const snap = await withTenant(session.tenantId, async (tx) => {
       const saved = await saveBomCodeRun(tx, {

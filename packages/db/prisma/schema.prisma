@@ -59,6 +59,8 @@ model Tenant {
   tableMetas      TableMeta[]
   printLayouts    PrintLayout[]
   drawingAnnotations DrawingAnnotation[]
+  designSymbols   DesignSymbol[]
+  drawingSymbols  DrawingSymbol[]
 
   @@map("tenant")
 }
@@ -900,4 +902,42 @@ model DrawingAnnotation {
 
   @@index([tenantId, drawingId], map: "drawing_annotation_drawing_idx")
   @@map("drawing_annotation")
+}
+
+/// 0036 · ccmd K · KC-3 · p58 설계 심볼 라이브러리 — 모양(선 · 원 · 호 · 사각형, mm). 앱 역할은 읽기만(샘플은 시드).
+model DesignSymbol {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  key        String
+  name       String
+  primitives Json     @db.JsonB
+  isSample   Boolean  @default(false) @map("is_sample")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant     Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  placements DrawingSymbol[]
+
+  @@unique([tenantId, key], map: "design_symbol_tenant_key_key")
+  @@map("design_symbol")
+}
+
+/// 0036 · 도면 위 심볼 배치(도면 좌표 mm · 회전 0/90/180/270 · 배율). 발행 도면이면 DB 트리거가 삽입 · 수정 · 삭제를 막는다.
+model DrawingSymbol {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  drawingId String   @map("drawing_id") @db.Uuid
+  symbolId  String   @map("symbol_id") @db.Uuid
+  x         Float
+  y         Float
+  rot       Int      @default(0)
+  scale     Float    @default(1)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+  createdBy String   @map("created_by") @db.Uuid
+
+  tenant Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  symbol DesignSymbol @relation(fields: [symbolId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, drawingId], map: "drawing_symbol_drawing_idx")
+  @@map("drawing_symbol")
 }

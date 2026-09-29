@@ -1,4 +1,4 @@
-import type { Dims } from "@edim/bom-code";
+import { componentMm, datumMm, kadValues, type Dims, type CadRules, type DetailDim, type At, type Level } from "@edim/bom-code";
 
 /**
  * M3/P4-a — DXF R12(ASCII) 작성기. 순수 함수: 같은 입력 → 같은 바이트.
@@ -34,11 +34,14 @@ function rect(x: number, y: number, w: number, h: number, layer: string): string
 const LAYERS: [string, number][] = [
   ["0", 7], ["OUTLINE", 7], ["SECTION", 3], ["DIM", 1], ["TEXT", 5], ["BALLOON", 2], ["TABLE", 4],
 ];
-function wrap(ents: string): string {
+/** ccmd K · KC-2 — 규칙서가 박힌 스냅샷의 조립도에만 더하는 레이어(기존 도면의 LAYER 표는 그대로 — 바이트 불변). */
+const CAD_LAYERS: [string, number][] = [["CADRULE", 6], ["KAD", 30]];
+function wrap(ents: string, extra: [string, number][] = []): string {
+  const layers = [...LAYERS, ...extra];
   return (
     `0\nSECTION\n2\nHEADER\n9\n$ACADVER\n1\nAC1009\n9\n$INSUNITS\n70\n4\n0\nENDSEC\n` +
-    `0\nSECTION\n2\nTABLES\n0\nTABLE\n2\nLAYER\n70\n${LAYERS.length}\n` +
-    LAYERS.map(([l, c]) => `0\nLAYER\n2\n${l}\n70\n0\n62\n${c}\n6\nCONTINUOUS\n`).join("") +
+    `0\nSECTION\n2\nTABLES\n0\nTABLE\n2\nLAYER\n70\n${layers.length}\n` +
+    layers.map(([l, c]) => `0\nLAYER\n2\n${l}\n70\n0\n62\n${c}\n6\nCONTINUOUS\n`).join("") +
     `0\nENDTAB\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n${ents}0\nENDSEC\n0\nEOF\n`
   );
 }
@@ -70,6 +73,61 @@ export interface DxfInput {
    * 전고 H = casing + 2 × frame. 제품 도면은 이 값을 넘기지 않으므로 바이트가 그대로다.
    */
   frame?: { casing: number; frame: number };
+  /** ccmd K · KC-1 · KC-2 — 스냅샷에 박힌 CAD 규칙서 · 세부 치수. 있으면 조립도에 기준점 · mm 배치 · 세부 치수선 · KAD 슬롯 줄을 더한다. */
+  cad?: DxfCad;
+}
+
+export interface DxfCad {
+  version: string;
+  fingerprint: string;
+  sample: string;
+  rules: CadRules;
+  details: DetailDim[];
+  /** KAD 슬롯이 읽는 사실: dim.W · dim.H · dim.L(전장) · detail.<대상>.<label> · special.<필드> */
+  facts: Record<string, number | string>;
+}
+
+/**
+ * 조립도의 CAD 규칙서 층 — 전부 규칙서(스냅샷 사본)에서 좌표를 얻는다. 코드에 좌표 상수 없음.
+ *   CADRULE: 구획마다 기준점(p36 Point: Shaft · Foot) 십자 + 부품 mm 배치(원 + "코드 @x,y")
+ *   DIM    : 세부 치수선 — 대상 구획의 anchor 기준점(또는 대상 부품의 mm 중심)에서 값만큼, 외형 위 띠에 한 줄씩
+ *   KAD    : KAD-□ 슬롯 줄(샘플 대응표 · RCCS 문법 미확정) + 규칙서 판 · 지문
+ */
+function cadEntities(cad: DxfCad, secs: { name: string; len: number; components?: { code: string; at: string; level: string }[] }[], offs: number[], W: number): { s: string; n: number } {
+  let s = ""; let n = 0;
+  const compAt = new Map<string, { x: number; y: number }>();
+  secs.forEach((sec, i) => {
+    for (const d of datumMm(cad.rules, offs[i]!, sec.len, W)) {
+      s += line(d.x - 60, d.y, d.x + 60, d.y, "CADRULE") + line(d.x, d.y - 60, d.x, d.y + 60, "CADRULE"); n += 2;
+      s += text(d.x + 70, d.y + 20, 40, `${d.name.toUpperCase()} ${d.x},${d.y}`, "CADRULE"); n++;
+    }
+    for (const c of sec.components ?? []) {
+      const p = componentMm(cad.rules, offs[i]!, sec.len, W, c.at as At, c.level as Level);
+      if (!compAt.has(c.code)) compAt.set(c.code, p);
+      s += circle(p.x, p.y, 40, "CADRULE"); n++;
+      s += text(p.x + 50, p.y - 20, 45, `${c.code.toUpperCase()} @${p.x},${p.y}`, "CADRULE"); n++;
+    }
+  });
+  const anchorX = (target: string): number => {
+    const i = secs.findIndex((x) => x.name === target);
+    if (i >= 0) return datumMm(cad.rules, offs[i]!, secs[i]!.len, W).find((d) => d.name === cad.rules.detail.anchor)?.x ?? offs[i]!;
+    return compAt.get(target)?.x ?? 0;   // 배치 안 된 부품 대상이면 원점에서(자리를 지어내지 않는다)
+  };
+  cad.details.forEach((d, k) => {
+    const x0 = anchorX(d.target), x1 = x0 + d.value, y = W + cad.rules.detail.startMm + k * cad.rules.detail.gapMm;
+    s += line(x0, y, x1, y, "DIM") + line(x0, y - 50, x0, y + 50, "DIM") + line(x1, y - 50, x1, y + 50, "DIM"); n += 3;
+    s += text(x0 + 20, y + 40, 55, `detail.${d.target}.${d.label}=${d.value}`, "DIM"); n++;
+  });
+  const kv = kadValues(cad.rules, cad.facts);
+  const ky = W + 560;
+  s += text(0, ky, 70, cad.rules.kad.prefix, "KAD"); n++;
+  kv.forEach((v, j) => {
+    const x = 420 + j * 720;
+    s += rect(x, ky - 40, 680, 140, "KAD"); n += 4;
+    s += text(x + 30, ky, 60, `${v.slot}:${v.value}`, "KAD"); n++;
+  });
+  s += text(420 + kv.length * 720 + 60, ky, 45, `${cad.rules.kad.prefix}${kv.map((v) => v.value).join("-")} · CAD RULES ${cad.version} #${cad.fingerprint} (SAMPLE)`, "KAD"); n++;
+  return { s, n };
 }
 
 /** 3각법 뷰 — plan=Top(L×W) · front=Front(L×H) · right=Right(W×H) · assembly=조립도 */
@@ -180,9 +238,10 @@ export function buildAssemblyDxf(input: DxfInput): { dxf: string; meta: DxfMeta 
   });
 
   ents += text(0, W + 300, 90, `EDIM ${input.code} - ASSEMBLY - DIM ${input.dimItem} (W${W} H${H} L${L})`); n++;
+  if (input.cad) { const c = cadEntities(input.cad, secs, offs, W); ents += c.s; n += c.n; }
 
   return {
-    dxf: wrap(ents),
+    dxf: wrap(ents, input.cad ? CAD_LAYERS : []),
     meta: { type: "assembly", sections, widthMm: W, heightMm: H, lengthMm: length, dimItem: input.dimItem, entities: n, items: items.length },
   };
 }

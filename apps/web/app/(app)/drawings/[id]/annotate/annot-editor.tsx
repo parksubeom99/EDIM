@@ -3,17 +3,20 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent as RPE } from "react";
 import { ANNOT_LABEL, dimLabel, type Annot, type AnnotKind } from "@/app/lib/annotation";
 import type { DxfFrame } from "@/app/lib/output/dxf-svg";
+import { expand, type Prim } from "@/app/lib/symbol";
 
 /**
  * H10 · p58 그림 제작 Module 1단계 — 주석 편집기. 원 도면 SVG 위에 같은 틀(frame)의 투명 SVG 를 겹친다.
  *   도구: 고르기(끌어 옮기기) · 선 · 사각형 · 글자 · 치수선. 좌표는 도면 좌표(mm)로 저장한다.
  */
-type Tool = "select" | AnnotKind;
+type Tool = "select" | "symbol" | AnnotKind;
 interface Row extends Annot { id: string }
 const LOCKED: [string, string][] = [
   ["Free CAD", "EDIM 안의 CAD 편집기는 아직 없습니다 — 도면은 DXF 를 외부 CAD(AutoCAD·FreeCAD)에서 여십시오"],
-  ["설계 심볼", "설계 심볼 배치(p59)는 아직 없습니다 — 부품 배치는 Arrangement 의 Component 칸에서 합니다"],
 ];
+/** ccmd K · KC-3 · p58 — 설계 심볼(샘플 라이브러리). 놓기 · 옮기기(고르기 도구로 끌기) · 회전 · 지우기. 도면 좌표 mm 로 저장. */
+interface SymLib { id: string; key: string; name: string; primitives: Prim[]; isSample: boolean }
+interface SymRow { id: string; symbolId: string; x: number; y: number; rot: number; scale: number }
 const btn = (on: boolean): CSSProperties => ({ fontSize: "var(--fs-12)", padding: "5px 10px", borderRadius: 4, border: `1px solid ${on ? "var(--accent)" : "var(--line)"}`, background: on ? "var(--accent)" : "var(--surface-1)", color: on ? "var(--accent-contrast, #fff)" : "var(--ink)", fontWeight: on ? 700 : 400, cursor: "pointer" });
 const INK = "#c0392b";
 
@@ -32,9 +35,19 @@ export function AnnotEditor({ drawingId, svg, frame, locked, canEdit }: { drawin
   const textH = Math.max(frame.W, frame.H) / 60;
   const sw = Math.max(frame.W, frame.H) / 450;
 
+  const [lib, setLib] = useState<SymLib[]>([]);
+  const [syms, setSyms] = useState<SymRow[]>([]);
+  const [symReady, setSymReady] = useState(false);
+  const [pick, setPick] = useState<string | null>(null);
+  const [selSym, setSelSym] = useState<string | null>(null);
+
   const load = useCallback(async () => {
-    const j = await fetch(`/api/drawings/${drawingId}/annotations`).then((r) => r.json()).catch(() => ({}));
-    setRows(j.rows ?? []); setReady(true);
+    const [j, s, l] = await Promise.all([
+      fetch(`/api/drawings/${drawingId}/annotations`).then((r) => r.json()).catch(() => ({})),
+      fetch(`/api/drawings/${drawingId}/symbols`).then((r) => r.json()).catch(() => ({})),
+      fetch(`/api/design-symbols`).then((r) => r.json()).catch(() => ({})),
+    ]);
+    setRows(j.rows ?? []); setSyms(s.rows ?? []); setLib(l.rows ?? []); setReady(true); setSymReady(true);
   }, [drawingId]);
   useEffect(() => { void load(); }, [load]);
 
@@ -59,7 +72,13 @@ export function AnnotEditor({ drawingId, svg, frame, locked, canEdit }: { drawin
     if (!editable) return;
     const m = toModel(ev);
     const hit = (ev.target as Element).closest("[data-aid]")?.getAttribute("data-aid") ?? undefined;
-    if (tool === "select") { setSel(hit ?? null); if (hit) start.current = { ...m, id: hit }; return; }
+    const hitSym = (ev.target as Element).closest("[data-sid]")?.getAttribute("data-sid") ?? undefined;
+    if (tool === "symbol") {
+      if (pick) void call(`/api/drawings/${drawingId}/symbols`, "POST", { symbolId: pick, x: m.x, y: m.y }, "설계 심볼을 놓았습니다");
+      return;
+    }
+    if (tool === "select" && hitSym) { setSelSym(hitSym); setSel(null); start.current = { ...m, id: `sym:${hitSym}` }; return; }
+    if (tool === "select") { setSel(hit ?? null); setSelSym(null); if (hit) start.current = { ...m, id: hit }; return; }
     if (tool === "text") { void call(`/api/drawings/${drawingId}/annotations`, "POST", { kind: "text", x1: m.x, y1: m.y, text: label }, "글자 주석을 더했습니다"); return; }
     start.current = m; setDraft({ x1: m.x, y1: m.y, x2: m.x, y2: m.y });
   }
@@ -74,11 +93,13 @@ export function AnnotEditor({ drawingId, svg, frame, locked, canEdit }: { drawin
     if (!s0) return;
     if (s0.id) {
       const mv = moveBy; setMoveBy(null);
-      if (mv && Math.hypot(mv.dx, mv.dy) >= 1) void call(`/api/drawing-annotations/${s0.id}`, "PATCH", { dx: Math.round(mv.dx * 10) / 10, dy: Math.round(mv.dy * 10) / 10 }, "주석을 옮겼습니다");
+      const d = mv ? { dx: Math.round(mv.dx * 10) / 10, dy: Math.round(mv.dy * 10) / 10 } : null;
+      if (s0.id.startsWith("sym:")) { if (d && Math.hypot(d.dx, d.dy) >= 1) void call(`/api/drawing-symbols/${s0.id.slice(4)}`, "PATCH", d, "설계 심볼을 옮겼습니다"); return; }
+      if (d && Math.hypot(d.dx, d.dy) >= 1) void call(`/api/drawing-annotations/${s0.id}`, "PATCH", d, "주석을 옮겼습니다");
       return;
     }
     const d = draft; setDraft(null);
-    if (d && tool !== "select" && tool !== "text") void call(`/api/drawings/${drawingId}/annotations`, "POST", { kind: tool, ...d }, `${ANNOT_LABEL[tool]}을(를) 더했습니다`);
+    if (d && tool !== "select" && tool !== "text" && tool !== "symbol") void call(`/api/drawings/${drawingId}/annotations`, "POST", { kind: tool, ...d }, `${ANNOT_LABEL[tool]}을(를) 더했습니다`);
   }
 
   function shape(a: Annot, key: string, id?: string) {
@@ -104,14 +125,30 @@ export function AnnotEditor({ drawingId, svg, frame, locked, canEdit }: { drawin
     }
   }
 
-  const tools: Tool[] = ["select", "line", "rect", "text", "dim"];
+  /** 배치된 심볼 — 서버와 같은 전개(expand)로 그린다(DXF SYMBOL 레이어와 같은 선). */
+  function symShape(r: SymRow) {
+    const l = lib.find((x) => x.id === r.symbolId);
+    if (!l) return null;
+    const off = moveBy && moveBy.id === `sym:${r.id}` ? moveBy : { dx: 0, dy: 0 };
+    const e = expand(l.primitives, { x: r.x + off.dx, y: r.y + off.dy, rot: r.rot, scale: r.scale });
+    const stroke = r.id === selSym ? "#1f6feb" : "#0f6b8f";
+    return (
+      <g key={r.id} data-sid={r.id} data-testid={`sym-${r.id}`} data-key={l.key} data-rot={r.rot} style={{ cursor: tool === "select" && editable ? "move" : "default" }}>
+        {e.lines.map(([x1, y1, x2, y2], i) => <line key={`l${i}`} x1={X(x1)} y1={Y(y1)} x2={X(x2)} y2={Y(y2)} stroke={stroke} strokeWidth={sw * 1.4} />)}
+        {e.circles.map(([x, y, rr], i) => <circle key={`c${i}`} cx={X(x)} cy={Y(y)} r={rr} fill="rgba(15,107,143,0.06)" stroke={stroke} strokeWidth={sw * 1.4} />)}
+      </g>
+    );
+  }
+  const selRow = syms.find((x) => x.id === selSym) ?? null;
+
+  const tools: ("select" | AnnotKind)[] = ["select", "line", "rect", "text", "dim"];
   return (
     <section data-testid="annot-editor" data-ready={ready ? "1" : "0"} data-count={rows.length} data-locked={locked ? "1" : "0"} style={{ display: "grid", gap: 10, marginTop: 10 }}>
       <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
         {tools.map((t) => <button key={t} type="button" data-testid={`annot-tool-${t}`} disabled={!editable} onClick={() => { setTool(t); setSel(null); }} style={btn(tool === t)}>{t === "select" ? "고르기·옮기기" : ANNOT_LABEL[t]}</button>)}
         <input data-testid="annot-text-input" value={label} disabled={!editable} onChange={(e) => setLabel(e.target.value)} placeholder="글자 주석" style={{ fontSize: "var(--fs-12)", padding: "4px 7px", border: "1px solid var(--line)", borderRadius: 4, width: 180 }} />
         <button type="button" data-testid="annot-del" disabled={!editable || !sel} onClick={() => { const id = sel; setSel(null); if (id) void call(`/api/drawing-annotations/${id}`, "DELETE", undefined, "주석을 지웠습니다"); }} style={btn(false)}>고른 주석 지우기</button>
-        {LOCKED.map(([k, why]) => <span key={k} data-testid="annot-locked-tool" title={why} style={{ ...btn(false), opacity: 0.5, cursor: "not-allowed" }}>{k} 🔒</span>)}
+        {LOCKED.map(([k, why]) => <span key={k} data-testid="annot-locked-tool" data-name={k} title={why} style={{ ...btn(false), opacity: 0.5, cursor: "not-allowed" }}>{k} 🔒</span>)}
         <span style={{ marginLeft: "auto", display: "flex", gap: 10, fontSize: "var(--fs-12)" }}>
           <a data-testid="annot-dl-orig" href={`/api/drawings/${drawingId}`} style={{ color: "var(--accent)" }}>원 도면 DXF</a>
           <a data-testid="annot-dl-annot" href={`/api/drawings/${drawingId}?annot=1`} style={{ color: "var(--accent)" }}>주석 포함 DXF (ANNOT 레이어)</a>
@@ -122,12 +159,25 @@ export function AnnotEditor({ drawingId, svg, frame, locked, canEdit }: { drawin
         <div dangerouslySetInnerHTML={{ __html: svg }} style={{ lineHeight: 0 }} />
         <svg ref={ov} data-testid="annot-overlay" viewBox={`0 0 ${frame.W.toFixed(1)} ${frame.H.toFixed(1)}`} onPointerDown={down} onPointerMove={move} onPointerUp={up}
           style={{ position: "absolute", inset: 0, width: "100%", height: "100%", touchAction: "none", cursor: editable && tool !== "select" ? "crosshair" : "default" }}>
+          {syms.map((r) => symShape(r))}
           {rows.map((r) => shape(r, r.id, r.id))}
-          {draft && tool !== "select" && tool !== "text" && shape({ kind: tool, ...draft }, "draft")}
+          {draft && tool !== "select" && tool !== "text" && tool !== "symbol" && shape({ kind: tool, ...draft }, "draft")}
         </svg>
       </div>
+      <div data-testid="symbol-panel" data-ready={symReady ? "1" : "0"} data-count={syms.length} style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", padding: "6px 8px", border: "1px dashed var(--line)", borderRadius: 4 }}>
+        <b style={{ fontSize: "var(--fs-12)" }}>설계 심볼 (p58 · 샘플)</b>
+        {lib.map((l) => (
+          <button key={l.id} type="button" data-testid={`sym-pick-${l.key}`} disabled={!editable}
+            onClick={() => { setPick(l.id); setTool("symbol"); setSel(null); setSelSym(null); }} style={btn(tool === "symbol" && pick === l.id)}>{l.name}</button>
+        ))}
+        <button type="button" data-testid="sym-rot" disabled={!editable || !selRow}
+          onClick={() => { if (selRow) void call(`/api/drawing-symbols/${selRow.id}`, "PATCH", { rot: (selRow.rot + 90) % 360 }, "설계 심볼을 90° 돌렸습니다"); }} style={btn(false)}>고른 심볼 90° 돌리기</button>
+        <button type="button" data-testid="sym-del" disabled={!editable || !selRow}
+          onClick={() => { const id = selSym; setSelSym(null); if (id) void call(`/api/drawing-symbols/${id}`, "DELETE", undefined, "설계 심볼을 지웠습니다"); }} style={btn(false)}>고른 심볼 지우기</button>
+        <span style={{ fontSize: 11, color: "var(--ink-muted)" }}>심볼을 고른 뒤 도면을 누르면 놓입니다 · 옮기기는 “고르기·옮기기”로 끌기 · DXF 는 SYMBOL 레이어(주석 포함 DXF)</span>
+      </div>
       {msg && <p data-testid="annot-msg" data-ok={msg.ok ? "1" : "0"} style={{ margin: 0, fontSize: "var(--fs-12)", color: msg.ok ? "var(--accent)" : "var(--warn)" }}>{msg.text}</p>}
-      <p style={{ margin: 0, fontSize: 11, color: "var(--ink-muted)" }}>주석 {rows.length}개 · 좌표는 도면 mm. 원 도면(BOM 스냅샷에서 뜬 DXF)은 바꾸지 않습니다. 아직 없음: 실제 CAD 편집(Free CAD) · 설계 심볼 — 필요한 입력: EDIM 안 CAD 편집기 결정.</p>
+      <p style={{ margin: 0, fontSize: 11, color: "var(--ink-muted)" }}>주석 {rows.length}개 · 설계 심볼 {syms.length}개 · 좌표는 도면 mm. 원 도면(BOM 스냅샷에서 뜬 DXF)은 바꾸지 않습니다. 아직 없음: 실제 CAD 편집(Free CAD) — 필요한 입력: EDIM 안 CAD 편집기 결정.</p>
     </section>
   );
 }

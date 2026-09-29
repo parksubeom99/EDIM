@@ -21,3 +21,6 @@ packages/db/prisma/*.db
 *.tsbuildinfo
 .storage/
 shots/
+
+# ccmd K · KC-2 — 회사 자기 CAD 규칙서(샘플을 대신해 읽힘 · 저장소에 올리지 않는다)
+packages/bom-code/cad-rules/cad-rules.local.json

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type CSSProperties } from "react";
+import { PartInfoPanel } from "./part-info-panel";
 
 /**
  * F6 · p13 · p58 DWG View — 툴바 "DWG View ▼" 가 도면을 **화면에 띄운다**.
@@ -13,6 +14,7 @@ const box: CSSProperties = { width: "min(1200px, 94vw)", height: "min(820px, 90v
 export function DwgViewer({ runId, view, onView, onClose }: { runId: string; view: string; onView: (v: string) => void; onClose: () => void }) {
   const [svg, setSvg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [part, setPart] = useState<number | null>(null);
   useEffect(() => {
     let live = true;
     setSvg(null); setErr(null);
@@ -30,7 +32,7 @@ export function DwgViewer({ runId, view, onView, onClose }: { runId: string; vie
   }, [onClose]);
   return (
     <div style={back} onClick={onClose}>
-      <div data-testid="dwg-viewer" data-view={view} data-ready={svg ? "1" : err ? "err" : "0"} style={box} onClick={(e) => e.stopPropagation()}>
+      <div data-testid="dwg-viewer" data-view={view} data-run={runId} data-ready={svg ? "1" : err ? "err" : "0"} style={box} onClick={(e) => e.stopPropagation()}>
         <div style={{ display: "flex", gap: 6, alignItems: "center", padding: "8px 12px", borderBottom: "1px solid var(--line)" }}>
           <b style={{ fontSize: "var(--fs-13)" }}>DWG View</b>
           {VIEWS.map(([v, l]) => (
@@ -41,10 +43,15 @@ export function DwgViewer({ runId, view, onView, onClose }: { runId: string; vie
           <a data-testid="dwg-viewer-download" href={`/api/dxf?runId=${runId}&type=${view}`} download style={{ marginLeft: "auto", fontSize: 12, color: "var(--accent)" }}>DXF 내려받기</a>
           <button type="button" data-testid="dwg-viewer-close" onClick={onClose} style={{ fontSize: 12 }}>닫기 ✕</button>
         </div>
-        <div style={{ overflow: "auto", background: "#fff", padding: 8 }}>
-          {err && <p data-testid="dwg-viewer-error" style={{ color: "var(--warn)" }}>{err}</p>}
-          {!svg && !err && <p style={{ color: "var(--ink-muted)" }}>도면을 그리는 중…</p>}
-          {svg && <div data-testid="dwg-viewer-svg" style={{ width: "100%", height: "100%" }} dangerouslySetInnerHTML={{ __html: svg.replace("<svg ", '<svg width="100%" height="100%" ') }} />}
+        <div style={{ display: "grid", gridTemplateColumns: view === "assembly" ? "1fr 400px" : "1fr", minHeight: 0 }}>
+          <div style={{ overflow: "auto", background: "#fff", padding: 8 }}
+            onDoubleClick={(e) => { const b = (e.target as Element).closest?.("[data-balloon]")?.getAttribute("data-balloon"); if (b) setPart(Number(b)); }}>
+            {err && <p data-testid="dwg-viewer-error" style={{ color: "var(--warn)" }}>{err}</p>}
+            {!svg && !err && <p style={{ color: "var(--ink-muted)" }}>도면을 그리는 중…</p>}
+            {svg && <div data-testid="dwg-viewer-svg" style={{ width: "100%", height: "100%" }} dangerouslySetInnerHTML={{ __html: svg.replace("<svg ", '<svg width="100%" height="100%" ') }} />}
+          </div>
+          {/* ccmd K · KC-4 · p28 · p38 — 조립도 옆 Item 표 · 줄 또는 풍선번호 더블클릭 = 부품의 정보(스냅샷 기준) */}
+          {view === "assembly" && <PartInfoPanel runId={runId} selected={part} onSelect={setPart} />}
         </div>
       </div>
     </div>

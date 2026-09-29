@@ -6,6 +6,7 @@ import {
 import { getServerSession } from "@/app/lib/session";
 import { canEditProject } from "@/app/lib/project-perms";
 import { withAnnotations, type Annot } from "@/app/lib/annotation";
+import { withSymbols, validatePrims } from "@/app/lib/symbol";
 
 /**
  * GET = 도면 DXF 내려받기(?annot=1 이면 H10 주석을 ANNOT 레이어로 덧붙인 사본 — 원 DXF 는 그대로)
@@ -20,11 +21,14 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const row = await getDrawing(tx, id);
     if (!row) return null;
     const notes = annot ? await tx.drawingAnnotation.findMany({ where: { drawingId: row.id }, orderBy: { createdAt: "asc" } }) : [];
-    return { row, notes };
+    // ccmd K · KC-3 — 설계 심볼 배치도 같은 사본에 SYMBOL 레이어로(선 전개). 원 DXF 는 그대로.
+    const syms = annot ? await tx.drawingSymbol.findMany({ where: { drawingId: row.id }, orderBy: { createdAt: "asc" }, include: { symbol: true } }) : [];
+    return { row, notes, syms };
   });
   if (!out) return NextResponse.json({ error: "not found" }, { status: 404 });
-  const { row, notes } = out;
-  const body = annot ? withAnnotations(row.dxf, notes.map((n) => ({ kind: n.kind as Annot["kind"], x1: n.x1, y1: n.y1, x2: n.x2, y2: n.y2, text: n.text }))) : row.dxf;
+  const { row, notes, syms } = out;
+  const placed = syms.flatMap((sm) => { const v = validatePrims(sm.symbol.primitives); return v.ok ? [{ prims: v.prims, at: { x: sm.x, y: sm.y, rot: sm.rot, scale: sm.scale } }] : []; });
+  const body = annot ? withSymbols(withAnnotations(row.dxf, notes.map((n) => ({ kind: n.kind as Annot["kind"], x1: n.x1, y1: n.y1, x2: n.x2, y2: n.y2, text: n.text }))), placed) : row.dxf;
   return new NextResponse(body, {
     headers: {
       "content-type": "application/dxf",

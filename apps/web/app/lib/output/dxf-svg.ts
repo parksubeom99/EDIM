@@ -3,7 +3,7 @@
  * 우리 생성기(dxf.ts)가 쓰는 R12 엔티티만 읽는다: LINE · CIRCLE · TEXT. 그 밖은 건너뛰고 개수를 센다(skipped).
  * DXF 는 y 가 위로, SVG 는 아래로 — 뒤집어 그린다.
  */
-const COLOR: Record<string, string> = { "0": "#1c2b2b", OUTLINE: "#1c2b2b", SECTION: "#2f8f83", DIM: "#b4232a", TEXT: "#1f4e8c", BALLOON: "#a0781c", TABLE: "#5a4b8a" };
+const COLOR: Record<string, string> = { "0": "#1c2b2b", OUTLINE: "#1c2b2b", SECTION: "#2f8f83", DIM: "#b4232a", TEXT: "#1f4e8c", BALLOON: "#a0781c", TABLE: "#5a4b8a", CADRULE: "#8a3f8f", KAD: "#b0561c", SYMBOL: "#0f6b8f" };
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 export interface DxfEntities {
@@ -60,7 +60,8 @@ export function dxfToSvg(dxf: string): { svg: string; counts: { lines: number; c
   const body = [
     ...e.lines.map((l) => `<line x1="${X(l.x1)}" y1="${Y(l.y1)}" x2="${X(l.x2)}" y2="${Y(l.y2)}" stroke="${COLOR[l.layer] ?? "#1c2b2b"}"/>`),
     ...e.circles.map((c) => `<circle cx="${X(c.x)}" cy="${Y(c.y)}" r="${c.r.toFixed(1)}" fill="none" stroke="${COLOR[c.layer] ?? "#1c2b2b"}"/>`),
-    ...e.texts.map((t) => `<text x="${X(t.x)}" y="${Y(t.y)}" font-size="${t.h.toFixed(1)}" fill="${COLOR[t.layer] ?? "#1f4e8c"}" font-family="monospace">${esc(t.value)}</text>`),
+    // ccmd K · KC-4 — 풍선번호 글자에 data-balloon(번호)을 달아 화면이 더블클릭으로 부품 정보를 연다(모양은 그대로)
+    ...e.texts.map((t) => `<text x="${X(t.x)}" y="${Y(t.y)}" font-size="${t.h.toFixed(1)}" fill="${COLOR[t.layer] ?? "#1f4e8c"}" font-family="monospace"${t.layer === "BALLOON" && /^\d+$/.test(t.value.trim()) ? ` data-balloon="${t.value.trim()}" style="cursor:pointer"` : ""}>${esc(t.value)}</text>`),
   ].join("");
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W.toFixed(1)} ${H.toFixed(1)}" stroke-width="${sw}" data-lines="${e.lines.length}" data-circles="${e.circles.length}" data-texts="${e.texts.length}"><rect width="100%" height="100%" fill="#ffffff"/>${body}</svg>`;
   return { svg, counts: { lines: e.lines.length, circles: e.circles.length, texts: e.texts.length, skipped: e.skipped }, frame };

@@ -66,8 +66,9 @@ export interface TechTable {
    *   buy 표는 슬롯으로 행을 고르지 않는 경우가 많아, 행이 하나면 그 행을 쓴다.
    * special = Special 호출 선언(ccmd K · KA) — 한 행 = 입력 한 개의 출처(program · input · from · required).
    *   BOM Run 이 이 표를 보고 서버에서 Special 을 부른다(사람이 입력을 다시 치지 않는다) · specialCallOf.
+   * detail = Detail Dimension(ccmd K · KC-1 · p36 · p38) — 한 행 = 세부 치수 하나(target · label A~K · value · from) · detailDimsOf.
    */
-  role?: "tech" | "dim" | "buy" | "rule" | "special";
+  role?: "tech" | "dim" | "buy" | "rule" | "special" | "detail";
   by: SlotKey;
   /**
    * ccmd K · KA — 행을 슬롯이 아니라 **이 BOM Run 의 Special 결과 필드**로 고른다(예: motorKw → "3.7" 행).
@@ -272,6 +273,8 @@ export type DesignRule =
 export interface RuleViolation { name: string; target: string; op: "max" | "min" | "macro"; limit: number | string; actual: number | string }
 
 const RULE_TARGETS = ["L", "W", "H", "SECTIONS", "COMPONENTS"] as const;
+/** ccmd K · KC-1 — 세부 치수 규칙 대상: detail.<구획 또는 자식 코드>.<A~K> */
+const DETAIL_TARGET = /^detail\.[\w][\w -]{0,39}\.[A-K]$/;
 
 export function designRulesOf(product: ProductCode): DesignRule[] {
   const t = Object.values(product.tables ?? {}).find((x) => x.role === "rule");
@@ -281,7 +284,9 @@ export function designRulesOf(product: ProductCode): DesignRule[] {
   if (!kT || !kO || !kV) return [];
   const out: DesignRule[] = [];
   for (const r of t.rows) {
-    const target = String(r.cells[kT] ?? "").toUpperCase();
+    // ccmd K · KC-1 — detail.<대상>.<A~K> 는 대상 이름의 대소문자를 그대로 둔다(구획 · 코드 이름)
+    const rawT = String(r.cells[kT] ?? "").trim();
+    const target = /^detail\./i.test(rawT) ? `detail.${rawT.slice(7)}` : rawT.toUpperCase();
     const op = String(r.cells[kO] ?? "").toLowerCase();
     if (op === "macro") {
       const macro = String(r.cells[kV] ?? "").trim();
@@ -290,7 +295,7 @@ export function designRulesOf(product: ProductCode): DesignRule[] {
       continue;
     }
     const value = Number(r.cells[kV]);
-    if (!(RULE_TARGETS as readonly string[]).includes(target)) continue;
+    if (!(RULE_TARGETS as readonly string[]).includes(target) && !DETAIL_TARGET.test(target)) continue;
     if (op !== "max" && op !== "min") continue;
     if (!Number.isFinite(value)) continue;
     out.push({ name: String(r.cells[kN ?? ""] ?? r.item ?? target), target, op, value });
@@ -321,14 +326,19 @@ export type MacroRuleEval = (macro: string, facts: Record<string, number>) => Ma
 
 const MACRO_FAIL: Record<"missing" | "unapproved" | "error", string> = { missing: "검증 매크로 없음", unapproved: "검증 매크로 미승인", error: "검증 매크로 오류" };
 
-/** 규칙을 지금 치수·구획에 대 본다. 통과면 빈 배열. evalMacro 가 없으면 매크로 규칙은 "없음" 위반이다(조용히 통과시키지 않는다). */
+/**
+ * 규칙을 지금 치수·구획에 대 본다. 통과면 빈 배열. evalMacro 가 없으면 매크로 규칙은 "없음" 위반이다(조용히 통과시키지 않는다).
+ * ccmd K · KC-1 — details(세부 치수)가 오면 detail.<대상>.<label> 규칙도 판정한다. 등록 안 된 세부 치수를 가리키는 규칙은 위반("없음").
+ */
 export function checkDesign(
   rules: DesignRule[],
   dims: { W: number; H: number; L: number },
   secDims: SectionDim[],
   evalMacro?: MacroRuleEval,
+  details?: DetailDim[],
 ): RuleViolation[] {
   const facts = designFacts(dims, secDims);
+  const dfacts = detailFacts(details);
   const out: RuleViolation[] = [];
   for (const r of rules) {
     if (r.op === "macro") {
@@ -337,6 +347,12 @@ export function checkDesign(
       else if (res.value === 1) continue;
       else if (res.value === 0) out.push({ name: r.name, target: "MACRO", op: "macro", limit: r.macro, actual: 0 });
       else out.push({ name: `${MACRO_FAIL.error}: ${r.macro}`, target: "MACRO", op: "macro", limit: r.macro, actual: `결과 ${res.value} — 1(통과)·0(위반)이 아님` });
+      continue;
+    }
+    if (DETAIL_TARGET.test(r.target)) {
+      const dv = dfacts[r.target];
+      if (dv === undefined) { out.push({ name: r.name, target: r.target, op: r.op, limit: r.value, actual: "없음" }); continue; }
+      if (r.op === "max" ? dv > r.value : dv < r.value) out.push({ name: r.name, target: r.target, op: r.op, limit: r.value, actual: dv });
       continue;
     }
     const actual = facts[r.target] ?? 0;
@@ -654,3 +670,5 @@ export function dimsFor(p: ProductCode, slots: SlotValues): DimsResult {
 }
 
 export * from "./spec";
+export * from "./cad";
+import { detailFacts, type DetailDim } from "./cad";

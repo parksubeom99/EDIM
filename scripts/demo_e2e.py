@@ -1944,8 +1944,11 @@ with sync_playwright() as p:
     for st in ("review","approved","issued"): ist=ctx.request.patch(DRW+f"/{dI.get('id')}",headers=J0,data=json.dumps({"status":st}))
     lk=ctx.request.post(DRW+f"/{dI.get('id')}/annotations",headers=J0,data=json.dumps({"kind":"line","x1":0,"y1":0,"x2":100,"y2":0}))
     pg.goto(BASE+f"/drawings/{dI.get('id')}/annotate",wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=annot-editor][data-locked='1']",timeout=60000)
-    ok("S69d 발행된 도면에는 주석을 더하지 못한다(409) · 편집기는 잠김 표시 · Free CAD · 설계 심볼은 잠긴 자리(이유)", (ist.status, lk.status, bool(pg.query_selector("[data-testid=annot-locked]")), len(pg.query_selector_all("[data-testid=annot-locked-tool]"))),
-       ist.status==200 and lk.status==409 and bool(pg.query_selector("[data-testid=annot-locked]")) and len(pg.query_selector_all("[data-testid=annot-locked-tool]"))==2)
+    # ccmd K · KC-3 — '설계 심볼' 자리는 심볼 패널로 열렸다(S77). Free CAD 만 잠긴 자리로 남는다.
+    _lk=pg.eval_on_selector_all("[data-testid=annot-locked-tool]","es=>es.map(e=>e.dataset.name)")
+    ok("S69d 발행된 도면에는 주석을 더하지 못한다(409) · 편집기는 잠김 표시 · Free CAD 는 잠긴 자리(이유) — 설계 심볼은 KC-3 에서 열림",
+       (ist.status, lk.status, bool(pg.query_selector("[data-testid=annot-locked]")), _lk),
+       ist.status==200 and lk.status==409 and bool(pg.query_selector("[data-testid=annot-locked]")) and _lk==["Free CAD"])
     q=lambda body: ctx.request.post(AN,headers=J0,data=json.dumps(body))
     e1=q({"kind":"text","x1":0,"y1":0}); e2=q({"kind":"circle","x1":0,"y1":0,"x2":10,"y2":10}); e3=q({"kind":"line","x1":5,"y1":5,"x2":5,"y2":5})
     e4=ctx.request.patch(BASE+f"/api/drawing-annotations/{ln1['id']}",headers=J0,data=json.dumps({"kind":"rect"}))
@@ -2251,13 +2254,150 @@ with sync_playwright() as p:
     c75f=ctx.request.post(CP,headers=J0,data=json.dumps({**PT,"p":663,"eta":0.5})); pf.close()
     ok("S75f viewer 는 스냅샷 읽기 · BOM Run 403 · 다른 회사는 그 스냅샷 404 · 회사 계정은 플랫폼 성능표 API 403",
        (v75.status, vb75.status, g75.status, c75f.status), (v75.status, vb75.status, g75.status, c75f.status)==(403,403,404,403))
+    # ── S76 KC-1 · KC-2 (ccmd K) — Detail Dimension(role detail) · CAD 규칙서(샘플 파일) — 샘플 제품 SPF 만(기존 EU 는 그대로) ──
+    def run_spf():
+        return ctx.request.post(BASE+"/api/run/bom",headers=J0,data=json.dumps({"slots":{"A":"SPF","B":"55","C":"2123"},"code":"SPF-55-2123"}))
+    def layer_texts(txt, layer):
+        return sorted(e.dxf.text for e in ezdxf.read(io.StringIO(txt)).modelspace() if e.dxftype()=="TEXT" and e.dxf.layer==layer)
+    j76=run_spf().json(); rid76=j76.get("runId")
+    s76=ctx.request.get(BASE+f"/api/bom-runs/{rid76}").json(); d76=s76.get("dims") or {}
+    det76=sorted((d["target"],d["label"],d["value"]) for d in d76.get("detail",[])); cr76=d76.get("cadRules") or {}
+    asm76=ctx.request.get(BASE+f"/api/dxf?runId={rid76}&type=assembly").text()
+    dim76=layer_texts(asm76,"DIM"); cad76=layer_texts(asm76,"CADRULE"); kad76=layer_texts(asm76,"KAD")
+    dxf_png(asm76, f"{OUT}/76_detail_dim.png", "SPF 샘플 조립도 — 세부 치수(DIM) · 기준점 · mm 배치(CADRULE) · KAD 슬롯(샘플 대응표) — ezdxf re-render")
+    ok("S76a 세부 치수(detail 표) → BOM Run 이 스냅샷 dims.detail 에 박는다(Fan A=1250 · B=1400 = 사이즈 표 fsz 55 행 · SMT 1 C=350 등록 값) · 규칙서 판 sample-1 · 지문 12자 → 조립도 DXF(ezdxf) DIM 레이어에 같은 값",
+       (det76, cr76.get("version"), cr76.get("fingerprint"), cr76.get("file"), [t for t in dim76 if t.startswith("detail.")]),
+       det76==[("Fan","A",1250),("Fan","B",1400),("SMT 1","C",350)] and cr76.get("version")=="sample-1" and len(cr76.get("fingerprint") or "")==12 and cr76.get("file")=="cad-rules.sample.json"
+       and [t for t in dim76 if t.startswith("detail.")]==["detail.Fan.A=1250","detail.Fan.B=1400","detail.SMT 1.C=350"])
+    ok("S76b CAD 규칙서가 부품을 mm 좌표에 놓는다(3×3 칸 → Fan 구획 2700~3600 · W 2472) · 기준점 Shaft · Foot · KAD- 슬롯 줄 = 대응표의 치수 키(W · H · 전장 · Fan A · B) · '샘플'",
+       ([t for t in cad76 if "@" in t], [t for t in kad76 if t.startswith("KAD-2")]),
+       "SFN 1 @3150,1236" in cad76 and "SMT 1 @3450,412.1" in cad76 and "SHAFT 3150,1236" in cad76 and "FOOT 2750,0" in cad76
+       and any(t.startswith("KAD-2472-2472-3600-1250-1400 · CAD RULES sample-1 #"+str(cr76.get("fingerprint"))) and t.endswith("(SAMPLE)") for t in kad76))
+    # 규칙 위반: 사이즈 표 fsz 55 행 A 1250 → 1400(규칙 max 1300) → 도면 422 · 앞 스냅샷 도면은 그대로 · 되돌림
+    _cat=ctx.request.get(BASE+"/api/setup/catalog").json(); spf=[p_ for p_ in _cat.get("productCodes",[]) if p_.get("code")=="SPF"][0]
+    spf_orig=json.loads(json.dumps(spf)); spf2=json.loads(json.dumps(spf))
+    for r_ in spf2["tables"]["fsz"]["rows"]:
+        if r_["item"]=="55": r_["cells"]["A"]=1400
+    up76=ctx.request.post(BASE+"/api/setup/product-codes",headers=J0,data=json.dumps(spf2))
+    j76v=run_spf().json(); v76=ctx.request.post(BASE+"/api/drawings",headers=J0,data=json.dumps({"runId":j76v.get("runId"),"type":"assembly"}))
+    asm76_again=ctx.request.get(BASE+f"/api/dxf?runId={rid76}&type=assembly").text()
+    rs76=ctx.request.post(BASE+"/api/setup/product-codes",headers=J0,data=json.dumps(spf_orig))
+    ok("S76c 설계 검증 규칙이 세부 치수에도 걸린다(detail.Fan.A max 1300 · 표를 1400 으로 고치면 도면 422 + 규칙 이름) · 세부 치수를 고쳐도 앞 스냅샷의 조립도는 한 글자도 안 바뀐다 · 되돌림 200",
+       (up76.status, v76.status, (v76.json().get("error","") if v76.status!=200 else "")[:70], asm76_again==asm76, rs76.status),
+       up76.status==200 and v76.status==422 and "팬 구획 세부 A 한계" in v76.json().get("error","") and asm76_again==asm76 and rs76.status==200)
+    # 파일 교체 시험(완료 정의 "파일 교체만으로 반영") — 회사 규칙서 자리(cad-rules.local.json)에 오프셋만 다른 사본 → 코드 변경 0 으로 좌표만 바뀐다
+    _rules_dir=os.path.join(os.path.dirname(os.path.abspath(__file__)),"..","packages","bom-code","cad-rules")
+    _local=os.path.join(_rules_dir,"cad-rules.local.json")
+    _sample=json.load(open(os.path.join(_rules_dir,"cad-rules.sample.json"),encoding="utf-8"))
+    _copy=json.loads(json.dumps(_sample)); _copy["version"]="sample-1-offset"; _copy["grid"]["offsetMm"]={"x":100,"y":-50}
+    try:
+        with open(_local,"w",encoding="utf-8",newline="\n") as f_: json.dump(_copy,f_,ensure_ascii=False,indent=2)
+        j76f=run_spf().json(); s76f=ctx.request.get(BASE+f"/api/bom-runs/{j76f.get('runId')}").json(); cr76f=(s76f.get("dims") or {}).get("cadRules") or {}
+        asm76f=ctx.request.get(BASE+f"/api/dxf?runId={j76f.get('runId')}&type=assembly").text()
+    finally:
+        if os.path.exists(_local): os.remove(_local)
+    j76b=run_spf().json(); cr76b=((ctx.request.get(BASE+f"/api/bom-runs/{j76b.get('runId')}").json().get("dims") or {}).get("cadRules") or {})
+    ok("S76d 규칙서 파일만 바꾸면(오프셋 +100 · -50 사본) 새 BOM Run 의 도면 좌표만 바뀐다 — 부품 @3250,1186 · 세부 치수 값 그대로 · 지문 · 판이 다르다 · 앞 스냅샷 도면 불변 · 파일을 치우면 샘플 지문으로 돌아온다",
+       (cr76f.get("file"), cr76f.get("version"), cr76f.get("fingerprint"), [t for t in layer_texts(asm76f,"CADRULE") if t.startswith("SFN")], cr76b.get("fingerprint")),
+       cr76f.get("file")=="cad-rules.local.json" and cr76f.get("version")=="sample-1-offset" and cr76f.get("fingerprint")!=cr76.get("fingerprint")
+       and "SFN 1 @3250,1186" in layer_texts(asm76f,"CADRULE") and layer_texts(asm76f,"DIM")==dim76
+       and ctx.request.get(BASE+f"/api/dxf?runId={rid76}&type=assembly").text()==asm76 and cr76b.get("fingerprint")==cr76.get("fingerprint"))
+    r76e=run55("S76e"); s76e=ctx.request.get(BASE+f"/api/bom-runs/{r76e.get('runId')}").json()
+    asm76e=ctx.request.get(BASE+f"/api/dxf?runId={r76e.get('runId')}&type=assembly").text()
+    ok("S76e 기존 시연 제품(EU)은 세부 치수 · 규칙서를 쓰지 않는다 — 스냅샷에 detail · cadRules 없음 · 조립도에 CADRULE · KAD 레이어 없음",
+       (("detail" in (s76e.get("dims") or {})), ("cadRules" in (s76e.get("dims") or {})), dxf_stats(asm76e)["layers"]),
+       "detail" not in (s76e.get("dims") or {}) and "cadRules" not in (s76e.get("dims") or {}) and not ({"CADRULE","KAD"} & set(dxf_stats(asm76e)["layers"])))
+    # ── S77 KC-3 (ccmd K) — p58 설계 심볼 라이브러리: 놓기 · 옮기기 · 회전 · 지우기 · DXF SYMBOL 레이어 · 발행 도면 잠금 ──
+    DRW=BASE+"/api/drawings"
+    d77=ctx.request.post(DRW,headers=J0,data=json.dumps({"runId":rid76,"type":"assembly"})).json(); D77=d77.get("id"); SY=DRW+f"/{D77}/symbols"
+    lib77=ctx.request.get(BASE+"/api/design-symbols").json().get("rows",[]); key_of={r_["id"]:r_["key"] for r_ in lib77}
+    orig77=ctx.request.get(DRW+f"/{D77}").text()
+    pg.goto(BASE+f"/drawings/{D77}/annotate",wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=symbol-panel][data-ready='1']",timeout=60000); nuke(pg)
+    ob=pg.locator("[data-testid=annot-overlay]").bounding_box()
+    P=lambda fx,fy: (ob["x"]+ob["width"]*fx, ob["y"]+ob["height"]*fy)
+    def sym_count(n): pg.wait_for_selector(f"[data-testid=symbol-panel][data-count='{n}']",timeout=30000)
+    OV=pg.locator("[data-testid=annot-overlay]")
+    def ov_click(fx,fy): OV.click(position={"x":ob["width"]*fx,"y":ob["height"]*fy})
+    pg.click("[data-testid=sym-pick-fan]"); ov_click(.3,.45); sym_count(1)
+    pg.click("[data-testid=sym-pick-motor]"); ov_click(.6,.45); sym_count(2)
+    rows77=ctx.request.get(SY).json().get("rows",[]); fan77=[r_ for r_ in rows77 if key_of.get(r_["symbolId"])=="fan"][0]; mot77=[r_ for r_ in rows77 if key_of.get(r_["symbolId"])=="motor"][0]
+    pg.click("[data-testid=annot-tool-select]"); pg.locator(f"[data-testid=sym-{fan77['id']}] circle").first.scroll_into_view_if_needed()
+    fb=pg.locator(f"[data-testid=sym-{fan77['id']}] circle").first.bounding_box(); c0=(fb["x"]+fb["width"]/2, fb["y"]+fb["height"]/2)
+    pg.mouse.move(*c0); pg.mouse.down(); pg.mouse.move(c0[0]+80,c0[1],steps=6); pg.mouse.up(); wait_text(pg,"[data-testid=annot-msg]","옮겼습니다")
+    pg.locator(f"[data-testid=sym-{fan77['id']}] circle").first.click(force=True)
+    pg.click("[data-testid=sym-rot]"); wait_text(pg,"[data-testid=annot-msg]","돌렸습니다")
+    pg.locator(f"[data-testid=sym-{mot77['id']}] line").first.click(force=True)
+    pg.click("[data-testid=sym-del]"); sym_count(1)
+    nuke(pg); pg.screenshot(path=f"{OUT}/77_symbol.png",full_page=True)
+    rows77b=ctx.request.get(SY).json().get("rows",[])
+    ok("S77a 설계 심볼(샘플 5종)을 도면에 놓고(팬 · 모터) · 팬을 끌어 옮기고(x 증가) · 90° 돌리고 · 모터를 지운다 — 도면 좌표 mm 로 저장",
+       (sorted(key_of.values()), [(key_of.get(r_["symbolId"]), r_["rot"]) for r_ in rows77b], fan77["x"], rows77b[0]["x"] if rows77b else None),
+       sorted(key_of.values())==["coil","damper","fan","filter","motor"] and len(rows77b)==1 and key_of.get(rows77b[0]["symbolId"])=="fan" and rows77b[0]["rot"]==90 and rows77b[0]["x"]>fan77["x"])
+    def prim_n(prims):
+        import math
+        return sum(1 if p_["t"] in ("line","circle") else 4 if p_["t"]=="rect" else max(2, math.ceil((p_["a1"]-p_["a0"])/15)) for p_ in prims)
+    fan_prims=[r_ for r_ in lib77 if r_["key"]=="fan"][0]["primitives"]
+    ex77=ctx.request.get(DRW+f"/{D77}?annot=1").text(); sy77=[e for e in ezdxf.read(io.StringIO(ex77)).modelspace() if e.dxf.layer=="SYMBOL"]
+    ok("S77b DXF 내보내기(주석 포함)에 SYMBOL 레이어 — 엔티티 수 = 팬 도형 전개 수(원 2 + 호 3 × 선분 10 = 32) · 원 도면 DXF 는 한 글자도 안 바뀐다",
+       (len(sy77), prim_n(fan_prims), ctx.request.get(DRW+f"/{D77}").text()==orig77), len(sy77)==prim_n(fan_prims)==32 and ctx.request.get(DRW+f"/{D77}").text()==orig77)
+    sid77=rows77b[0]["id"] if rows77b else "00000000-0000-4000-8000-000000000000"
+    lk77=ctx.request.post(DRW+f"/{dI.get('id')}/symbols",headers=J0,data=json.dumps({"symbolId":fan77["symbolId"],"x":0,"y":0}))
+    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data=LOGIN("viewer@acme.test"))
+    v77=(vw.request.get(SY).status, vw.request.post(SY,headers=J0,data=json.dumps({"symbolId":fan77["symbolId"],"x":0,"y":0})).status,
+         vw.request.patch(BASE+f"/api/drawing-symbols/{sid77}",headers=J0,data=json.dumps({"rot":180})).status, vw.request.delete(BASE+f"/api/drawing-symbols/{sid77}").status); vw.close()
+    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data=LOGIN("owner@globex.test"))
+    glib=gb.request.get(BASE+"/api/design-symbols").json().get("rows",[])
+    g77=(gb.request.get(SY).status, gb.request.patch(BASE+f"/api/drawing-symbols/{sid77}",headers=J0,data=json.dumps({"dx":10})).status,
+         gb.request.post(SY,headers=J0,data=json.dumps({"symbolId":glib[0]["id"] if glib else "","x":0,"y":0})).status); gb.close()
+    ok("S77c 발행된 도면에는 심볼을 놓지 못한다(409) · viewer 는 보기 200 · 놓기 · 돌리기 · 지우기 403 · 다른 회사는 우리 도면 심볼 404(자기 라이브러리 5종만 · 우리 id 0건)",
+       (lk77.status, v77, g77, len(glib), len(set(r_["id"] for r_ in glib) & set(key_of))),
+       lk77.status==409 and v77==(200,403,403,403) and g77==(404,404,404) and len(glib)==5 and not (set(r_["id"] for r_ in glib) & set(key_of)))
+    # ── S78 KC-4 (ccmd K) — 조립도 Item 표 · 풍선번호 더블클릭 = 부품의 정보(스냅샷 기준 · 단가 출처 = 그때 단가 이력 행) ──
+    PRC=BASE+"/api/setup/prices"
+    p78a=ctx.request.post(PRC,headers=J0,data=json.dumps({"code":"SCS 1","price":2500000,"currency":"KRW","effectiveFrom":"2026-01-01","note":"e2e S78 샘플"}))
+    pid78=[r_ for r_ in ctx.request.get(PRC+"?code=SCS%201").json().get("rows",[]) if r_["price"]==2500000][0]["id"]
+    pg.goto(BASE+f"/workbench?node={AHU75}",wait_until="domcontentloaded"); hydrated(pg); nuke(pg)
+    sel78=pg.query_selector_all("[data-testid=code-builder] select"); sel78[0].select_option(value="SPF"); sel78[1].select_option(value="55")
+    pg.locator("button",has_text=re.compile(r"^BOM$")).first.click(); pg.wait_for_selector("button:has-text('BOM Run')",timeout=30000)
+    with pg.expect_response(lambda q: "/api/run/bom" in q.url and q.request.method=="POST",timeout=60000) as br78:
+        pg.click("button:has-text('BOM Run')")
+    rid78=br78.value.json().get("runId")
+    def open_asm():
+        pg.select_option("[data-cmd=dwg-view]","assembly"); pg.wait_for_selector("[data-testid=dwg-viewer][data-view=assembly][data-ready='1']",timeout=30000)
+        pg.wait_for_selector("[data-testid=part-panel][data-ready='1']",timeout=30000)
+    open_asm()
+    rows78=pg.eval_on_selector_all("[data-testid=part-table] tbody tr","es=>es.map(e=>e.dataset.code)")
+    cas_no=[i+1 for i,c in enumerate(rows78) if c=="SCS 1"][0]; mot_no=[i+1 for i,c in enumerate(rows78) if c=="SMT 1"][0]
+    pg.dblclick(f"[data-testid=part-row-{mot_no}]"); pg.wait_for_selector(f"[data-testid=part-info][data-no='{mot_no}']",timeout=30000)
+    pi_m=pg.eval_on_selector("[data-testid=part-info]","e=>({...e.dataset, text:e.innerText})")
+    nuke(pg); pg.screenshot(path=f"{OUT}/78_part_info.png",full_page=True)
+    pg.dblclick(f"[data-testid=dwg-viewer-svg] [data-balloon='{cas_no}']"); pg.wait_for_selector(f"[data-testid=part-info][data-no='{cas_no}']",timeout=30000)
+    pi_c=pg.eval_on_selector("[data-testid=part-info]","e=>({...e.dataset})")
+    ok("S78a 조립도 옆 Item 표(Item · Description · Q'ty · Remarks info) — 줄 더블클릭 = 모터(SMT 1) 정보: 코드 · 사양 3.7 kW · 수량 · 공급처 · 단가 ₩420,000 · 조립순서 4/4(Fan) · 세부 치수 C=350 · 주의사항 · DWG · Remarks info 칸이 채워진다",
+       (pi_m.get("code"), pi_m.get("qty"), pi_m.get("unitCost"), pi_m.get("order"), pg.inner_text(f"[data-testid=part-remarks-{mot_no}]")),
+       pg.get_attribute("[data-testid=dwg-viewer]","data-run")==rid78 and pi_m.get("code")=="SMT 1" and pi_m.get("qty")=="1" and pi_m.get("unitCost")=="420000" and pi_m.get("order")=="4" and "3.7 kW" in pi_m.get("text","")
+       and "SMT 1.C=350" in pi_m.get("text","") and "C=350" in pg.inner_text(f"[data-testid=part-remarks-{mot_no}]") and "주의사항" in pg.inner_text(f"[data-testid=part-remarks-{mot_no}]"))
+    p78b=ctx.request.post(PRC,headers=J0,data=json.dumps({"code":"SCS 1","price":2700000,"currency":"KRW","effectiveFrom":"2026-02-01","note":"e2e S78 샘플 인상"}))
+    pg.click("[data-testid=dwg-viewer-close]"); pg.wait_for_selector("[data-testid=dwg-viewer]",state="detached",timeout=10000); open_asm()
+    pg.dblclick(f"[data-testid=dwg-viewer-svg] [data-balloon='{cas_no}']"); pg.wait_for_selector(f"[data-testid=part-info][data-no='{cas_no}']",timeout=30000)
+    pi_c2=pg.eval_on_selector("[data-testid=part-info]","e=>({...e.dataset})")
+    pg.click("[data-testid=dwg-viewer-close]")
+    ok("S78b 풍선번호 더블클릭 = 케이싱(SCS 1) 정보 · 단가 출처 = 그때 단가 이력 행(₩2,500,000) — 단가를 ₩2,700,000 으로 올린 뒤 다시 열어도 패널은 스냅샷 값 · 같은 행 id",
+       (p78a.status, p78b.status, pi_c.get("code"), pi_c.get("unitCost"), pi_c.get("priceId")==pid78, pi_c2.get("unitCost"), pi_c2.get("priceId")==pid78),
+       p78a.status==200 and p78b.status==200 and pi_c.get("code")=="SCS 1" and pi_c.get("unitCost")=="2500000" and pi_c.get("priceId")==pid78 and pi_c2.get("unitCost")=="2500000" and pi_c2.get("priceId")==pid78)
+    PA=BASE+f"/api/bom-runs/{rid78}/parts"
+    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data=LOGIN("viewer@acme.test")); v78=vw.request.get(PA).status; vw.close()
+    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data=LOGIN("owner@globex.test")); g78=gb.request.get(PA).status; gb.close()
+    x78=ctx.request.get(PA+f"?drawing={D77}")
+    ok("S78c 부품 정보 API — viewer 403(단가가 들어 있다) · 다른 회사 404 · 이 스냅샷에서 뜬 도면이 아닌 drawing 을 주면 404",
+       (v78, g78, x78.status), (v78, g78, x78.status)==(403,404,404))
     # S37 은 맨 끝에서 센다 — 중간(옛 자리)에서는 뒤에 찍히는 5장(40·41·42·52·53)이 아직 없어,
     # 빈 폴더에서는 25장이라 실패하고 이전 실행 잔재가 있을 때만 통과했다(2026-09-24 실측).
     _want=["00_login","05_project_mgmt","06_module_cpq_stub","10_project_bound","11_code_builder","11b_revisions","12_macro_tab",
            "13_macro_approved","14_edim_run","15_bom_cost","16_design_tab","20_setup_subcode","21_setup_product_table",
            "22_setup_relationship","23_codebuilder_from_subcode","30_toolbox_program","31_toolbox_ui_tool","40_company_admin",
            "41_platform_console","42_user_management","43_drawings","44_document_tab","45_purchasing","46_quotation_print",
-           "47_techdata_print","48_dxf_plan","49_dxf_assembly","51_accepted","52_register","53_schedule","54_toolbar","55_project_mgmt","56_print_setup","57_ui_design","58_material","59_arrangement_code","60_spec_input","61_drawing_purpose","62_company_db","63_input_data","64_viewer3d","65_price_to_cost","66_project_contacts","67_partner_edit","68_spec_import","69_code_approval","70_dwg_view","71_techdata_list","72_mfg_rate","73_erp_master","74_sub_drawing","75_output_template","76_coding_list","77_wizards","78_print_layout","79_draw_module","80_macro_verify","81_learning_job","82_formula_cards","83_projection","84_toolbox_suggestion","85_special_request","86_fan_result","87_special_meter","75_cpq_special_bom","75_cpq_special_drawing"]
+           "47_techdata_print","48_dxf_plan","49_dxf_assembly","51_accepted","52_register","53_schedule","54_toolbar","55_project_mgmt","56_print_setup","57_ui_design","58_material","59_arrangement_code","60_spec_input","61_drawing_purpose","62_company_db","63_input_data","64_viewer3d","65_price_to_cost","66_project_contacts","67_partner_edit","68_spec_import","69_code_approval","70_dwg_view","71_techdata_list","72_mfg_rate","73_erp_master","74_sub_drawing","75_output_template","76_coding_list","77_wizards","78_print_layout","79_draw_module","80_macro_verify","81_learning_job","82_formula_cards","83_projection","84_toolbox_suggestion","85_special_request","86_fan_result","87_special_meter","75_cpq_special_bom","75_cpq_special_drawing","76_detail_dim","77_symbol","78_part_info"]
     _miss=[w for w in _want if not os.path.exists(f"{OUT}/{w}.png") or os.path.getmtime(f"{OUT}/{w}.png")<T0]
     ok(f"S37 캡처 {len(_want)}장이 이번 실행에서 전부 나온다 (잔재 파일은 세지 않음)", _miss or len(_want), not _miss)
     b.close()

@@ -1498,6 +1498,53 @@
               }
             }
           ]
+        },
+        "fsz": {
+          "no": 4,
+          "by": "B",
+          "default": "55",
+          "cols": [
+            { "key": "A", "name": "A", "label": "팬 구획 세부 A mm (샘플 · p36 Item 표 모양)" },
+            { "key": "B", "name": "B", "label": "팬 구획 세부 B mm (샘플)" }
+          ],
+          "rows": [
+            { "item": "10", "cells": { "A": 679, "B": 760 } },
+            { "item": "12", "cells": { "A": 720, "B": 810 } },
+            { "item": "25", "cells": { "A": 900, "B": 1010 } },
+            { "item": "55", "cells": { "A": 1250, "B": 1400 } }
+          ]
+        },
+        "det": {
+          "no": 5,
+          "role": "detail",
+          "by": "B",
+          "default": "55",
+          "cols": [
+            { "key": "A", "name": "target", "label": "대상(구획 또는 자식 코드)" },
+            { "key": "B", "name": "label", "label": "치수 기호 A~K" },
+            { "key": "C", "name": "value", "label": "값 mm (from 없을 때)" },
+            { "key": "D", "name": "from", "label": "출처 표.열 (사이즈 행)" }
+          ],
+          "rows": [
+            { "item": "1", "cells": { "A": "Fan", "B": "A", "C": "", "D": "fsz.A" } },
+            { "item": "2", "cells": { "A": "Fan", "B": "B", "C": "", "D": "fsz.B" } },
+            { "item": "3", "cells": { "A": "SMT 1", "B": "C", "C": 350, "D": "" } }
+          ]
+        },
+        "rul": {
+          "no": 6,
+          "role": "rule",
+          "by": "B",
+          "default": "",
+          "cols": [
+            { "key": "A", "name": "target" },
+            { "key": "B", "name": "op" },
+            { "key": "C", "name": "value" },
+            { "key": "D", "name": "name" }
+          ],
+          "rows": [
+            { "item": "R1", "cells": { "A": "detail.Fan.A", "B": "max", "C": 1300, "D": "팬 구획 세부 A 한계(샘플)" } }
+          ]
         }
       },
       "sections": [
@@ -1511,7 +1558,11 @@
           "name": "Coil"
         },
         {
-          "name": "Fan"
+          "name": "Fan",
+          "components": [
+            { "code": "SFN 1", "at": "center", "level": "mid" },
+            { "code": "SMT 1", "at": "rear", "level": "bottom" }
+          ]
         }
       ]
     },

@@ -30,6 +30,10 @@ async function resetDemo(): Promise<void> {
   // 발행된 도면은 트리거가 삭제를 막으므로(운영에서는 그게 맞다) 리셋 동안만 내린다.
   await adminPrisma.$executeRawUnsafe(`ALTER TABLE "drawing" DISABLE TRIGGER USER`);
   await adminPrisma.drawingAnnotation.deleteMany({ where: { tenantId: t } });   // 0031 · 도면 주석(도면보다 먼저 — cascade 지만 명시)
+  // 0036 · 설계 심볼 배치 — 발행 도면의 배치는 트리거가 삭제를 막으므로 리셋 동안만 내린다(라이브러리 design_symbol 은 남긴다)
+  await adminPrisma.$executeRawUnsafe(`ALTER TABLE "drawing_symbol" DISABLE TRIGGER USER`);
+  await adminPrisma.drawingSymbol.deleteMany({ where: { tenantId: t } });
+  await adminPrisma.$executeRawUnsafe(`ALTER TABLE "drawing_symbol" ENABLE TRIGGER USER`);
   const dwg = await adminPrisma.drawing.deleteMany({ where: { tenantId: t } });
   await adminPrisma.$executeRawUnsafe(`ALTER TABLE "drawing" ENABLE TRIGGER USER`);
   // P4-b: 문서·구매 요청도 BOM 스냅샷을 참조한다 → 스냅샷보다 **먼저** 지운다.

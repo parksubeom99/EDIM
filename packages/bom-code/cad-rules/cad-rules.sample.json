@@ -1,0 +1,31 @@
+{
+  "version": "sample-1",
+  "sample": "샘플 CAD 규칙서 — 회사 실 CAD 규칙 아님 · KAD 슬롯 문법(RCCS) 미확정",
+  "grid": {
+    "_note": "p36 Component 3×3 칸 → 구획 안 mm. at = 길이 방향 비율(앞 · 중 · 뒤) · level = 폭 방향 비율(하 · 중 · 상) · offsetMm = 모든 부품에 더하는 이동",
+    "at": { "front": 0.1667, "center": 0.5, "rear": 0.8333 },
+    "level": { "top": 0.8333, "mid": 0.5, "bottom": 0.1667 },
+    "offsetMm": { "x": 0, "y": 0 }
+  },
+  "datum": [
+    { "name": "Shaft", "xRatio": 0.5, "yRatio": 0.5, "xMm": 0, "yMm": 0 },
+    { "name": "Foot", "xRatio": 0, "yRatio": 0, "xMm": 50, "yMm": 0 }
+  ],
+  "kad": {
+    "note": "샘플 대응표 · RCCS 문법 미확정 — 슬롯 순번 ↔ 치수 키. 문법 확정은 회장님 · 사장님 몫",
+    "prefix": "KAD-",
+    "slots": [
+      { "slot": 1, "key": "dim.W" },
+      { "slot": 2, "key": "dim.H" },
+      { "slot": 3, "key": "dim.L" },
+      { "slot": 4, "key": "detail.Fan.A" },
+      { "slot": 5, "key": "detail.Fan.B" }
+    ]
+  },
+  "detail": {
+    "_note": "세부 치수선은 대상 구획의 anchor 기준점에서 시작해 외형 위쪽 띠에 그린다(startMm = 외형 위 간격 · gapMm = 줄 간격)",
+    "anchor": "Foot",
+    "startMm": 900,
+    "gapMm": 220
+  }
+}
