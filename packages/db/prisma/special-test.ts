@@ -5,11 +5,13 @@
  *   3. 승인 안 된 의뢰로는 grant 가 생기지 않는다 · 회사는 grant 를 직접 넣지 못한다
  *   4. 사용 기록(special_run)은 고치지도 지우지도 못한다(과금 근거) · 다른 회사 기록 0건
  *   5. 플랫폼은 사용 기록의 금액 칸만 — 입력·결과 칸은 못 읽는다 · 회사 자체 팬 표는 권한 0
+ *   6. (0035 · ccmd K · KA) BOM Run 에서 나온 사용 기록 = 스냅샷 하나에 한 건(bom_run_id 부분 유일) · 다른 회사 0건 · 플랫폼은 bom_run_id 도 못 읽는다
  */
 import { withTenant } from "../src/tenant";
 import { adminPrisma, appPrisma, platformDb } from "../src/client";
 import { createPlatformRequest, decidePlatformRequest } from "../src/platform";
-import { platformGrantSpecial, fanCandidates, insertSpecialRun, listSpecialRuns, listSpecialGrants } from "../src/special";
+import { platformGrantSpecial, fanCandidates, insertSpecialRun, listSpecialRuns, listSpecialGrants, specialRunsForBomRun } from "../src/special";
+import { saveBomCodeRun } from "../src/code-catalog";
 import { IDS } from "./seed";
 
 let pass = 0, fail = 0;
@@ -68,8 +70,25 @@ async function main(): Promise<void> {
   check("플랫폼은 부여를 직접 넣지 못한다(함수로만)", await denied(() => platformDb.$executeRawUnsafe(
     `INSERT INTO public.special_grant (tenant_id, program_key, version, title, price_per_run, currency, binding, request_id) VALUES ('${IDS.tenantB}', 'fan-select', 1, 'x', 0, 'KRW', '{}', '${req.id}')`)));
 
+  // 6) 0035 — BOM Run 1회 = 사용 기록 1건(스냅샷에 묶임)
+  const bom = await withTenant(IDS.tenantA, (tx) => saveBomCodeRun(tx, {
+    stableId: null, code: "SPF-55 (special:test)", slots: { A: "SPF", B: "55" }, macroValue: null, parentCode: "SPF", catalogFp: "special-test",
+    lines: [], cost: { total: 0 }, createdBy: IDS.ownerA,
+  }));
+  const run1 = () => withTenant(IDS.tenantA, (tx) => insertSpecialRun(tx, { tenantId: IDS.tenantA, programKey: "fan-select", version: 1, input: { q_cmh: 12000, p_pa: 600, source: "bom-run" }, result: { ok: true }, bindingSource: "platform", price: 5000, currency: "KRW", createdBy: IDS.ownerA, bomRunId: bom.id }));
+  const b1 = await run1();
+  check("BOM 스냅샷에 묶인 사용 기록 1건이 들어간다(bom_run_id)", /^[0-9a-f-]{36}$/.test(b1), b1);
+  check("같은 BOM 스냅샷으로 두 번 과금되지 않는다(부분 유일 인덱스)", await rejects(run1, /unique|duplicate|23505|special_run_bom_run_key/i));
+  const byBomA = await withTenant(IDS.tenantA, (tx) => specialRunsForBomRun(tx, bom.id));
+  check("그 스냅샷의 사용 기록 = 정확히 1건 · 금액 5,000", byBomA.length === 1 && byBomA[0]!.price === 5000, JSON.stringify(byBomA));
+  const byBomB = await withTenant(IDS.tenantB, (tx) => specialRunsForBomRun(tx, bom.id));
+  check("다른 회사는 그 스냅샷의 사용 기록을 0건 본다(RLS)", byBomB.length === 0, String(byBomB.length));
+  check("플랫폼은 bom_run_id 칸도 읽지 못한다(금액 칸만)", await denied(() => platformDb.$queryRawUnsafe(`SELECT bom_run_id FROM public.special_run`)));
+  check("회사도 BOM 에서 나온 사용 기록을 고치지 못한다", await denied(() => withTenant(IDS.tenantA, (tx) => tx.$executeRawUnsafe(`UPDATE special_run SET bom_run_id = NULL WHERE id = '${b1}'`))));
+
   // 정리
   await adminPrisma.$executeRawUnsafe(`DELETE FROM public.special_run WHERE program_key = 'fan-select'`);
+  await adminPrisma.$executeRawUnsafe(`DELETE FROM public.bom_code_run WHERE id = '${bom.id}'`);
   await adminPrisma.$executeRawUnsafe(`DELETE FROM public.special_grant WHERE program_key = 'fan-select'`);
   await adminPrisma.$executeRawUnsafe(`DELETE FROM public.platform_request WHERE id = '${req.id}'`);
 

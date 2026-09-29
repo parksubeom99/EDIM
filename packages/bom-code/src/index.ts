@@ -64,9 +64,16 @@ export interface TechTable {
    * buy  = 구매 속성(p32 Material code & General purchase items — Supplier·V·Hz·IP·Insulation…) ·
    * rule = 설계 검증 규칙(p36·p60 Design Verification Tool · 코퍼스 "Design Tool Binding").
    *   buy 표는 슬롯으로 행을 고르지 않는 경우가 많아, 행이 하나면 그 행을 쓴다.
+   * special = Special 호출 선언(ccmd K · KA) — 한 행 = 입력 한 개의 출처(program · input · from · required).
+   *   BOM Run 이 이 표를 보고 서버에서 Special 을 부른다(사람이 입력을 다시 치지 않는다) · specialCallOf.
    */
-  role?: "tech" | "dim" | "buy" | "rule";
+  role?: "tech" | "dim" | "buy" | "rule" | "special";
   by: SlotKey;
+  /**
+   * ccmd K · KA — 행을 슬롯이 아니라 **이 BOM Run 의 Special 결과 필드**로 고른다(예: motorKw → "3.7" 행).
+   * 있으면 `by` 는 무시된다. Special 결과가 없는 Run 에서 이 표를 읽으면 UNKNOWN_REF(추측하지 않는다).
+   */
+  bySpecial?: string;
   /** Item used when the slot is EMPTY (a chosen value without a row is an error) */
   default: string;
   cols: TableColumn[];
@@ -191,7 +198,12 @@ export interface BomCodeLine extends BomLine {
    * 등록 안 된 코드는 null.
    */
   supplier: string | null;
+  /** ccmd K · KA — 이 줄의 사양·단가가 Special 결과를 읽었다(조립도 Item 표가 사양을 함께 적는다). 없으면 false. */
+  fromSpecial?: boolean;
 }
+
+/** ccmd K · KA — BOM Run 이 받은 Special 결과(스냅샷 dims.special.result 의 평평한 값). `{special.model}` 등으로 읽는다. */
+export type SpecialValues = Record<string, Cell>;
 
 export type BomCodeError =
   | { code: "UNKNOWN_PRODUCT"; message: string }
@@ -356,35 +368,121 @@ class RefError extends Error {}
 /** Records which slots a line reads, so the child's resolved code can carry them. */
 type Used = Set<SlotKey>;
 
-function lookup(ref: string, child: ProductCode, parent: ProductCode, slots: SlotValues, used?: Used): Cell {
+/** 한 줄을 채우는 동안 Special 결과를 읽었는지 기록한다(조립도 Item 표 · 스냅샷 줄의 fromSpecial). */
+type SpecialUse = { special: SpecialValues | null; hit: boolean };
+
+function lookup(ref: string, child: ProductCode, parent: ProductCode, slots: SlotValues, used?: Used, sp?: SpecialUse): Cell {
   const dot = ref.indexOf(".");
   const tName = dot < 0 ? ref : ref.slice(0, dot);
   const colRef = dot < 0 ? "" : ref.slice(dot + 1);
+  // ccmd K · KA — `{special.<필드>}` = 이 Run 의 Special 결과. 없는 Run 이면 거부(0 이나 빈칸으로 메우지 않는다).
+  if (tName === "special" && !child.tables.special && !parent.tables.special) {
+    const v = sp?.special?.[colRef];
+    if (v === undefined) throw new RefError(`'${ref}' — 이 BOM Run 에 Special 결과가 없습니다(제품 코드의 special 표 · 부여 확인)`);
+    if (sp) sp.hit = true;
+    return v;
+  }
   const table = child.tables[tName] ?? parent.tables[tName];
   if (!table) throw new RefError(`table '${tName}' is not registered on ${child.code} or ${parent.code}`);
-  used?.add(table.by);
-  const key = slots[table.by] ?? "";
+  let key: string;
+  if (table.bySpecial) {
+    const v = sp?.special?.[table.bySpecial];
+    if (v === undefined) throw new RefError(`table '${tName}' (Table${table.no}) 는 Special 결과 '${table.bySpecial}' 로 행을 고르는데 이 BOM Run 에 Special 결과가 없습니다`);
+    if (sp) sp.hit = true;
+    key = String(v);
+  } else {
+    used?.add(table.by);
+    key = slots[table.by] ?? "";
+  }
+  const by = table.bySpecial ? `special.${table.bySpecial}` : table.by;
   // `default` covers an EMPTY slot only. A chosen value with no row is a gap in
   // the registration and must surface — never borrow another size's numbers.
   const want = key === "" ? table.default : key;
   const row = table.rows.find((r) => r.item === want);
-  if (!row) throw new RefError(`table '${tName}' (Table${table.no}) has no row for ${table.by}='${key}' — register it in Set-Up ▸ Product Code ▸ Table`);
+  if (!row) throw new RefError(`table '${tName}' (Table${table.no}) has no row for ${by}='${key}' — register it in Set-Up ▸ Product Code ▸ Table`);
   const col = table.cols.find((c) => c.name === colRef || c.key === colRef);
   const cell = col ? row.cells[col.key] : undefined;
-  if (cell === undefined) throw new RefError(`'${ref}' has no value for ${table.by}='${key}'`);
+  if (cell === undefined) throw new RefError(`'${ref}' has no value for ${by}='${key}'`);
   return cell;
 }
 
-function num(ref: string, child: ProductCode, parent: ProductCode, slots: SlotValues, used?: Used): number {
-  const v = lookup(ref, child, parent, slots, used);
+function num(ref: string, child: ProductCode, parent: ProductCode, slots: SlotValues, used?: Used, sp?: SpecialUse): number {
+  const v = lookup(ref, child, parent, slots, used, sp);
   if (typeof v !== "number") throw new RefError(`'${ref}' is not a number`);
   return v;
 }
 
-function fill(tpl: string, child: ProductCode, parent: ProductCode, slots: SlotValues, macroValue: number | null, used?: Used): string {
+function fill(tpl: string, child: ProductCode, parent: ProductCode, slots: SlotValues, macroValue: number | null, used?: Used, sp?: SpecialUse): string {
   return tpl.replace(/\{([^}]+)\}/g, (_m, ref: string) =>
-    ref === "macro" ? String(Math.round(macroValue ?? 0)) : String(lookup(ref, child, parent, slots, used)),
+    ref === "macro" ? String(Math.round(macroValue ?? 0)) : String(lookup(ref, child, parent, slots, used, sp)),
   );
+}
+
+/* ── ccmd K · KA — Special 호출 선언(제품 코드의 role="special" 표) ─────────────── */
+
+/** 입력 한 개의 출처. from = `dim.W` 처럼 Key Dimension · `<표>.<열>`(슬롯으로 행 선택) · 숫자 상수. */
+export interface SpecialInputDecl { input: string; from: string; required: boolean }
+export interface SpecialCall { program: string; inputs: SpecialInputDecl[]; required: boolean; tableName: string }
+
+/**
+ * 제품 코드의 special 표를 읽는다. 열 이름으로 찾는다 — program · from · required(행 Item = 입력 이름).
+ * 표가 없으면 null(Special 을 부르지 않는 제품 — 기존 제품 전부). 형식이 틀리면 null 이 아니라 오류를 돌려준다.
+ */
+export function specialCallOf(product: ProductCode): SpecialCall | { error: string } | null {
+  const entry = Object.entries(product.tables ?? {}).find(([, t]) => t.role === "special");
+  if (!entry) return null;
+  const [tableName, t] = entry;
+  const colOf = (nm: string) => t.cols.find((c) => c.name.toLowerCase() === nm)?.key;
+  const kP = colOf("program"), kF = colOf("from"), kR = colOf("required");
+  if (!kP || !kF) return { error: `special 표 ${tableName} 에 열 program · from 이 필요합니다` };
+  const programs = new Set<string>();
+  const inputs: SpecialInputDecl[] = [];
+  for (const r of t.rows) {
+    const program = String(r.cells[kP] ?? "").trim();
+    const from = String(r.cells[kF] ?? "").trim();
+    if (!r.item || !program || !from) return { error: `special 표 ${tableName} 의 행 '${r.item}' — 입력 이름 · program · from 이 비었습니다` };
+    programs.add(program);
+    const req = kR ? String(r.cells[kR] ?? "").trim().toLowerCase() : "y";
+    inputs.push({ input: r.item, from, required: !(req === "n" || req === "no" || req === "0" || req === "아니오" || req === "false") });
+  }
+  if (programs.size !== 1) return { error: `special 표 ${tableName} 는 프로그램 하나만 부를 수 있습니다(지금 ${programs.size}개)` };
+  return { program: [...programs][0]!, inputs, required: inputs.some((i) => i.required), tableName };
+}
+
+/**
+ * 입력을 모은다 — 스냅샷에 박힐 치수(dim.*)와 등록 표(슬롯으로 행 선택)에서. 사람이 다시 입력하지 않는다.
+ * 값이 없으면(등록 안 됨) 지어내지 않고 이유와 함께 거부한다.
+ */
+export function resolveSpecialInputs(
+  product: ProductCode, call: SpecialCall, slots: SlotValues, dims: Dims | null,
+): { ok: true; values: Record<string, number>; sources: Record<string, string> } | { ok: false; message: string } {
+  const values: Record<string, number> = {};
+  const sources: Record<string, string> = {};
+  for (const d of call.inputs) {
+    let v: number | null = null;
+    let src = d.from;
+    if (/^-?\d+(\.\d+)?$/.test(d.from)) { v = Number(d.from); src = `상수 ${d.from}`; }
+    else if (/^dim\.[WHL]$/.test(d.from)) {
+      if (!dims) return { ok: false, message: `Special 입력 ${d.input} = ${d.from} — 치수 표(Dim)가 없습니다` };
+      v = dims[d.from.slice(4) as DimName]; src = `Key Dimension ${d.from.slice(4)}`;
+    } else if (/^\w+\.\w+$/.test(d.from)) {
+      try {
+        const c = lookup(d.from, product, product, slots);
+        v = typeof c === "number" ? c : Number(c);
+        const t = product.tables[d.from.split(".")[0]!];
+        src = `${d.from}(Table${t?.no ?? "?"} · ${t?.by ?? ""}=${(t && slots[t.by]) || t?.default || ""})`;
+      } catch (e) {
+        if (e instanceof RefError) return { ok: false, message: `Special 입력 ${d.input} = ${d.from} — ${e.message}` };
+        throw e;
+      }
+    } else return { ok: false, message: `Special 입력 ${d.input} 의 from '${d.from}' 을 읽을 수 없습니다(dim.W · 표.열 · 숫자)` };
+    if (v === null || !Number.isFinite(v)) {
+      if (d.required) return { ok: false, message: `Special 입력 ${d.input} = ${d.from} 이 숫자가 아닙니다` };
+      continue;
+    }
+    values[d.input] = v; sources[d.input] = src;
+  }
+  return { ok: true, values, sources };
 }
 
 const SLOT_ORDER: readonly SlotKey[] = ["A", "B", "C", "D", "E", "F"];
@@ -400,7 +498,7 @@ function seqOf(catalog: Catalog, key: SlotKey, slots: SlotValues): number {
  * Part List Run (p34). Deterministic: same catalog + same slots (+ same
  * approved-macro value) → same lines, in the same order.
  */
-export function runBomCode(catalog: Catalog, slots: SlotValues, macroValue: number | null = null): BomCodeResult {
+export function runBomCode(catalog: Catalog, slots: SlotValues, macroValue: number | null = null, special: SpecialValues | null = null): BomCodeResult {
   const mv = typeof macroValue === "number" && Number.isFinite(macroValue) ? macroValue : null;
   const byCode = new Map(catalog.productCodes.map((p) => [p.code, p]));
   const parentCode = slots.A ?? "";
@@ -425,12 +523,13 @@ export function runBomCode(catalog: Catalog, slots: SlotValues, macroValue: numb
       const child = byCode.get(r.child);
       if (!child) return { ok: false, error: { code: "UNKNOWN_CHILD", message: `child code '${r.child}' is not registered` } };
       const used: Used = new Set();
+      const sp: SpecialUse = { special, hit: false };
       if (r.when && "slot" in r.when) used.add(r.when.slot);
-      const qty = "lit" in r.qty ? r.qty.lit : num(r.qty.ref, child, parent, slots, used);
-      const base = "lit" in r.unitCost ? r.unitCost.lit : num(r.unitCost.ref, child, parent, slots, used);
-      const unitCost = Math.round(r.unitCost.scale ? base * num(r.unitCost.scale, child, parent, slots, used) : base);
-      const spec = fill(child.specTemplate, child, parent, slots, mv, used);
-      const material = fill(child.materialTemplate, child, parent, slots, mv, used);
+      const qty = "lit" in r.qty ? r.qty.lit : num(r.qty.ref, child, parent, slots, used, sp);
+      const base = "lit" in r.unitCost ? r.unitCost.lit : num(r.unitCost.ref, child, parent, slots, used, sp);
+      const unitCost = Math.round(r.unitCost.scale ? base * num(r.unitCost.scale, child, parent, slots, used, sp) : base);
+      const spec = fill(child.specTemplate, child, parent, slots, mv, used, sp);
+      const material = fill(child.materialTemplate, child, parent, slots, mv, used, sp);
       const seqs = SLOT_ORDER.filter((k) => used.has(k)).map((k) => seqOf(catalog, k, slots));
       lines.push({
         no: lines.length + 1,
@@ -448,6 +547,7 @@ export function runBomCode(catalog: Catalog, slots: SlotValues, macroValue: numb
         kind: child.kind,
         // p32 → p51: 구매 품목이면 등록된 공급처를 이 줄에 박는다(스냅샷이 근거)
         supplier: child.kind === "purchase" ? (buyAttrsOf(child, slots).Supplier ?? null) : null,
+        ...(sp.hit ? { fromSpecial: true } : {}),
       });
     }
   } catch (e) {

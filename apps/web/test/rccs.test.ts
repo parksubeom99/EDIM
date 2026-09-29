@@ -60,7 +60,11 @@ import demo from "@edim/bom-code/catalog/ahu-demo.json";
 describe("P1 — Code Builder choices come from registered Sub Codes (p31)", () => {
   const defs = slotDefsFromSubCodes(demo.subCodes);
   it("the demo registration reproduces the sample catalog exactly (labels included)", () => {
-    expect(defs).toEqual(RCCS_SLOTS);
+    // ccmd K · KA — 데모 등록에는 Special 샘플 제품 SPF 가 A 의 **맨 뒤** 선택지로 하나 더 있다(기존 선택지 · 순서 · 라벨 불변).
+    expect(slotDefsFromSubCodes(demo.subCodes.filter((s) => s.value !== "SPF"))).toEqual(RCCS_SLOTS);
+    const a = defs.find((d) => d.key === "A")!.options;
+    expect(a.slice(0, -1)).toEqual(RCCS_SLOTS.find((d) => d.key === "A")!.options);
+    expect(a.at(-1)).toEqual({ value: "SPF", label: "SPF · AHU 샘플 — Special 팬 선정(샘플 성능표)" });
   });
   it("a newly registered sub item becomes a valid choice; an unregistered one stays an error", () => {
     const more = slotDefsFromSubCodes([...demo.subCodes, { itemKey: "B", itemName: "용량", seq: 5, value: "80", description: "80,000 CMH" }]);

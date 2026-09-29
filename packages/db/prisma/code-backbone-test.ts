@@ -18,9 +18,9 @@ async function throws(fn: () => Promise<unknown>): Promise<boolean> {
 
 async function main(): Promise<void> {
   const a = await withTenant(IDS.tenantA, (tx) => loadCatalogRows(tx));
-  check("seed: 18 sub codes", a.subCodes.length === 18, String(a.subCodes.length));
-  check("seed: 16 product codes", a.productCodes.length === 16, String(a.productCodes.length));
-  check("seed: 39 relationships", a.relationships.length === 39, String(a.relationships.length));
+  check("seed: 19 sub codes (18 + ccmd K 샘플 SPF)", a.subCodes.length === 19, String(a.subCodes.length));
+  check("seed: 20 product codes (16 + ccmd K 샘플 SPF · SCS 1 · SFN 1 · SMT 1)", a.productCodes.length === 20, String(a.productCodes.length));
+  check("seed: 42 relationships (39 + ccmd K 샘플 SPF 3)", a.relationships.length === 42, String(a.relationships.length));
 
   const b = await withTenant(IDS.tenantB, (tx) => loadCatalogRows(tx));
   check("RLS: tenant B sees no tenant-A catalog", b.subCodes.length + b.productCodes.length + b.relationships.length === 0);

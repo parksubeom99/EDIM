@@ -159,6 +159,6 @@ export {
 } from "./learning";
 export {
   platformListPrograms, platformGrantSpecial, platformGrantsWithBilling,
-  listSpecialGrants, fanCandidates, tenantFanCurves, insertSpecialRun, listSpecialRuns,
+  listSpecialGrants, fanCandidates, tenantFanCurves, insertSpecialRun, listSpecialRuns, specialRunsForBomRun, platformUpdateFanPoint,
   type SpecialProgramRow, type GrantBillingRow, type SpecialGrantRow, type FanSegmentRow, type SpecialRunInsert, type SpecialRunRow,
 } from "./special";

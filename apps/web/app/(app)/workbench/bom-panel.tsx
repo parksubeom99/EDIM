@@ -27,6 +27,17 @@ export function BomPanel({ code, runs }: { code: string; runs: RunResult[] }) {
           <span style={muted}>코드 <CodeChip code={code || "—"} /> · Action Bar → BOM Run</span>
           {bom && <span style={{ ...muted, marginLeft: "auto" }}>{bom.at.slice(11, 19)} · {lines.length}행</span>}
         </div>
+        {bom?.special && (
+          <div data-testid="bom-special" data-model={bom.special.result?.model ?? ""} data-motor={bom.special.result?.motorKw ?? ""}
+            style={{ ...muted, margin: "0 0 8px", padding: "6px 8px", border: "1px dashed var(--line)", borderRadius: 4 }}>
+            {bom.special.result
+              ? <>Special <b>팬 선정</b>(BOM Run 안 · 결정론) — 입력 {Object.entries(bom.special.input ?? {}).map(([k, v]) => `${k} ${v.toLocaleString("ko-KR")}${bom.special?.inputSources?.[k] ? ` ← ${bom.special.inputSources[k]}` : ""}`).join(" · ")}
+                  {" → "}<b>{bom.special.result.model} · {bom.special.result.rpm} rpm · 모터 {bom.special.result.motorKw} kW</b>
+                  {" · 동작점 "}{Math.round(bom.special.result.q).toLocaleString("ko-KR")} CMH · η {(bom.special.result.eta * 100).toFixed(1)}%
+                  {" · 과금 "}{(bom.special.price ?? 0).toLocaleString("ko-KR")} {bom.special.currency}(1회 · 샘플) · 곡선 지문 {bom.special.curveFingerprint} · {bom.special.sample}</>
+              : <>Special 호출 안 됨 — {bom.special.notice}</>}
+          </div>
+        )}
         {lines.length === 0 ? (
           <p style={{ ...muted, margin: 0 }}>아직 실행 결과 없음</p>
         ) : (

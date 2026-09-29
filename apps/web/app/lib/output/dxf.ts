@@ -51,6 +51,8 @@ export interface DrawingItem {
   unit: string;
   childCode?: string;
   remarks?: string;
+  /** ccmd K · KA — Special 이 고른 줄이면 그 사양(모델 · rpm · kW). 있으면 Description 칸에 사양을 적는다. */
+  spec?: string;
 }
 
 export interface DxfInput {
@@ -173,7 +175,7 @@ export function buildAssemblyDxf(input: DxfInput): { dxf: string; meta: DxfMeta 
   head.forEach((h, i) => { ents += text(colX[i]! + 60, tblY - rowH + 80, 95, h, "TABLE"); n++; });
   items.forEach((it, i) => {
     const y = tblY - (i + 2) * rowH + 80;
-    const cells = [String(it.no), it.part, `${it.qty} ${it.unit}`, it.childCode ?? it.remarks ?? ""];
+    const cells = [String(it.no), it.spec ?? it.part, `${it.qty} ${it.unit}`, it.childCode ?? it.remarks ?? ""];
     cells.forEach((c, k) => { ents += text(colX[k]! + 60, y, 90, c.slice(0, 38), "TABLE"); n++; });
   });
 

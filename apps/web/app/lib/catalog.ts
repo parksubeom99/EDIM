@@ -48,17 +48,23 @@ export function parseTables(v: unknown): Record<string, TechTable> | "invalid" {
   const out: Record<string, TechTable> = {};
   const nos = new Set<number>();
   let dimSeen = false;
+  let specialSeen = false;
   for (const [name, t] of Object.entries(v)) {
     if (!/^\w+$/.test(name) || !isObj(t) || !isSlot(t.by) || typeof t.default !== "string") return "invalid";
     if (typeof t.no !== "number" || !Number.isInteger(t.no) || t.no < 1 || nos.has(t.no)) return "invalid"; // TableN must be unique
     nos.add(t.no);
     // p16/p51 Table Type — 기본은 tech. dim(Key Dimension)은 제품 코드당 하나만.
-    let role: "tech" | "dim" | "buy" | "rule" | undefined;
+    let role: "tech" | "dim" | "buy" | "rule" | "special" | undefined;
     if (t.role !== undefined && t.role !== null) {
-      if (t.role !== "tech" && t.role !== "dim" && t.role !== "buy" && t.role !== "rule") return "invalid";  // buy = p32 구매 속성 · rule = p36 설계 검증
+      // buy = p32 구매 속성 · rule = p36 설계 검증 · special = Special 호출 선언(ccmd K · KA — 제품 코드당 하나)
+      if (t.role !== "tech" && t.role !== "dim" && t.role !== "buy" && t.role !== "rule" && t.role !== "special") return "invalid";
       role = t.role;
       if (role === "dim") { if (dimSeen) return "invalid"; dimSeen = true; }
+      if (role === "special") { if (specialSeen) return "invalid"; specialSeen = true; }
     }
+    // ccmd K · KA — 행을 Special 결과 필드로 고르는 표(예: motorKw). 이름 형식만 본다.
+    if (t.bySpecial !== undefined && t.bySpecial !== null && !(typeof t.bySpecial === "string" && /^\w+$/.test(t.bySpecial))) return "invalid";
+    const bySpecial = typeof t.bySpecial === "string" ? t.bySpecial : undefined;
     if (!Array.isArray(t.cols) || !Array.isArray(t.rows) || t.cols.length === 0) return "invalid";
     const cols: TechTable["cols"] = [];
     const keys = new Set<string>();
@@ -80,7 +86,7 @@ export function parseTables(v: unknown): Record<string, TechTable> | "invalid" {
       }
       rows.push({ item: r.item, cells });
     }
-    out[name] = { no: t.no, by: t.by, default: t.default, cols, rows, ...(role ? { role } : {}) };
+    out[name] = { no: t.no, by: t.by, default: t.default, cols, rows, ...(role ? { role } : {}), ...(bySpecial ? { bySpecial } : {}) };
   }
   return out;
 }

@@ -41,6 +41,8 @@ async function resetDemo(): Promise<void> {
   for (const tb of P4B) await adminPrisma.$executeRawUnsafe(`ALTER TABLE "${tb}" ENABLE TRIGGER USER`);
   // P6: 승인 기록이 BOM 스냅샷을 참조한다 → 스냅샷보다 먼저 지운다(시연은 Design 단계에서 시작).
   const apr = await adminPrisma.projectApproval.deleteMany({ where: { tenantId: t } });
+  // 0034 · 0035: Special 사용 기록이 BOM 스냅샷을 참조한다(bom_run_id) → 스냅샷보다 먼저(부여 · 회사 자체 팬 표도 함께 — seedDemo 가 자체 표를 다시 넣는다).
+  await resetSpecial();
   const run = await adminPrisma.bomCodeRun.deleteMany({ where: { tenantId: t } });
   const req = await adminPrisma.platformRequest.deleteMany({ where: { tenantId: t } });
   const aud = await adminPrisma.auditLog.deleteMany({ where: { tenantId: t } });
@@ -79,8 +81,6 @@ async function resetDemo(): Promise<void> {
   await adminPrisma.printLayout.deleteMany({ where: { tenantId: t } });
   // 0033: 리허설이 돌린 학습 작업 · 투영(착지 표) · 올린 도면을 지운다 — 샘플 원천은 남는다(seedDemo 가 없으면 다시 넣는다).
   await resetLearning();
-  // 0034: 리허설이 받은 Special 부여 · 사용 기록 · 회사 자체 팬 표(seedDemo 가 자체 표를 다시 넣는다)
-  await resetSpecial();
   // 리허설이 역할을 바꿔 놓았을 수 있다(User Management 시연) → 시드 역할로 되돌린다.
   await adminPrisma.membership.updateMany({ where: { tenantId: t, userId: IDS.viewerA }, data: { role: "viewer" } });
   await adminPrisma.membership.updateMany({ where: { tenantId: t, userId: IDS.ownerA }, data: { role: "owner" } });

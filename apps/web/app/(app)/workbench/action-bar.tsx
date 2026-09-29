@@ -26,6 +26,13 @@ export interface RunResult {
     rules?: number;
     violations?: { name: string; target: string; op: string; limit: number | string; actual: number | string }[];
   } | null;
+  /** ccmd K · KA — 제품 코드가 Special 을 부른 BOM Run 이면 그 선정 결과(스냅샷 dims.special 과 같은 값) · 아니면 null */
+  special?: {
+    program: string; required: boolean;
+    result: { model: string; rpm: number; q: number; p: number; eta: number; shaftKw: number; motorKw: number; candidates: number; dropped: number } | null;
+    input: Record<string, number> | null; inputSources: Record<string, string> | null;
+    curveFingerprint: string | null; price: number; currency: string | null; sample: string | null; notice: string | null;
+  } | null;
 }
 
 const RUNS: { kind: "bom" | "edim" | "ebom" | "cost"; label: string }[] = [
@@ -102,6 +109,7 @@ export function ActionBar({
         mainCode: body.mainCode,
         runId: body.runId ?? null,
         dims: body.dims ?? null,
+        special: body.special ?? null,
       };
       if (kind === "bom" && body.runId) setRunId(body.runId);
       setLast(r);

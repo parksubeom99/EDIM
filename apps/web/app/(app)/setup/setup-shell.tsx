@@ -244,7 +244,9 @@ function ProductTab({ cat, reload, say }: TabProps) {
                     <option value="dim">dim · 도면 치수</option>
                     <option value="buy">buy · 구매 속성</option>
                     <option value="rule">rule · 설계 검증</option>
+                    <option value="special">special · Special 호출</option>
                   </select>
+                  {t.bySpecial && <span data-testid={`tbl-byspecial-${tName}`} style={muted}>행 = Special 결과 <span style={mono}>{t.bySpecial}</span></span>}
                   {cat.canEdit && <><button type="button" onClick={() => addRow(tName)} style={{ ...btn(), padding: "2px 8px", marginLeft: "auto" }}>+ 행</button><button type="button" onClick={() => addCol(tName)} style={{ ...btn(), padding: "2px 8px" }}>+ 열</button></>}
                 </div>
                 <table style={{ borderCollapse: "collapse", width: "100%" }}>

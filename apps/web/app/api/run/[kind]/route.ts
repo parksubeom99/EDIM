@@ -5,11 +5,12 @@ import { runApprovedForSession } from "@/app/lib/macro/run";
 import { ruleMacroEvaluator } from "@/app/lib/macro/rule-macros";
 import type { SlotValues } from "@/app/lib/rccs";
 import { buildEbom, buildCost } from "@/app/lib/output/bom";
-import { runBomCode, toBomLine, catalogFingerprint, dimsFor, sectionDimsFor, designRulesOf, checkDesign, buyItemOf } from "@edim/bom-code";
+import { runBomCode, toBomLine, catalogFingerprint, dimsFor, sectionDimsFor, designRulesOf, checkDesign, buyItemOf, specialCallOf, type SpecialValues } from "@edim/bom-code";
 import { applyPriceHistory, type PriceRowLike } from "@/app/lib/price";
 import { businessToday, dateOnly } from "@/app/lib/today";
 import { loadCatalog } from "@/app/lib/catalog";
-import { withTenant, saveBomCodeRun, getBomRun, revisionIdForSlots } from "@edim/db";
+import { withTenant, saveBomCodeRun, getBomRun, revisionIdForSlots, insertSpecialRun } from "@edim/db";
+import { callSpecialForBom, type SpecialSnapshot } from "@/app/lib/special/bom-call";
 
 const KINDS = new Set(["bom", "edim", "ebom", "cost"]);
 
@@ -99,7 +100,22 @@ export async function POST(
   }
   const base = { ok: true, status: "ran", kind, projectId: typeof body.projectId === "string" ? body.projectId : null, code: typeof body.code === "string" ? body.code : null, at };
   const { catalog, rejected } = await loadCatalog(session.tenantId);
-  const result = runBomCode(catalog, slots, macroValue);
+  // ccmd K · KA — 제품 코드에 special 표가 있으면 서버가 **BOM Run 안에서** Special 을 부른다(입력 = 등록 값 · 결정론).
+  // 기존 제품 코드(EU · ER · EC)에는 special 표가 없다 → 이 블록을 지나지 않는다(시연 수치 보호).
+  const parentProduct = catalog.productCodes.find((p) => p.code === (slots.A ?? "") && p.kind === "product");
+  const call = parentProduct ? specialCallOf(parentProduct) : null;
+  if (call && "error" in call) return NextResponse.json({ error: call.error }, { status: 422 });
+  let special: SpecialSnapshot | null = null;
+  let specialValues: SpecialValues | null = null;
+  let specialNotice: string | null = null;
+  if (call && parentProduct) {
+    const dr = dimsFor(parentProduct, slots);
+    const out = await withTenant(session.tenantId, (tx) => callSpecialForBom(tx, parentProduct, call, slots, dr.ok ? dr.dims : null));
+    if (!out.ok) return NextResponse.json({ error: out.error, special: { program: call.program, required: call.required } }, { status: out.status });
+    special = out.snapshot; specialValues = out.values;
+    if (!out.snapshot) specialNotice = out.notice;
+  }
+  const result = runBomCode(catalog, slots, macroValue, specialValues);
   if (!result.ok)
     return NextResponse.json({ error: `${result.error.code}: ${result.error.message}`, rejected }, { status: 422 });
   const catalogFp = catalogFingerprint(catalog);   // 단가 이력은 카탈로그가 아니다 — 지문에 넣지 않는다(단가 한 줄로 옛 스냅샷이 막히지 않게)
@@ -131,10 +147,10 @@ export async function POST(
     // E6 · p39 — op=macro 규칙은 승인된 매크로를 스냅샷 값으로 돌려 판정한다(판정도 스냅샷에 박혀, 매크로를 나중에 고쳐도 불변).
     const violations = drSnap && drSnap.ok ? checkDesign(rules, drSnap.dims, secDims, await ruleMacroEvaluator(session.tenantId, rules)) : [];
     const dimsSnap = drSnap && drSnap.ok
-      ? { ...drSnap.dims, item: drSnap.item, tableName: drSnap.tableName, sections: secDims, rules: rules.length, violations }
+      ? { ...drSnap.dims, item: drSnap.item, tableName: drSnap.tableName, sections: secDims, rules: rules.length, violations, ...(call ? { special } : {}) }
       : null;
-    const snap = await withTenant(session.tenantId, async (tx) =>
-      saveBomCodeRun(tx, {
+    const snap = await withTenant(session.tenantId, async (tx) => {
+      const saved = await saveBomCodeRun(tx, {
         stableId: node,
         code: typeof body.code === "string" ? body.code : "", slots: clean, macroValue, parentCode: result.parent,
         catalogFp, lines: priced as unknown as object[], cost: cost as unknown as object,
@@ -143,11 +159,21 @@ export async function POST(
         ...(macroSrc ?? {}),
         dims: dimsSnap,
         createdBy: session.userId,
-      }),
-    );
+      });
+      // 과금 = BOM Run 1회당 1건(같은 트랜잭션). EBOM · Cost · 문서 · 도면은 이 스냅샷을 읽기만 한다 — 다시 부르지 않는다.
+      if (special)
+        await insertSpecialRun(tx, {
+          tenantId: session.tenantId, programKey: special.program, version: special.version,
+          input: { ...special.input, source: "bom-run", sources: special.inputSources }, result: { ok: true, pick: special.result, curveFingerprint: special.curveFingerprint, sample: special.sample },
+          bindingSource: "platform", price: special.price, currency: special.currency, createdBy: session.userId, bomRunId: saved.id,
+        });
+      return saved;
+    });
     // 등록된 Key Dimension 을 함께 돌려준다 — 화면이 치수를 따로 계산하지 않도록.
     const dims = dimsSnap ? { W: dimsSnap.W, H: dimsSnap.H, L: dimsSnap.L, item: dimsSnap.item, sections: result.sections?.length ?? 0, rules: rules.length, violations } : null;
-    return NextResponse.json({ ...base, lines, trace, mainCode: result.mainCode, catalogFp, runId: snap.id, macroValue, dims, message: `BOM ${lines.length}행 · 코드 관계 ${result.parent} · 스냅샷 ${snap.id.slice(0, 8)}` });
+    const specialOut = call ? { program: call.program, required: call.required, result: special?.result ?? null, input: special?.input ?? null, inputSources: special?.inputSources ?? null, curveFingerprint: special?.curveFingerprint ?? null, price: special?.price ?? 0, currency: special?.currency ?? null, sample: special?.sample ?? null, notice: specialNotice } : null;
+    const spMsg = special ? ` · Special 팬 선정 ${special.result.model} · ${special.result.rpm} rpm · 모터 ${special.result.motorKw} kW(샘플 성능표)` : specialNotice ? ` · ${specialNotice}` : "";
+    return NextResponse.json({ ...base, lines, trace, mainCode: result.mainCode, catalogFp, runId: snap.id, macroValue, dims, special: specialOut, message: `BOM ${lines.length}행 · 코드 관계 ${result.parent} · 스냅샷 ${snap.id.slice(0, 8)}${spMsg}` });
   }
   return NextResponse.json({
     ok: true,

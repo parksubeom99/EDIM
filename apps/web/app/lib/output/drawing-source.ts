@@ -16,6 +16,8 @@ export type DxfSource =
 interface SnapLine {
   no?: unknown; section?: unknown; part?: unknown; qty?: unknown; unit?: unknown;
   childCode?: unknown; remarks?: unknown;
+  /** ccmd K · KA — Special 결과를 읽은 줄(팬 · 모터). 조립도 Item 표가 사양(모델 · kW)을 함께 적는다. */
+  spec?: unknown; fromSpecial?: unknown;
 }
 
 function parseDims(v: unknown): { dims: Dims; item: string; secDims: { name: string; len: number; dir?: string; components?: { code: string; at: string; level: string }[] }[] } | null {
@@ -71,6 +73,7 @@ export async function dxfSourceFromRun(tenantId: string, runId: string): Promise
     unit: typeof l.unit === "string" ? l.unit : "ea",
     ...(typeof l.childCode === "string" ? { childCode: l.childCode } : {}),
     ...(typeof l.remarks === "string" ? { remarks: l.remarks } : {}),
+    ...(l.fromSpecial === true && typeof l.spec === "string" && l.spec ? { spec: l.spec } : {}),
   }));
   const sections: string[] = [];
   for (const l of raw) {

@@ -356,7 +356,9 @@ with sync_playwright() as p:
     pg.goto(BASE+"/workbench?node=a0000000-0000-4000-8000-000000000004",wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=pipeline-stage]",timeout=30000); time.sleep(1.5); nuke(pg)
     st0=pg.inner_text("[data-testid=pipeline-stage]"); insp=pg.inner_text("[data-testid=pipeline-stage] >> xpath=ancestor::*[3]")
     ok("S29b 화면: Inspector 가 Approve 단계와 승인된 BOM 을 보여 준다", (st0, RUN1[:8] in insp), st0.strip()=="Approve" and RUN1[:8] in insp)
-    nuke(pg); pg.click("[data-testid=request-platform]", force=True); time.sleep(2.5); nuke(pg); pg.click("[data-testid=approve-btn]", force=True); time.sleep(2.5)
+    # 고정 sleep 대신 상태를 기다린다(ccmd K · 개발 모드에서 2.5초 안에 화면이 못 따라와 S29c 가 한 번 깨졌다 — 2026-09-29)
+    nuke(pg); pg.click("[data-testid=request-platform]", force=True); wait_sel(pg,"[data-testid=approve-btn]:not([disabled])",60000); nuke(pg)
+    pg.click("[data-testid=approve-btn]", force=True); wait_text(pg,"[data-testid=pipeline-stage]","Accepted",60000)
     st1=pg.inner_text("[data-testid=pipeline-stage]"); t2=ctx.request.get(BASE+f"/api/trace?runId={RUN1}").json()
     bd=pg.query_selector("[data-testid=approval-bound]")
     ok("S29d 화면: 승인된 것은 BOM 이다 — 화면의 현재 코드(AL)가 승인된 BOM(SS)과 다르면 그렇다고 말한다", (bd.get_attribute("data-differs") if bd else None), bool(bd) and "630SS" in bd.inner_text() and bd.get_attribute("data-differs")=="1" and "다릅니다" in bd.inner_text())
@@ -2116,6 +2118,11 @@ with sync_playwright() as p:
     lp.close()
     ok("S72h 역류 0 — 회사 계정은 학습 API 403(읽기 · 작업 · 올리기) · 플랫폼 계정은 회사 API 에 못 들어간다 · viewer 숨기기 403 · 다른 회사 제안 404",
        (c1.status,c2.status,c3.status,p1.status,p2.status,v1.status,g1.status), (c1.status,c2.status,c3.status)==(403,403,403) and p1.status in (401,403) and p2.status in (401,403) and v1.status==403 and g1.status==404)
+    # ── S75c KA (ccmd K) — 부여 전: Special 을 부르는 샘플 제품(SPF)의 BOM Run 은 422 "Special 부여 필요"(S74 가 부여하기 전 자리) ──
+    r75c=ctx.request.post(BASE+"/api/run/bom",headers=J0,data=json.dumps({"slots":{"A":"SPF","B":"55","C":"2123"},"code":"SPF-55-2123"}))
+    e75c=r75c.json().get("error","") if r75c.status!=200 else ""
+    ok("S75c 부여 없는 회사가 Special 을 부르는 샘플 제품(SPF)을 BOM Run 하면 422 — 'Special 부여 필요 — 플랫폼에 의뢰하세요'(스냅샷 · 과금 없음)",
+       (r75c.status, e75c[:40]), r75c.status==422 and "Special 부여 필요" in e75c)
     # ── S74 C · Special Tool Box 첫 사례 — 팬 선정 (ccmd J) — 회사 UI Form → 의뢰 → 플랫폼 승인·부여 → Toolbox 버튼 → 결정론 계산 → 사용 기록·과금 ──
     UF=BASE+"/api/ui-forms"
     cf=ctx.request.post(UF,headers=J0,data=json.dumps({"name":"팬 선정 입력(E2E)","scope":"Technical"})).json(); FID=cf.get("id")
@@ -2186,15 +2193,73 @@ with sync_playwright() as p:
     spp.screenshot(path=f"{OUT}/87_special_meter.png",full_page=True); sp.close()
     ok("S74f viewer 는 보기만(부여 목록 200) · 실행 403(실행 = 과금이라 편집 권한) · 플랫폼 과금은 사용 기록의 금액 칸만 — 3회 · 10,000(샘플)",
        (v74.status, len(vg), bill), v74.status==403 and len(vg)==1 and bill==[["3","10000"]])
+    # ── S75 KA · CPQ 가 BOM Run 안에서 Special 팬 선정을 부른다 (ccmd K) — 샘플 제품 SPF(등록 표 special) · 기존 시연 코드(EU)는 부르지 않는다 ──
+    AHU75="a0000000-0000-4000-8000-000000000002"
+    pg.goto(BASE+f"/workbench?node={AHU75}",wait_until="domcontentloaded"); hydrated(pg); nuke(pg)
+    sel75=pg.query_selector_all("[data-testid=code-builder] select")
+    sel75[0].select_option(value="SPF"); sel75[1].select_option(value="55")
+    pg.locator("button",has_text=re.compile(r"^BOM$")).first.click(); pg.wait_for_selector("button:has-text('BOM Run')",timeout=30000)
+    with pg.expect_response(lambda q: "/api/run/bom" in q.url and q.request.method=="POST",timeout=60000) as br75:
+        pg.click("button:has-text('BOM Run')")
+    j75=br75.value.json(); rid75=j75.get("runId")
+    pg.wait_for_selector("[data-testid=bom-special][data-model]",timeout=30000)
+    nuke(pg); pg.screenshot(path=f"{OUT}/75_cpq_special_bom.png",full_page=True)
+    s75=ctx.request.get(BASE+f"/api/bom-runs/{rid75}").json(); sp75=s75.get("special") or {}; res75=sp75.get("result") or {}
+    fan75=[l for l in s75.get("lines",[]) if l.get("childCode")=="SFN 1"]; mot75=[l for l in s75.get("lines",[]) if l.get("childCode")=="SMT 1"]
+    c75=ctx.request.post(BASE+"/api/run/cost",headers=J0,data=json.dumps({"runId":rid75})).json().get("cost",{})
+    mat75=sum(l["unitCost"]*l["qty"] for l in s75.get("lines",[]))
+    ok("S75a 샘플 제품 SPF(B=55) BOM Run → 서버가 BOM Run 안에서 팬 선정을 부른다(입력 = 등록 표 air 12,000 CMH · 600 Pa — 사람 입력 없음) → 스냅샷 dims.special = EDIM-PF-560 · 2600 rpm · 3.7 kW · BOM 에 팬 · 모터 줄 · 원가 재료비에 모터 단가 420,000",
+       (br75.value.status, sp75.get("input"), res75.get("model"), res75.get("rpm"), res75.get("motorKw"), [l.get("spec") for l in fan75+mot75], c75.get("material"), mat75),
+       br75.value.status==200 and sp75.get("input")=={"q_cmh":12000,"p_pa":600} and res75.get("model")=="EDIM-PF-560 (샘플)" and res75.get("rpm")==2600 and res75.get("motorKw")==3.7
+       and len(fan75)==1 and fan75[0]["spec"].startswith("EDIM-PF-560 (샘플) · 2600 rpm") and len(mot75)==1 and mot75[0]["unitCost"]==420000 and mot75[0]["spec"].startswith("3.7 kW")
+       and c75.get("material")==mat75 and 420000<=mat75 and pg.get_attribute("[data-testid=bom-special]","data-motor")=="3.7")
+    # 선정 불가(곡선 범위 밖)면 422 + 이유 · 과금 없음
+    r75x=ctx.request.post(BASE+"/api/run/bom",headers=J0,data=json.dumps({"slots":{"A":"SPF","B":"10","C":"2123"},"code":"SPF-10-2123"}))
+    ok("S75a2 선정 불가(B=10 → 6,000 CMH · 400 Pa · 샘플 곡선 밖)면 422 + 이유 — 스냅샷도 과금도 없다(지어내지 않는다)",
+       (r75x.status, (r75x.json().get("error","") if r75x.status!=200 else "")[:50]), r75x.status==422 and "선정 불가" in r75x.json().get("error",""))
+    # (b) 같은 스냅샷으로 EBOM · Cost · 견적 · 조립도 → 사용 기록(과금)은 여전히 1건
+    e75=ctx.request.post(BASE+"/api/run/ebom",headers=J0,data=json.dumps({"runId":rid75}))
+    q75=ctx.request.post(BASE+"/api/documents",headers=J0,data=json.dumps({"runId":rid75,"type":"quotation"})).json()
+    asm75=ctx.request.get(BASE+f"/api/dxf?runId={rid75}&type=assembly").text()
+    dxf_png(asm75, f"{OUT}/75_cpq_special_drawing.png", "EDIM - ASSEMBLY · SPF 샘플 (ezdxf re-render) — Item 표에 Special 선정 팬 · 모터")
+    tx75=dxf_stats(asm75)["texts"]
+    runs75=ctx.request.get(BASE+f"/api/bom-runs/{rid75}").json().get("specialRuns",[])
+    ok("S75b 같은 스냅샷으로 EBOM · Cost · 견적 · 조립도를 뽑아도 사용 기록(과금)은 BOM Run 1회 = 1건 · 5,000(샘플) · 견적 합계 = 스냅샷 원가 · 조립도 Item 표에 팬 모델 · 모터 kW(ezdxf)",
+       (e75.status, q75.get("total"), c75.get("total"), [(r["price"]) for r in runs75], [t for t in tx75 if "EDIM-PF" in t or "kW" in t][:3]),
+       e75.status==200 and q75.get("total")==c75.get("total") and len(runs75)==1 and runs75[0]["price"]==5000
+       and any(t.startswith("EDIM-PF-560 (샘플) · 2600 rpm") for t in tx75) and any(t.startswith("3.7 kW") for t in tx75))
+    # (d) 플랫폼이 성능표 점 하나를 고친다 → 새 BOM Run 은 다른 결과 · 앞 스냅샷의 선정 결과는 그대로
+    pf=b.new_context(); pf.request.post(BASE+"/api/auth/login",data=LOGIN("platform@edim.test"))
+    CP=BASE+"/api/platform/special/curves"; PT={"model":"EDIM-PF-560 (샘플)","rpm":2600,"q":11200}
+    cu=pf.request.post(CP,headers=J0,data=json.dumps({**PT,"p":663,"eta":0.60}))
+    j75d=ctx.request.post(BASE+"/api/run/bom",headers=J0,data=json.dumps({"slots":{"A":"SPF","B":"55","C":"2123"},"code":"SPF-55-2123"})).json()
+    new75=(j75d.get("special") or {}); old75=ctx.request.get(BASE+f"/api/bom-runs/{rid75}").json().get("special") or {}
+    rs=pf.request.post(CP,headers=J0,data=json.dumps({**PT,"p":663,"eta":0.7395}))
+    k=lambda x: ((x.get("result") or {}).get("model"), (x.get("result") or {}).get("rpm"), (x.get("result") or {}).get("eta"))
+    ok("S75d 플랫폼이 샘플 성능표 점 하나(PF-560 · 2600 rpm · 11,200 CMH 효율 0.7395 → 0.60)를 고치면 새 BOM Run 은 다른 선정 · 곡선 지문도 다르다 — 앞 스냅샷의 dims.special 은 그대로(되돌림 200)",
+       (cu.status, k(sp75), k(new75), k(old75), sp75.get("curveFingerprint"), new75.get("curveFingerprint"), rs.status),
+       cu.status==200 and rs.status==200 and k(new75)!=k(sp75) and new75.get("curveFingerprint")!=sp75.get("curveFingerprint") and old75==sp75)
+    # (e) 기존 시연 제품 코드는 Special 을 부르지 않는다 — 수치는 S3 · S5 · S6b · S22b 가 이미 못 박았다(455.4 · 11행 · ₩15,487,170)
+    r75e=run55("S75e"); s75e=ctx.request.get(BASE+f"/api/bom-runs/{r75e.get('runId')}").json()
+    ok("S75e 기존 시연 제품(EU-55-2123-630SS)은 Special 을 부르지 않는다 — 응답 special 없음 · 스냅샷에 dims.special 키 없음 · 사용 기록 0건(455.4 · ₩15,487,170 · 11행은 S5 · S6b · S8 이 못 박는다)",
+       (r75e.get("special"), "special" in (s75e.get("dims") or {}), len(s75e.get("specialRuns",[])), len(r75e.get("lines",[]))),
+       r75e.get("special") is None and "special" not in (s75e.get("dims") or {}) and len(s75e.get("specialRuns",[]))==0 and len(r75e.get("lines",[]))>0)
+    # (f) viewer 403 · 다른 회사 404 · 회사 계정은 성능표 API 403
+    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data=LOGIN("viewer@acme.test"))
+    v75=vw.request.get(BASE+f"/api/bom-runs/{rid75}"); vb75=vw.request.post(BASE+"/api/run/bom",headers=J0,data=json.dumps({"slots":{"A":"SPF","B":"55"}})); vw.close()
+    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data=LOGIN("owner@globex.test")); g75=gb.request.get(BASE+f"/api/bom-runs/{rid75}"); gb.close()
+    c75f=ctx.request.post(CP,headers=J0,data=json.dumps({**PT,"p":663,"eta":0.5})); pf.close()
+    ok("S75f viewer 는 스냅샷 읽기 · BOM Run 403 · 다른 회사는 그 스냅샷 404 · 회사 계정은 플랫폼 성능표 API 403",
+       (v75.status, vb75.status, g75.status, c75f.status), (v75.status, vb75.status, g75.status, c75f.status)==(403,403,404,403))
     # S37 은 맨 끝에서 센다 — 중간(옛 자리)에서는 뒤에 찍히는 5장(40·41·42·52·53)이 아직 없어,
     # 빈 폴더에서는 25장이라 실패하고 이전 실행 잔재가 있을 때만 통과했다(2026-09-24 실측).
     _want=["00_login","05_project_mgmt","06_module_cpq_stub","10_project_bound","11_code_builder","11b_revisions","12_macro_tab",
            "13_macro_approved","14_edim_run","15_bom_cost","16_design_tab","20_setup_subcode","21_setup_product_table",
            "22_setup_relationship","23_codebuilder_from_subcode","30_toolbox_program","31_toolbox_ui_tool","40_company_admin",
            "41_platform_console","42_user_management","43_drawings","44_document_tab","45_purchasing","46_quotation_print",
-           "47_techdata_print","48_dxf_plan","49_dxf_assembly","51_accepted","52_register","53_schedule","54_toolbar","55_project_mgmt","56_print_setup","57_ui_design","58_material","59_arrangement_code","60_spec_input","61_drawing_purpose","62_company_db","63_input_data","64_viewer3d","65_price_to_cost","66_project_contacts","67_partner_edit","68_spec_import","69_code_approval","70_dwg_view","71_techdata_list","72_mfg_rate","73_erp_master","74_sub_drawing","75_output_template","76_coding_list","77_wizards","78_print_layout","79_draw_module","80_macro_verify","81_learning_job","82_formula_cards","83_projection","84_toolbox_suggestion","85_special_request","86_fan_result","87_special_meter"]
+           "47_techdata_print","48_dxf_plan","49_dxf_assembly","51_accepted","52_register","53_schedule","54_toolbar","55_project_mgmt","56_print_setup","57_ui_design","58_material","59_arrangement_code","60_spec_input","61_drawing_purpose","62_company_db","63_input_data","64_viewer3d","65_price_to_cost","66_project_contacts","67_partner_edit","68_spec_import","69_code_approval","70_dwg_view","71_techdata_list","72_mfg_rate","73_erp_master","74_sub_drawing","75_output_template","76_coding_list","77_wizards","78_print_layout","79_draw_module","80_macro_verify","81_learning_job","82_formula_cards","83_projection","84_toolbox_suggestion","85_special_request","86_fan_result","87_special_meter","75_cpq_special_bom","75_cpq_special_drawing"]
     _miss=[w for w in _want if not os.path.exists(f"{OUT}/{w}.png") or os.path.getmtime(f"{OUT}/{w}.png")<T0]
-    ok("S37 캡처 64장이 이번 실행에서 전부 나온다 (잔재 파일은 세지 않음)", _miss or len(_want), not _miss)
+    ok(f"S37 캡처 {len(_want)}장이 이번 실행에서 전부 나온다 (잔재 파일은 세지 않음)", _miss or len(_want), not _miss)
     b.close()
 n=sum(1 for v in R.values() if v[0]); print(f"\n[demo_e2e] {n}/{len(R)} steps passed"); json.dump(R,open(f"{OUT}/demo_e2e_result.json","w",encoding="utf-8"),ensure_ascii=False,indent=1)
 sys.exit(0 if n==len(R) else 1)

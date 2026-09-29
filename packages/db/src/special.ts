@@ -63,13 +63,30 @@ export async function tenantFanCurves(tx: TenantClient): Promise<{ model: string
   return [...by.values()];
 }
 
-export interface SpecialRunInsert { programKey: string; version: number; input: unknown; result: unknown; bindingSource: "platform" | "tenant"; price: number; currency: string; createdBy: string; tenantId: string }
+/** bomRunId(0035 · ccmd K · KA) — BOM Run 안에서 부른 실행이면 그 스냅샷 id. 손 실행(Toolbox)은 null. 같은 스냅샷 두 번은 DB 가 거부(부분 유일 인덱스). */
+export interface SpecialRunInsert { programKey: string; version: number; input: unknown; result: unknown; bindingSource: "platform" | "tenant"; price: number; currency: string; createdBy: string; tenantId: string; bomRunId?: string | null }
 export async function insertSpecialRun(tx: TenantClient, r: SpecialRunInsert): Promise<string> {
   const rows = await tx.$queryRaw<{ id: string }[]>`
-    INSERT INTO special_run (tenant_id, program_key, version, input, result, binding_source, price, currency, created_by)
-    VALUES (${r.tenantId}::uuid, ${r.programKey}, ${r.version}, ${JSON.stringify(r.input)}::jsonb, ${JSON.stringify(r.result)}::jsonb, ${r.bindingSource}, ${r.price}, ${r.currency}, ${r.createdBy}::uuid)
+    INSERT INTO special_run (tenant_id, program_key, version, input, result, binding_source, price, currency, created_by, bom_run_id)
+    VALUES (${r.tenantId}::uuid, ${r.programKey}, ${r.version}, ${JSON.stringify(r.input)}::jsonb, ${JSON.stringify(r.result)}::jsonb, ${r.bindingSource}, ${r.price}, ${r.currency}, ${r.createdBy}::uuid, ${r.bomRunId ?? null}::uuid)
     RETURNING id`;
   return rows[0]!.id;
+}
+
+/** 이 BOM 스냅샷에서 나온 사용 기록(과금) — ccmd K · KA: BOM Run 1회 = 1건, EBOM · Cost · 문서 · 도면은 0건을 더한다. */
+export async function specialRunsForBomRun(tx: TenantClient, bomRunId: string): Promise<{ id: string; price: number; programKey: string }[]> {
+  const rows = await tx.$queryRaw<{ id: string; price: unknown; programKey: string }[]>`
+    SELECT id, price, program_key AS "programKey" FROM special_run WHERE bom_run_id = ${bomRunId}::uuid ORDER BY created_at`;
+  return rows.map((r) => ({ ...r, price: Number(r.price) }));
+}
+
+/**
+ * 플랫폼이 DB① 팬 성능표의 점 하나를 고친다(ccmd K · KA — 성능표 개정 · 앞 스냅샷 불변 시험). edim_platform 만 · 없는 점이면 0.
+ * 회사 쪽에는 여전히 special_fan_candidates 의 교점 구간만 닿는다.
+ */
+export async function platformUpdateFanPoint(pt: { model: string; rpm: number; q: number; p: number; eta: number }): Promise<number> {
+  return platformDb.$executeRaw`
+    UPDATE platform.fan_curve SET p_pa = ${pt.p}, eta = ${pt.eta} WHERE model = ${pt.model} AND rpm = ${pt.rpm} AND q_cmh = ${pt.q}`;
 }
 
 export interface SpecialRunRow { id: string; programKey: string; input: unknown; result: unknown; bindingSource: string; price: number; currency: string; createdAt: Date }

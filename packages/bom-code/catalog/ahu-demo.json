@@ -26,6 +26,14 @@
     },
     {
       "group": "AHU Code",
+      "itemKey": "A",
+      "itemName": "제품군",
+      "seq": 4,
+      "value": "SPF",
+      "description": "AHU 샘플 — Special 팬 선정(샘플 성능표)"
+    },
+    {
+      "group": "AHU Code",
       "itemKey": "B",
       "itemName": "용량",
       "seq": 1,
@@ -1329,6 +1337,185 @@
       ]
     },
     {
+      "code": "SPF",
+      "name": "AHU 샘플 (Special 팬 선정)",
+      "kind": "product",
+      "category": "Product Code/AHU 샘플",
+      "unit": "set",
+      "specTemplate": "",
+      "materialTemplate": "",
+      "tables": {
+        "air": {
+          "no": 1,
+          "by": "B",
+          "default": "55",
+          "cols": [
+            {
+              "key": "A",
+              "name": "q_cmh",
+              "label": "설계 풍량 CMH (샘플)"
+            },
+            {
+              "key": "B",
+              "name": "p_pa",
+              "label": "기외정압 Pa (샘플)"
+            },
+            {
+              "key": "C",
+              "name": "casingCost",
+              "label": "케이싱 단가 (샘플)"
+            }
+          ],
+          "rows": [
+            {
+              "item": "10",
+              "cells": {
+                "A": 6000,
+                "B": 400,
+                "C": 1800000
+              }
+            },
+            {
+              "item": "12",
+              "cells": {
+                "A": 15000,
+                "B": 700,
+                "C": 2600000
+              }
+            },
+            {
+              "item": "25",
+              "cells": {
+                "A": 10000,
+                "B": 500,
+                "C": 2100000
+              }
+            },
+            {
+              "item": "55",
+              "cells": {
+                "A": 12000,
+                "B": 600,
+                "C": 2400000
+              }
+            }
+          ]
+        },
+        "dim": {
+          "no": 2,
+          "role": "dim",
+          "by": "B",
+          "default": "55",
+          "cols": [
+            {
+              "key": "A",
+              "name": "W",
+              "label": "단면 폭 mm"
+            },
+            {
+              "key": "B",
+              "name": "H",
+              "label": "단면 높이 mm"
+            },
+            {
+              "key": "C",
+              "name": "L",
+              "label": "섹션 1개 길이 mm"
+            }
+          ],
+          "rows": [
+            {
+              "item": "10",
+              "cells": {
+                "A": 1054,
+                "B": 1054,
+                "C": 900
+              }
+            },
+            {
+              "item": "12",
+              "cells": {
+                "A": 1155,
+                "B": 1155,
+                "C": 900
+              }
+            },
+            {
+              "item": "25",
+              "cells": {
+                "A": 1667,
+                "B": 1667,
+                "C": 900
+              }
+            },
+            {
+              "item": "55",
+              "cells": {
+                "A": 2472,
+                "B": 2472,
+                "C": 900
+              }
+            }
+          ]
+        },
+        "spc": {
+          "no": 3,
+          "role": "special",
+          "by": "A",
+          "default": "",
+          "cols": [
+            {
+              "key": "A",
+              "name": "program",
+              "label": "Special 프로그램"
+            },
+            {
+              "key": "B",
+              "name": "from",
+              "label": "입력 출처(치수 · 표.열 · 상수)"
+            },
+            {
+              "key": "C",
+              "name": "required",
+              "label": "필수(Y/N)"
+            }
+          ],
+          "rows": [
+            {
+              "item": "q_cmh",
+              "cells": {
+                "A": "fan-select",
+                "B": "air.q_cmh",
+                "C": "Y"
+              }
+            },
+            {
+              "item": "p_pa",
+              "cells": {
+                "A": "fan-select",
+                "B": "air.p_pa",
+                "C": "Y"
+              }
+            }
+          ]
+        }
+      },
+      "sections": [
+        {
+          "name": "Mixing"
+        },
+        {
+          "name": "Filter"
+        },
+        {
+          "name": "Coil"
+        },
+        {
+          "name": "Fan"
+        }
+      ]
+    },
+    {
       "code": "KCP 1",
       "name": "Panel (double skin)",
       "kind": "part",
@@ -1682,6 +1869,155 @@
                 "C": "",
                 "D": "",
                 "E": ""
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "code": "SCS 1",
+      "name": "Casing (샘플)",
+      "kind": "part",
+      "category": "Specification/Casing",
+      "unit": "set",
+      "specTemplate": "{dim.W}×{dim.H} · 샘플 케이싱",
+      "materialTemplate": "G.I",
+      "tables": {}
+    },
+    {
+      "code": "SFN 1",
+      "name": "Fan (Special 선정 · 샘플)",
+      "kind": "part",
+      "category": "Specification/Fan",
+      "unit": "ea",
+      "specTemplate": "{special.model} · {special.rpm} rpm · η {special.etaPct}%",
+      "materialTemplate": "—",
+      "tables": {
+        "fprice": {
+          "no": 1,
+          "by": "A",
+          "default": "",
+          "bySpecial": "model",
+          "cols": [
+            {
+              "key": "A",
+              "name": "price",
+              "label": "팬 단가 (샘플)"
+            }
+          ],
+          "rows": [
+            {
+              "item": "EDIM-PF-450 (샘플)",
+              "cells": {
+                "A": 1200000
+              }
+            },
+            {
+              "item": "EDIM-PF-500 (샘플)",
+              "cells": {
+                "A": 1350000
+              }
+            },
+            {
+              "item": "EDIM-PF-560 (샘플)",
+              "cells": {
+                "A": 1500000
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "code": "SMT 1",
+      "name": "Motor (샘플)",
+      "kind": "purchase",
+      "category": "General Purchase items/Motor",
+      "unit": "ea",
+      "specTemplate": "{special.motorKw} kW · 4P · 380V (샘플)",
+      "materialTemplate": "—",
+      "tables": {
+        "mprice": {
+          "no": 1,
+          "by": "A",
+          "default": "",
+          "bySpecial": "motorKw",
+          "cols": [
+            {
+              "key": "A",
+              "name": "price",
+              "label": "모터 단가 (샘플)"
+            }
+          ],
+          "rows": [
+            {
+              "item": "0.75",
+              "cells": {
+                "A": 180000
+              }
+            },
+            {
+              "item": "1.5",
+              "cells": {
+                "A": 240000
+              }
+            },
+            {
+              "item": "2.2",
+              "cells": {
+                "A": 300000
+              }
+            },
+            {
+              "item": "3.7",
+              "cells": {
+                "A": 420000
+              }
+            },
+            {
+              "item": "5.5",
+              "cells": {
+                "A": 560000
+              }
+            },
+            {
+              "item": "7.5",
+              "cells": {
+                "A": 720000
+              }
+            },
+            {
+              "item": "11",
+              "cells": {
+                "A": 980000
+              }
+            },
+            {
+              "item": "15",
+              "cells": {
+                "A": 1250000
+              }
+            }
+          ]
+        },
+        "buy": {
+          "no": 2,
+          "role": "buy",
+          "by": "F",
+          "default": "",
+          "cols": [
+            {
+              "key": "A",
+              "name": "Supplier",
+              "label": "공급처(p32 F:Supplier)"
+            }
+          ],
+          "rows": [
+            {
+              "item": "",
+              "cells": {
+                "A": "샘플 모터사"
               }
             }
           ]
@@ -2223,6 +2559,44 @@
         "macro": true
       },
       "remarks": "승인 매크로 값이 있을 때"
+    },
+    {
+      "parent": "SPF",
+      "child": "SCS 1",
+      "seq": 10,
+      "section": "Casing",
+      "qty": {
+        "lit": 1
+      },
+      "unitCost": {
+        "ref": "air.casingCost"
+      }
+    },
+    {
+      "parent": "SPF",
+      "child": "SFN 1",
+      "seq": 20,
+      "section": "Fan",
+      "qty": {
+        "lit": 1
+      },
+      "unitCost": {
+        "ref": "fprice.price"
+      },
+      "remarks": "Special 팬 선정(BOM Run 안 · 샘플 성능표)"
+    },
+    {
+      "parent": "SPF",
+      "child": "SMT 1",
+      "seq": 30,
+      "section": "Fan",
+      "qty": {
+        "lit": 1
+      },
+      "unitCost": {
+        "ref": "mprice.price"
+      },
+      "remarks": "모터 kW = Special 선정 결과"
     }
   ],
   "specItems": {
