@@ -2391,13 +2391,67 @@ with sync_playwright() as p:
     x78=ctx.request.get(PA+f"?drawing={D77}")
     ok("S78c 부품 정보 API — viewer 403(단가가 들어 있다) · 다른 회사 404 · 이 스냅샷에서 뜬 도면이 아닌 drawing 을 주면 404",
        (v78, g78, x78.status), (v78, g78, x78.status)==(403,404,404))
+    # ── S79 KB (ccmd K) — 컨설팅 두 트랙: 내부 최적안(읽기 전용 · 인쇄본) · 익명 · 집계 벤치마킹(k-익명 3) ──
+    import subprocess
+    PRC=BASE+"/api/setup/prices"
+    p79=ctx.request.post(PRC,headers=J0,data=json.dumps({"code":"SCS 1","price":2300000,"currency":"KRW","supplier":"샘플 공급처 B","effectiveFrom":"2026-01-15","note":"e2e S79 샘플"}))
+    pid79=[r_ for r_ in ctx.request.get(PRC+"?code=SCS%201").json().get("rows",[]) if r_["price"]==2300000][0]["id"]
+    j79=run_spf().json(); rid79=j79.get("runId")
+    CI=BASE+"/api/consulting/internal"; CB=BASE+"/api/consulting/benchmark"
+    rep79=ctx.request.get(CI+f"?runId={rid79}").json(); props=rep79.get("proposals",[])
+    kinds79=sorted({p_["kind"] for p_ in props})
+    sup79=[p_ for p_ in props if p_["kind"]=="supplier"]; mar79=[p_ for p_ in props if p_["kind"]=="margin"]
+    ev_price=[e["id"] for p_ in sup79 for e in p_["evidence"] if e["kind"]=="price_history"]
+    ev_rule=[e["id"] for p_ in mar79 for e in p_["evidence"] if e["kind"]=="rule_row"]
+    _cat79=ctx.request.get(BASE+"/api/setup/catalog").json(); _spf79=[p_ for p_ in _cat79.get("productCodes",[]) if p_.get("code")=="SPF"][0]
+    rule_rows={f"SPF#{tn}.{r_['item']}" for tn,t_ in _spf79["tables"].items() if t_.get("role")=="rule" for r_ in t_["rows"]}
+    price_ids={r_["id"] for r_ in ctx.request.get(PRC+"?code=SCS%201").json().get("rows",[])}
+    ok("S79a 트랙 1 내부 최적안 — 샘플 데이터로 제안 2종 이상(공급처: SCS 1 ₩2,700,000 → 샘플 공급처 B ₩2,300,000 · 차액 400,000 / 설계 여유: detail.Fan.A 1250 ≤ 1300 · 여유 3.8%) · 근거 행 id 가 실제 단가 이력 행 · 실제 규칙 표 행",
+       (kinds79, [p_["saving"] for p_ in sup79], [p_["title"] for p_ in mar79], ev_price[:1], ev_rule, rep79.get("fanNote")),
+       len(kinds79)>=2 and "supplier" in kinds79 and "margin" in kinds79 and any(p_["saving"]=={"amount":400000,"unit":"KRW"} for p_ in sup79)
+       and pid79 in ev_price and set(ev_price)<=price_ids and ev_rule and set(ev_rule)<=rule_rows)
+    pg.goto(BASE+f"/m/consulting?runId={rid79}",wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=consulting][data-ready='1']",timeout=60000); nuke(pg)
+    ui79=pg.eval_on_selector_all("[data-testid=consulting-internal] tbody tr[data-testid^=proposal-]","es=>es.map(e=>e.dataset.testid)")
+    apply_btn=pg.query_selector_all("[data-testid=consulting] button")
+    pg.screenshot(path=f"{OUT}/79_consulting_internal.png",full_page=True)
+    pr79=ctx.request.get(BASE+f"/api/consulting/print?runId={rid79}"); pt79=pr79.text()
+    ok("S79b 화면(/m/consulting)은 같은 제안을 읽기 전용으로(적용 버튼 0) · 인쇄본 A4 발치에 스냅샷 id · 분석 날짜 · '샘플 단가 · 샘플 운전시간'",
+       (sorted(set(ui79)), len(apply_btn), pr79.status, rid79 in pt79, "샘플 단가 · 샘플 운전시간" in pt79),
+       sorted(set(ui79))==sorted({f"proposal-{k_}" for k_ in kinds79}) and len(apply_btn)==0 and pr79.status==200 and rid79 in pt79
+       and "샘플 단가 · 샘플 운전시간" in pt79 and "consulting-print-footer" in pt79 and "size:A4" in pt79)
+    bm=ctx.request.get(CB).json(); bro={r_["metric"]:r_ for r_ in bm.get("rows",[])}; fe=bro.get("fan_eta",{})
+    pg.locator("[data-testid=consulting-benchmark]").screenshot(path=f"{OUT}/79_consulting_benchmark.png")
+    ok("S79c 트랙 2 업계 안 우리 위치 — 지표 3종(풍량당 원가 · 재료비 비율 · 팬 효율) · 표본 ≥ 3(샘플 회사 3 + 우리) · p25 · p50 · p75 · 우리 값 = 최신 스냅샷 η · 백분위 · 응답에 회사 id · 이름 칸 없음",
+       ({k_:(v_["n"],v_["suppressed"],v_["mine"],v_["percentile"]) for k_,v_ in bro.items()}, j79.get("special",{}).get("result",{}).get("eta")),
+       sorted(bro)==["cost_per_cmh","fan_eta","material_ratio"] and all(not v_["suppressed"] and v_["n"]>=4 and v_["p50"] is not None and v_["percentile"] is not None for v_ in bro.values())
+       and abs((fe.get("mine") or 0)-(j79.get("special",{}).get("result",{}).get("eta") or -1))<1e-4
+       and all(set(v_)=={"metric","label","unit","n","p25","p50","p75","mine","percentile","suppressed"} for v_ in bro.values()))
+    # 표본을 줄인 상태(테스트용 시드 옵션: 샘플 회사 1곳) → 표본 2곳 → 숨김 · 되돌림
+    sd1=subprocess.run("pnpm --filter @edim/db bench:seed -- 1",shell=True,capture_output=True)
+    bm1=ctx.request.get(CB).json(); b1={r_["metric"]:r_ for r_ in bm1.get("rows",[])}
+    pg.goto(BASE+f"/m/consulting?runId={rid79}",wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=consulting][data-ready='1']",timeout=60000)
+    hid=pg.query_selector_all("[data-testid^=bench-hidden-]"); hid_txt=pg.inner_text("[data-testid=bench-hidden-fan_eta]") if pg.query_selector("[data-testid=bench-hidden-fan_eta]") else ""
+    sd3=subprocess.run("pnpm --filter @edim/db bench:seed -- 3",shell=True,capture_output=True)
+    ok("S79d 표본을 2곳으로 줄이면(샘플 1 + 우리) 분포를 숨긴다 — suppressed · p25/p50/p75 · 백분위 NULL · 화면 '표본이 3곳 미만이라 보여 드리지 않습니다' · 시드 되돌림",
+       (sd1.returncode, {k_:(v_["n"],v_["suppressed"],v_["p50"]) for k_,v_ in b1.items()}, len(hid), hid_txt, sd3.returncode),
+       sd1.returncode==0 and sd3.returncode==0 and all(v_["suppressed"] and v_["n"]==2 and v_["p25"] is None and v_["p50"] is None and v_["p75"] is None and v_["percentile"] is None for v_ in b1.values())
+       and len(hid)==3 and "표본이 3곳 미만이라 보여 드리지 않습니다" in hid_txt)
+    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data=LOGIN("viewer@acme.test"))
+    v79=(vw.request.get(CI).status, vw.request.get(CB).status, vw.request.get(BASE+f"/api/consulting/print?runId={rid79}").status)
+    vp=vw.new_page(); vp.goto(BASE+"/m/consulting",wait_until="domcontentloaded"); v79p=bool(vp.query_selector("[data-testid=consulting-forbidden]")); vw.close()
+    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data=LOGIN("owner@globex.test"))
+    gbm=gb.request.get(CB); g79txt=gbm.text(); gbr={r_["metric"]:r_ for r_ in gbm.json().get("rows",[])}; g79i=gb.request.get(CI+f"?runId={rid79}").status; gb.close()
+    ok("S79e viewer 403(API 3 · 화면 403 안내) · 다른 회사(Globex)가 부르면 **그 회사 값**으로만(최신 스냅샷 없음 → 우리 값 없음 · 분포는 같다) · 응답에 Acme 이름 · id 없음 · Acme 스냅샷 분석 404",
+       (v79, v79p, {k_:(v_["n"],v_["mine"]) for k_,v_ in gbr.items()}, "Acme" in g79txt, "00000000-0000-4000-8000-00000000000a" in g79txt, g79i),
+       v79==(403,403,403) and v79p and gbr.get("fan_eta",{}).get("mine") is None and gbr.get("fan_eta",{}).get("p50")==fe.get("p50")
+       and "Acme" not in g79txt and "00000000-0000-4000-8000-00000000000a" not in g79txt and g79i==404)
     # S37 은 맨 끝에서 센다 — 중간(옛 자리)에서는 뒤에 찍히는 5장(40·41·42·52·53)이 아직 없어,
     # 빈 폴더에서는 25장이라 실패하고 이전 실행 잔재가 있을 때만 통과했다(2026-09-24 실측).
     _want=["00_login","05_project_mgmt","06_module_cpq_stub","10_project_bound","11_code_builder","11b_revisions","12_macro_tab",
            "13_macro_approved","14_edim_run","15_bom_cost","16_design_tab","20_setup_subcode","21_setup_product_table",
            "22_setup_relationship","23_codebuilder_from_subcode","30_toolbox_program","31_toolbox_ui_tool","40_company_admin",
            "41_platform_console","42_user_management","43_drawings","44_document_tab","45_purchasing","46_quotation_print",
-           "47_techdata_print","48_dxf_plan","49_dxf_assembly","51_accepted","52_register","53_schedule","54_toolbar","55_project_mgmt","56_print_setup","57_ui_design","58_material","59_arrangement_code","60_spec_input","61_drawing_purpose","62_company_db","63_input_data","64_viewer3d","65_price_to_cost","66_project_contacts","67_partner_edit","68_spec_import","69_code_approval","70_dwg_view","71_techdata_list","72_mfg_rate","73_erp_master","74_sub_drawing","75_output_template","76_coding_list","77_wizards","78_print_layout","79_draw_module","80_macro_verify","81_learning_job","82_formula_cards","83_projection","84_toolbox_suggestion","85_special_request","86_fan_result","87_special_meter","75_cpq_special_bom","75_cpq_special_drawing","76_detail_dim","77_symbol","78_part_info"]
+           "47_techdata_print","48_dxf_plan","49_dxf_assembly","51_accepted","52_register","53_schedule","54_toolbar","55_project_mgmt","56_print_setup","57_ui_design","58_material","59_arrangement_code","60_spec_input","61_drawing_purpose","62_company_db","63_input_data","64_viewer3d","65_price_to_cost","66_project_contacts","67_partner_edit","68_spec_import","69_code_approval","70_dwg_view","71_techdata_list","72_mfg_rate","73_erp_master","74_sub_drawing","75_output_template","76_coding_list","77_wizards","78_print_layout","79_draw_module","80_macro_verify","81_learning_job","82_formula_cards","83_projection","84_toolbox_suggestion","85_special_request","86_fan_result","87_special_meter","75_cpq_special_bom","75_cpq_special_drawing","76_detail_dim","77_symbol","78_part_info","79_consulting_internal","79_consulting_benchmark"]
     _miss=[w for w in _want if not os.path.exists(f"{OUT}/{w}.png") or os.path.getmtime(f"{OUT}/{w}.png")<T0]
     ok(f"S37 캡처 {len(_want)}장이 이번 실행에서 전부 나온다 (잔재 파일은 세지 않음)", _miss or len(_want), not _miss)
     b.close()

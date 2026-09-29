@@ -27,7 +27,9 @@
     "drawing:test": "dotenv -e ../../.env -- tsx prisma/drawing-test.ts",
     "document:test": "dotenv -e ../../.env -- tsx prisma/document-test.ts",
     "learning:test": "dotenv -e ../../.env -- tsx prisma/learning-test.ts",
-    "special:test": "dotenv -e ../../.env -- tsx prisma/special-test.ts"
+    "special:test": "dotenv -e ../../.env -- tsx prisma/special-test.ts",
+    "consulting:test": "dotenv -e ../../.env -- tsx prisma/consulting-test.ts",
+    "bench:seed": "dotenv -e ../../.env -- tsx prisma/seed-bench.ts"
   },
   "dependencies": {
     "@edim/core-ontology": "workspace:*",

@@ -213,3 +213,13 @@ ccmd J(main `d4cd7c4` · 0033 learning · 0034 special)가 남은 '없음' 두 �
 | Special 모듈 → MainForm | 없음 | **약함**(CC 주장) | **이어지는 쪽**: 회사 의뢰(`platform_request` · program_key + 회사 UI Form id) → 플랫폼 승인 + **`platform.grant_special()`** → `public.special_grant` → 작업대(MainForm) Toolbox 에 'Special: 팬 선정' 탭(`GET /api/special` · 부여 없으면 버튼도 없다) → 입력 화면 = 회사가 만든 UI Form 그대로(위젯 id · param 동일) → `POST /api/special/fan-select/run` → `public.special_fan_candidates()`(교점 구간만) → `selectFan`(`apps/web/app/lib/special/fan.ts` · 결정론) → `insertSpecialRun` → `public.special_run`(불변 · 금액). **약한 이유(한 방향 · 사람 입력)**: ① 입력(풍량 · 정압)을 **사람이 폼에 다시 친다** — 작업대에서 고른 노드 · 코드 · 스냅샷의 값을 읽지 않는다(요청 본문은 `inputs · source` 뿐) ② 결과(모델 · 회전수 · 모터 kW)가 **BOM · 코드 · 문서로 돌아가지 않는다** — `special_run` 에 노드 · BOM 스냅샷 열이 없다. **역방향 막힘**: `special:test` 「회사 계정은 platform.fan_curve 를 읽지 못한다」 · 「함수는 모델·회전수당 한 줄만 준다(원자료 점 수보다 훨씬 적다)」 · 「플랫폼은 사용 기록의 입력·결과를 읽지 못한다」 · 「플랫폼은 회사 자체 팬 표를 읽지 못한다」 · 「회사는 사용 기록을 고치지 못한다」. e2e **S74a~f**(S74a 부여 A 만 · B 실행 403 / S74b 입력 화면 = 회사 폼 / S74c 결과 / S74f 과금 = 금액 칸만). |
 
 - 합계(CC 주장): **이어짐 13 · 약함 1 · 없음 0 (총 14).** 엘 판정 전. 남는 '약함' 1칸을 '이어짐'으로 올리려면 — Special 입력이 작업대 노드의 등록 값(풍량 · 정압)을 읽고, 선정 결과가 BOM 스냅샷(팬 · 모터 줄)으로 들어가야 한다(코드 변경 · 이번 ccmd 범위 밖).
+
+## 2026-09-30 ccmd K 이후 (CC 주장 — 엘 판정 전)
+ccmd K(main `a3b1853` KA · `da10672` KC · KB 는 이 절과 같은 브랜치)가 남은 '약함' 한 칸에 손을 댔다. '후' 칸은 **CC 주장**이고 판정은 엘이 재측정한 뒤 확정한다. 기준은 위 '판정 기준' 그대로.
+
+| 연결 | 전 | 후(CC 주장) | 근거 |
+|---|---|---|---|
+| Special 모듈 → MainForm | 약함 | **이어짐**(CC 주장) | **흐름**: 제품 코드 등록 표 역할 `special`(한 행 = 입력 한 개의 출처 · `specialCallOf`) → 작업대 BOM Run(`POST /api/run/bom`) 안에서 서버가 입력을 **등록 표에서** 모은다(`resolveSpecialInputs` · 샘플 SPF: `air.q_cmh` 12,000 · `air.p_pa` 600 — 사람 입력 0) → 부여 확인(`special_grant` · 없으면 422 "Special 부여 필요") → `special_fan_candidates()`(교점 구간만) → `selectFan` → 결과를 **스냅샷 `dims.special`**(program · version · input · result · grantId · curveFingerprint)에 박는다 → BOM 줄(팬 사양 `{special.model}` · 모터 단가 표 `bySpecial: motorKw`) → 원가 · 견적 · 조립도 Item 표가 스냅샷을 읽는다 → 사용 기록 `special_run.bom_run_id`(0035 · `(tenant_id, bom_run_id)` 부분 유일 = BOM Run 1회 1건). ①(사람 재입력)과 ②(결과가 BOM 으로 안 감) 두 약점이 둘 다 닫혔다. **불변**: 성능표를 고쳐도 앞 스냅샷의 `dims.special` 그대로(S75d). **역방향 막힘**: `special:test` 기존 단언 그대로 + 「플랫폼은 bom_run_id 를 읽지 못한다」 「같은 스냅샷 두 번째 사용 기록 거부」 「다른 회사 0건」. e2e **S75a~f**. **시연 수치 보호**: 기존 제품(EU)은 special 표가 없어 이 길을 지나지 않는다(S75e · 455.4 · ₩15,487,170 · 11행은 S5 · S6b · S8). |
+
+- 합계(CC 주장): **이어짐 14 · 약함 0 · 없음 0 (총 14).** 엘 판정 전.
+- 곁가지(연결 칸 아님 · 참고): KC 세부 치수 · CAD 규칙서도 스냅샷(`dims.detail` · `dims.cadRules`)을 통해서만 도면에 닿는다(S76) · KB 컨설팅은 회사 **자기** 스냅샷만 읽고, 벤치마킹은 DB 함수가 집계 숫자만 준다(`consulting:test` · S79).

@@ -19,6 +19,7 @@ import { createDraft, approve, getApproved } from "../src/macro";
 import { IDS } from "./seed";
 import { seedCatalog } from "./seed-catalog";
 import { seedSymbols } from "./seed-symbols";
+import { seedBench } from "./seed-bench";
 import { seedLearning } from "./seed-learning";
 import { seedSpecial } from "./seed-special";
 
@@ -54,6 +55,8 @@ export async function seedDemo(opts: { forceCatalog?: boolean } = {}): Promise<v
   await seedCatalog({ force: opts.forceCatalog });
   // 0036 · ccmd K · KC-3 — 설계 심볼 라이브러리 샘플 5종(두 회사 · 멱등)
   await seedSymbols();
+  // 0037 · ccmd K · KB-2 — 벤치마킹 표본(샘플 회사 3곳의 값 · 회사 행이 아님 · 멱등)
+  await seedBench(3);
   await withTenant(IDS.tenantA, async (tx) => {
     if ((await tx.partner.count()) > 0) return;
     for (const p of DEMO_PARTNERS) await tx.partner.create({ data: { tenantId: IDS.tenantA, ...p, createdBy: IDS.ownerA } });

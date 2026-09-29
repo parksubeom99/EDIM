@@ -120,3 +120,13 @@ pnpm db:reset:demo         # ★ e2e 자신도 흔적을 남긴다 → 시연 �
 1. 탭: https://github.com/parksubeom99/EDIM/compare/main...feat/p6-followup → **Create pull request** → **Merge**(ff 가능)
 2. `git pull` → `pnpm db:generate && pnpm db:migrate` → §1 확인 블록 → 116/116 이면 회장님 PC 첫 실측
 3. `docs/ci/ci.yml` 을 `.github/workflows/ci.yml` 로 복사해 커밋(엘 토큰은 Workflows 권한 403)
+
+---
+
+## 부록 K — 새 장면 후보 (2026-09-30 · ccmd K · 본 장면 번호 1~13 그대로)
+
+| 후보 | 화면 · 조작 | 멘트 요지 | 근거 |
+|---|---|---|---|
+| K-1 CPQ 가 팬을 고르는 BOM Run | 작업대 AHU-01 → Code Builder **SPF(샘플)** · 55 → BOM → **BOM Run** → BOM 표 위 "Special 팬 선정 EDIM-PF-560 (샘플) · 2600 rpm · 모터 3.7 kW" · 팬 · 모터 줄 · 원가 → DWG View **조립도** Item 표에 팬 모델 · 모터 kW | "풍량 · 정압을 다시 치지 않습니다. 제품 코드에 등록된 값으로 BOM Run 이 팬을 고르고, 결과가 스냅샷에 박혀 원가 · 견적 · 도면이 같이 따라옵니다. 과금은 BOM Run 한 번에 한 건입니다." | e2e S75a~f · 캡처 75_cpq_special_bom · 75_cpq_special_drawing |
+| K-2 세부 치수와 설계 심볼 | 같은 스냅샷 → DWG View **조립도** → 세부 치수선(detail.Fan.A=1250 …) · 부품 mm 좌표 · KAD- 슬롯 줄(샘플) → 오른쪽 Item 표 줄 또는 풍선번호 **더블클릭** → 부품 정보(공급처 · 단가 출처 · 조립순서 · 주의사항) → 도면 등록 후 `/drawings/{id}/annotate` → **설계 심볼**(팬 · 모터 …) 놓기 · 옮기기 · 90° · 지우기 | "세부 치수 · 배치 좌표는 CAD 규칙서 파일 한 장(샘플)에서 옵니다. 파일을 바꾸면 코드 수정 없이 다음 도면이 바뀌고, 앞서 뜬 도면은 그대로입니다. KAD 슬롯 문법은 아직 샘플 대응표입니다." | e2e S76a~e · S77a~c · S78a~c · 캡처 76_detail_dim · 77_symbol · 78_part_info |
+| K-3 컨설팅 두 트랙 | `/m/consulting` → 트랙 1 제안(공급처 차액 · 설계 여유 3.8%) · **인쇄본(A4)** → 트랙 2 "업계 안 우리 위치"(표본 n 곳 · 샘플 · p25~p75 막대 · 우리 값 · 백분위) | "우리 회사 스냅샷만 분석합니다. 업계 비교는 DB 함수가 숫자만 주고, 다른 회사 이름이나 행은 오지 않습니다. 표본이 3곳 미만이면 아예 보여 드리지 않습니다. 단가 · 운전시간 · 표본은 샘플입니다." | e2e S79a~e · consulting:test · 캡처 79_consulting_internal · 79_consulting_benchmark |
