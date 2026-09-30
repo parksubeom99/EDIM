@@ -35,8 +35,34 @@ const EDIT_CMDS: { cmd: CanvasCmd; label: string; needsSel: boolean }[] = [
 /** 아직 EDIM 안에 없는 것 — 자리만 두고 이유를 적는다(누르면 된다고 착각하지 않게). */
 const NOT_YET: [string, string][] = [
   ["Free CAD", "EDIM 안의 CAD 편집기는 아직 없습니다 — 도면은 DWG View 의 DXF 를 외부 CAD(AutoCAD·FreeCAD)에서 여십시오"],
-  ["설계 심볼", "설계 심볼 배치(p59)는 아직 없습니다 — 부품 배치는 Arrangement 의 Component 칸에서 합니다"],
 ];
+
+/** ccmd L · LB-3 · p58 — '설계 심볼': 지금 스냅샷(runId)에서 등록된 도면을 고르면 그 도면 편집기의 심볼 패널로 간다.
+ * 도면이 없으면 고를 수 없고 이유를 적는다. 심볼을 놓는 곳은 편집기 한 곳뿐이다(두 번째 길을 만들지 않는다). */
+function SymbolCmd({ runId }: { runId: string | null }) {
+  const [rows, setRows] = useState<{ id: string; drawingNo: string; drawingType: string; currentRev: string }[] | null>(null);
+  async function load() {
+    if (!runId) { setRows(null); return; }
+    const r = await fetch("/api/drawings").catch(() => null);
+    const j = r && r.ok ? ((await r.json()) as { rows?: { id: string; drawingNo: string; drawingType: string; currentRev: string; bomRunId: string }[] }) : {};
+    setRows((j.rows ?? []).filter((d) => d.bomRunId === runId));
+  }
+  useEffect(() => { void load(); }, [runId]); // eslint-disable-line react-hooks/exhaustive-deps
+  const none = !!runId && rows !== null && rows.length === 0;
+  const off = !runId || !rows || rows.length === 0;
+  const why = !runId ? "먼저 BOM Run 을 실행하십시오 — 도면은 BOM 스냅샷에서 나옵니다"
+    : none ? "먼저 DWG View 에서 도면을 등록하세요 — 설계 심볼은 등록된 도면의 편집기에서 놓습니다"
+    : "이 스냅샷의 도면을 고르면 그 도면 편집기의 설계 심볼 패널이 열립니다";
+  return (
+    <select data-cmd="symbol" data-run-id={runId ?? ""} data-count={rows?.length ?? -1} value="" disabled={off} title={why}
+      onFocus={() => void load()}
+      onChange={(e) => { const id = e.target.value; if (id) window.location.assign(`/drawings/${id}/annotate#symbol-panel`); }}
+      style={{ ...cmdBtn(false, off), padding: "1px 4px" }}>
+      <option value="">{none ? "설계 심볼 — 먼저 도면 등록" : "설계 심볼 ▼"}</option>
+      {(rows ?? []).map((d) => <option key={d.id} value={d.id}>{`${d.drawingNo} · ${d.drawingType} · Rev ${d.currentRev}`}</option>)}
+    </select>
+  );
+}
 const cmdBtn = (on: boolean, off: boolean): CSSProperties => ({
   fontFamily: "var(--font-mono)",
   fontSize: 11,
@@ -245,6 +271,7 @@ export function Toolbar({
             <option value="">DWG View ▼</option>
             {DWG_VIEWS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
           </select>
+          <SymbolCmd runId={runId} />
           {NOT_YET.map(([label, why]) => (
             <button key={label} type="button" data-cmd-none={label} disabled title={why} style={cmdBtn(false, true)}>{label}</button>
           ))}

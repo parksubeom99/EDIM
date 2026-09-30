@@ -171,7 +171,7 @@ export function AnnotEditor({ drawingId, svg, frame, locked, canEdit }: { drawin
           {draft && tool !== "select" && tool !== "text" && tool !== "symbol" && shape({ kind: tool, ...draft }, "draft")}
         </svg>
       </div>
-      <div data-testid="symbol-panel" data-ready={symReady ? "1" : "0"} data-count={syms.length} style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", padding: "6px 8px", border: "1px dashed var(--line)", borderRadius: 4 }}>
+      <div id="symbol-panel" data-testid="symbol-panel" data-ready={symReady ? "1" : "0"} data-count={syms.length} style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", padding: "6px 8px", border: "1px dashed var(--line)", borderRadius: 4 }}>
         <b style={{ fontSize: "var(--fs-12)" }}>설계 심볼 (p58 · 샘플)</b>
         {lib.map((l) => (
           <button key={l.id} type="button" data-testid={`sym-pick-${l.key}`} disabled={!editable}

@@ -703,8 +703,9 @@ with sync_playwright() as p:
     pg.goto(NODE4,wait_until="domcontentloaded"); wait_canvas()
     cmds=pg.eval_on_selector_all("[data-testid=canvas-cmds] [data-cmd]","es=>es.map(e=>e.dataset.cmd)")
     none=pg.eval_on_selector_all("[data-testid=canvas-cmds] [data-cmd-none]","es=>es.map(e=>[e.dataset.cmdNone,e.disabled,e.title.length>10])")
-    ok("S41a 툴바가 p58 구성이다 — Arrangement·Move·Delete·Add·Copy·DWG View·승인은 명령, Free CAD·설계 심볼은 잠긴 자리(이유 표기)",
-       (cmds,none), cmds==["arrangement","move","delete","add","copy","dwg-view","approval"] and len(none)==2 and all(d and t for _,d,t in none))
+    # ccmd L · LB-3 — '설계 심볼'은 잠긴 자리가 아니라 명령(스냅샷의 도면 → 편집기 심볼 패널)이 됐다. 잠긴 자리는 Free CAD 하나.
+    ok("S41a 툴바가 p58 구성이다 — Arrangement·Move·Delete·Add·Copy·DWG View·설계 심볼·승인은 명령, Free CAD 는 잠긴 자리(이유 표기)",
+       (cmds,none), cmds==["arrangement","move","delete","add","copy","dwg-view","symbol","approval"] and len(none)==1 and none[0][0]=="Free CAD" and all(d and t for _,d,t in none))
     dis=pg.eval_on_selector_all("[data-cmd=move],[data-cmd=delete],[data-cmd=copy]","es=>es.map(e=>e.disabled)")
     ok("S41b 구획을 고르기 전에는 Move·Delete·Copy 가 잠긴다 (대상 없는 명령을 막는다)", dis, dis==[True,True,True])
     pg.click("[data-cmd=arrangement]"); pg.wait_for_selector("[data-testid=design-canvas][data-loaded='1']",timeout=30000); pg.wait_for_selector("[data-testid=arr-table] tbody tr",timeout=30000)
@@ -770,6 +771,18 @@ with sync_playwright() as p:
     fn=dl.value.suggested_filename
     pg.click("[data-testid=dwg-viewer-close]"); pg.wait_for_selector("[data-testid=dwg-viewer]",state="detached",timeout=10000)
     ok("S41k DWG View ▼ — BOM 스냅샷이 없으면 잠기고, 있으면 고른 뷰(정면도)의 DXF 를 받는다", (dwg_off, fn), dwg_off and fn.endswith("-front.dxf"))
+    # ccmd L · LB-3 · p58 — 툴바 '설계 심볼': 이 스냅샷에 도면이 없으면 잠기고(이유) · 도면을 등록하면 목록에 뜨고 · 고르면 그 도면 편집기의 심볼 패널
+    pg.wait_for_function("()=>{const s=document.querySelector('[data-cmd=symbol]'); return s && s.dataset.runId && s.dataset.count!=='-1';}",timeout=30000)
+    sym0=pg.eval_on_selector("[data-cmd=symbol]","e=>({run:e.dataset.runId,n:e.dataset.count,off:e.disabled,why:e.title})")
+    d41=ctx.request.post(BASE+"/api/drawings",headers=J0,data=json.dumps({"runId":sym0["run"],"type":"assembly"})).json()
+    pg.focus("[data-cmd=symbol]"); pg.wait_for_function("()=>{const s=document.querySelector('[data-cmd=symbol]'); return s && Number(s.dataset.count)>=1 && !s.disabled;}",timeout=30000)
+    sym1=pg.eval_on_selector_all("[data-cmd=symbol] option","es=>es.map(e=>e.value)")
+    pg.select_option("[data-cmd=symbol]",d41.get("id")); pg.wait_for_selector("[data-testid=symbol-panel][data-ready='1']",timeout=60000)
+    ok("S41s 툴바 '설계 심볼' — 스냅샷에 도면이 없으면 잠김 + '먼저 DWG View 에서 도면을 등록하세요' · 등록하면 그 도면이 목록에 · 고르면 /drawings/{id}/annotate 의 설계 심볼 패널이 열린다",
+       (sym0["n"], sym0["off"], sym0["why"][:30], d41.get("id") in sym1, pg.url.replace(BASE,"")[:60], pg.is_visible("[data-testid=symbol-panel]")),
+       sym0["n"]=="0" and sym0["off"] and "먼저 DWG View 에서 도면을 등록하세요" in sym0["why"] and d41.get("id") in sym1
+       and f"/drawings/{d41.get('id')}/annotate" in pg.url and pg.url.endswith("#symbol-panel") and pg.is_visible("[data-testid=symbol-panel]"))
+    pg.goto(NODE4,wait_until="domcontentloaded"); wait_canvas()   # 뒤 단계(S41l~)는 작업대 화면에서 이어진다
     pg.click("[data-cmd=approval]")
     pg.wait_for_function("()=>document.querySelector('[data-testid=inspector-approval]')?.dataset.focused==='1'",timeout=30000)
     ok("S41l 승인 — Inspector 의 Approval 로 데려가 강조한다 (요청·결정은 거기서만 — 보는 곳/하는 곳 분리)", True, True)
