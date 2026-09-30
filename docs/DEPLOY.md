@@ -60,3 +60,52 @@ openssl rand -base64 32
 - 준비된 자리: `EDIM_OIDC_ISSUER` 가 설정되면 로그인 화면에 "회사 계정(SSO)" 버튼 자리가 보인다(눌러도 아직 아무 일도 하지 않음).
 - 연결할 곳: `apps/web/app/api/auth/login/route.ts` 옆에 OIDC 콜백 경로를 두고, 콜백에서 확인된 이메일로 기존
   `authenticate()`(packages/auth) 를 부르면 회사 세션 · RLS 는 그대로 이어진다.
+
+## 6. 필요한 것 · 첫 실행 순서 (ccmd M)
+
+| 항목 | 값 |
+|---|---|
+| 도구 | Docker(Compose v2) 만. 개발 모드는 Node 20+ · pnpm 9.15.4 · Python 3.12(e2e) |
+| 포트 | 운영 킷: **3000**(web)만 밖으로 · 개발: 3000(web) · **5433**(PostgreSQL) |
+| 디스크 | 이미지 빌드 캐시 포함 약 3 GB(이미지 web · migrate · postgres:16-alpine) + DB 볼륨(샘플 데이터 수십 MB) |
+| 메모리 | 빌드 중 2 GB 이상 권장(Next.js 빌드) · 실행은 web 1대 수백 MB |
+
+첫 실행:
+
+1. `openssl rand -base64 32` 로 비밀값을 만든다(3절).
+2. `AUTH_SECRET=<값> docker compose -f docker-compose.prod.yml up -d --build` — `db` 가 healthy → `migrate` 가 끝나야(`Exited (0)`) → `web` 이 뜬다.
+3. `docker compose -f docker-compose.prod.yml ps` 로 web 이 `Up` 인지 본다 → http://localhost:3000/login.
+4. 확인이 끝나면 `docker compose -f docker-compose.prod.yml down`.
+
+## 7. AI 키가 없을 때 — 결정론 폴백 (D-6)
+
+**AI 키가 없어도 모든 화면이 돈다. 실패가 아니다.** 실행 경로에는 처음부터 LLM 이 없다(런타임 LLM 호출 0).
+
+| 자리 | 키가 없을 때 |
+|---|---|
+| 매크로 실행(EDIM Run) · BOM · 원가 · 견적 · 도면 | 원래 결정론 — 승인된 식만 실행 |
+| Prompt → Macro(자연어 번역 · `ANTHROPIC_API_KEY`) | 번역 버튼이 "번역 모델이 연결되지 않았습니다 … Macro 칸에 직접 입력하면 검증·역번역·승인·실행은 그대로 동작합니다" 를 돌려준다 |
+| UI 개발 AI(p25) | **결정론 설계기**가 UI Templet 대화 상자(용도 · 항목 · 필요 DB Table) + 설명 낱말로 폼을 설계한다 — 화면에 "결정론 설계기 — AI 키 없음" 표기 |
+| 학습 AI(플랫폼) | 공식 탐구 · 검증은 결정론 · 이름 맞추기 · 설명은 로컬 AI(`EDIM_LOCAL_AI_URL`)가 있으면 쓰고 없으면 사전(결정론) |
+
+## 8. 흔한 실패 3가지
+
+| 증상 | 원인 | 대처 |
+|---|---|---|
+| 킷은 뜨는데 화면 숫자 · 개정 · 시연 순서가 문서와 다르다(e2e 가 중간부터 실패) | 예전 킷 볼륨(`edim-prod-pgdata`)에 이전 실행의 데이터가 남아 있다(CP3 실측) | 샘플 데이터뿐이면 `docker compose -f docker-compose.prod.yml down -v` 로 볼륨을 지우고 다시 `up -d --build`(**되돌릴 수 없다** — 실데이터가 있으면 먼저 `pg_dump`) |
+| 로그인하면 500 | `AUTH_SECRET` 이 비었다 | 3절대로 값을 넣고 다시 띄운다(compose 가 없으면 시작을 거부한다) |
+| 화면이 빈 BOM · 도면 422 | ① 개발 DB 에 시드가 없다 ② 설계 검증 위반(정상 동작) | ① `pnpm db:reset:demo` ② 422 메시지의 규칙 · 치수를 고치고 BOM Run 을 다시 |
+
+## 9. 회사 실자료로 바꾸기 — 파일만 교체 (완료 정의 4)
+
+코드는 고치지 않는다. 샘플 파일 자리에 **회사 파일**을 두면 그것을 읽는다(회사 파일은 `.gitignore` — 저장소에 올라가지 않는다).
+
+| 무엇 | 샘플(저장소) | 회사 파일 자리 · 환경변수 | 언제 반영 |
+|---|---|---|---|
+| 카탈로그 — Sub Code · Product Code · 표(치수 · 기술 · 규칙 · 세부 치수) · 코드 관계 · 관계 단가 | `packages/bom-code/catalog/ahu-demo.json` | `packages/bom-code/catalog/catalog.local.json` · `EDIM_CATALOG` | `pnpm db:reset:demo`(개발) · 운영 킷은 `up -d --build`(migrate 가 시드) |
+| CAD 규칙서 — 3×3 칸 → mm · 기준점 · 구동 방식 · 방향 결합 · KAD 대응표 | `packages/bom-code/cad-rules/cad-rules.sample.json` | `cad-rules.local.json` · `EDIM_CAD_RULES` | 다음 BOM Run 부터(앞 스냅샷 도면은 그대로) |
+| PCR 요율표 — Business Type 열 · 요율 | `packages/bom-code/cost-rules/pcr-rules.sample.json` | `pcr-rules.local.json` · `EDIM_PCR_RULES` | 다음 견적부터(앞 견적은 그대로) |
+
+- 운영 킷(docker)에서는 이미지 빌드 때 저장소의 파일이 들어간다 — 회사 파일을 같은 자리에 두고 `up -d --build`, 또는 파일을 볼륨으로 붙이고 환경변수(`EDIM_CAD_RULES` · `EDIM_PCR_RULES`)로 가리킨다.
+- 틀린 파일은 조용히 무시하지 않는다: CAD 규칙서 · PCR 요율표가 틀리면 BOM Run · 견적이 422 로 이유를 돌려준다.
+- 단가 이력 · 제조 정보 표 · 회사 정보는 화면(Set-Up)에서 쌓는 데이터라 파일 교체 대상이 아니다.

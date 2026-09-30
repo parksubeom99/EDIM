@@ -27,3 +27,6 @@ packages/bom-code/cad-rules/cad-rules.local.json
 
 # ccmd M · p66 — 회사 자기 PCR 요율표(샘플을 대신해 읽힘 · 저장소에 올리지 않는다)
 packages/bom-code/cost-rules/pcr-rules.local.json
+
+# ccmd M — 회사 자기 카탈로그(Sub Code · Product Code · 표 · 관계 · 단가 — 샘플 ahu-demo.json 대신 읽힘 · 저장소에 올리지 않는다)
+packages/bom-code/catalog/catalog.local.json

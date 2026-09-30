@@ -11,8 +11,11 @@
  *
  * 수치는 샘플이다: M3 샘플 공식의 결과를 '등록된 표'로 1회 옮긴 것.
  * 회사 실 표(단가·규격)는 이 행들을 화면(Set-Up ▸ Product Code ▸ Table)에서 교체한다.
+ * ccmd M — 또는 **파일만 바꿔서**(코드 수정 0): 읽는 순서 = 환경변수 EDIM_CATALOG(파일 경로)
+ *   → packages/bom-code/catalog/catalog.local.json(회사 파일 자리 · .gitignore) → ahu-demo.json(샘플).
+ *   바꾼 뒤 `pnpm db:reset:demo` 하면 반영된다(CAD 규칙서 · PCR 요율표와 같은 규칙).
  */
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { adminPrisma } from "../src/client";
@@ -27,12 +30,20 @@ interface DemoCatalog {
 }
 
 const here = dirname(fileURLToPath(import.meta.url));
-const CATALOG_PATH = resolve(here, "../../bom-code/catalog/ahu-demo.json");
+const CATALOG_DIR = resolve(here, "../../bom-code/catalog");
+/** 지금 읽을 카탈로그 파일 — 부를 때마다 고른다(환경변수 · 회사 파일 · 샘플 순) */
+export function catalogPath(): string {
+  if (process.env.EDIM_CATALOG) return resolve(process.env.EDIM_CATALOG);
+  const local = resolve(CATALOG_DIR, "catalog.local.json");
+  return existsSync(local) ? local : resolve(CATALOG_DIR, "ahu-demo.json");
+}
 
 export async function seedCatalog(opts: { force?: boolean } = {}): Promise<void> {
   const t = IDS.tenantA;
   const existing = await adminPrisma.productCode.count({ where: { tenantId: t } });
-  const cat = JSON.parse(readFileSync(CATALOG_PATH, "utf-8")) as DemoCatalog;
+  const path = catalogPath();
+  const cat = JSON.parse(readFileSync(path, "utf-8")) as DemoCatalog;
+  if (!path.endsWith("ahu-demo.json")) console.log(`Catalog seed: 회사 카탈로그 파일 ${path} 을 읽습니다(샘플 대신).`);
   if (existing > 0 && !opts.force) {
     console.log(`Catalog seed: ${existing} product codes already registered — no-op.`);
     await seedSpecItems(cat, false);

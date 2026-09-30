@@ -38,6 +38,10 @@ RUN addgroup -S edim && adduser -S edim -G edim
 COPY --from=builder --chown=edim:edim /repo/apps/web/.next/standalone ./
 COPY --from=builder --chown=edim:edim /repo/apps/web/.next/static ./apps/web/.next/static
 COPY --from=builder --chown=edim:edim /prisma-engine/ ./apps/web/.prisma/client/
+# 실행 중에 읽는 규칙 파일(샘플 + 회사 .local.json 이 있으면 그것까지) — standalone 추적은 동적 경로 파일을 못 담는다.
+#   CAD 규칙서(ccmd K · p36 · p38) · PCR 요율표(ccmd M · p66). 서버가 /app 에서 위로 packages/bom-code/… 를 찾는다.
+COPY --from=builder --chown=edim:edim /repo/packages/bom-code/cad-rules ./packages/bom-code/cad-rules
+COPY --from=builder --chown=edim:edim /repo/packages/bom-code/cost-rules ./packages/bom-code/cost-rules
 USER edim
 EXPOSE 3000
 CMD ["node", "apps/web/server.js"]
