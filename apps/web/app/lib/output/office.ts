@@ -1,7 +1,7 @@
 import { AlignmentType, BorderStyle, Document, HeadingLevel, Packer, Paragraph, Table, TableCell, TableRow, TextRun, WidthType } from "docx";
 import ExcelJS from "exceljs";
 import type { QuotationBody, TechDataBody, SourceStamp } from "./document";
-import { pcrCostBasisText } from "./document";
+import { pcrCostBasisText, snapshotProfit } from "./document";
 import type { LayoutElement } from "../print-layout";
 
 /**
@@ -60,7 +60,7 @@ function partsOf(doc: ExportDoc): { title: Section; fields: Section; tables: Sec
       rows.push(line("Direct costs total", d.directTotal), line("Contribution margin", d.contribution));
       for (const s of d.sections.filter((x) => x.group === "sna")) rows.push(...s.rows.map((r) => line(`${s.name} · ${r.label}`, r.values)));
       rows.push(line("Full costs", d.fullCost));
-      fields.push(["PCR 세부 원가 기준", pcrCostBasisText(d)]);
+      fields.push(["PCR 세부 원가 기준", pcrCostBasisText(d)], ["참고 — 스냅샷 원가 기준 이익 = 견적 − 스냅샷 원가", snapshotProfit(b)]);
       tables.push({ kind: "table", id: "pcrdetail", name: `PCR 세부 · Business Type${d.sample ? " (샘플 요율)" : ""} · ${d.file} ${d.fingerprint}`,
         head: ["항목", ...d.businessTypes], fmt: [null, ...d.businessTypes.map(() => "won" as const)], rows, total: line("EBIT", d.ebit) });
     }

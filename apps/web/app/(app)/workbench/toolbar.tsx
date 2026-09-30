@@ -47,15 +47,20 @@ function SymbolCmd({ runId }: { runId: string | null }) {
     const j = r && r.ok ? ((await r.json()) as { rows?: { id: string; drawingNo: string; drawingType: string; currentRev: string; bomRunId: string }[] }) : {};
     setRows((j.rows ?? []).filter((d) => d.bomRunId === runId));
   }
-  useEffect(() => { void load(); }, [runId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    void load();
+    // 도면이 등록되면(Design 탭 '도면 등록') · 창으로 돌아오면 다시 읽는다 — 잠긴 select 는 focus 를 받지 못하므로 이벤트로 연다
+    const again = () => void load();
+    window.addEventListener("edim:drawings-changed", again); window.addEventListener("focus", again);
+    return () => { window.removeEventListener("edim:drawings-changed", again); window.removeEventListener("focus", again); };
+  }, [runId]); // eslint-disable-line react-hooks/exhaustive-deps
   const none = !!runId && rows !== null && rows.length === 0;
   const off = !runId || !rows || rows.length === 0;
   const why = !runId ? "먼저 BOM Run 을 실행하십시오 — 도면은 BOM 스냅샷에서 나옵니다"
-    : none ? "먼저 DWG View 에서 도면을 등록하세요 — 설계 심볼은 등록된 도면의 편집기에서 놓습니다"
+    : none ? "먼저 도면을 등록하세요 — Design 탭의 '도면 등록'(평면 · 정면 · 조립도 …). 설계 심볼은 등록된 도면의 편집기에서 놓습니다"
     : "이 스냅샷의 도면을 고르면 그 도면 편집기의 설계 심볼 패널이 열립니다";
   return (
     <select data-cmd="symbol" data-run-id={runId ?? ""} data-count={rows?.length ?? -1} value="" disabled={off} title={why}
-      onFocus={() => void load()}
       onChange={(e) => { const id = e.target.value; if (id) window.location.assign(`/drawings/${id}/annotate#symbol-panel`); }}
       style={{ ...cmdBtn(false, off), padding: "1px 4px" }}>
       <option value="">{none ? "설계 심볼 — 먼저 도면 등록" : "설계 심볼 ▼"}</option>

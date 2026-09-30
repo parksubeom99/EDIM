@@ -839,6 +839,7 @@ function DrawingRegister({ runId, nodeStable, canEdit, verify }: { runId: string
     setBusy(false);
     if (!r.ok) { setErr(j.error ?? "도면 생성 실패"); return; }
     await load();
+    window.dispatchEvent(new CustomEvent("edim:drawings-changed"));   // ccmd L · LB-3 — 툴바 '설계 심볼'이 목록을 다시 읽는다
   }
   async function advance(id: string, status: string) {
     setErr(null);

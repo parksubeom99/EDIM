@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { parsePcrRules, buildPcrDetail, salePrice } from "../app/lib/pcr";
-import { buildQuotationBody, renderDocumentHtml, type SnapshotLike } from "../app/lib/output/document";
+import { buildQuotationBody, renderDocumentHtml, snapshotProfit, type SnapshotLike } from "../app/lib/output/document";
 
 const SAMPLE = JSON.parse(readFileSync(join(__dirname, "../../../packages/bom-code/cost-rules/pcr-rules.sample.json"), "utf-8"));
 
@@ -71,6 +71,15 @@ describe("ccmd M · p66 견적 body · 인쇄본", () => {
     expect(html).toContain("283,200");
     expect(html).toContain("마진율 10%)");
     expect(html).not.toContain("스냅샷 원가 그대로");
+  });
+  it("ccmd N · 참고 줄 — 스냅샷 원가 기준 이익 = 견적 합계 − 스냅샷 원가 × 수량(하드코딩 없음) · 인쇄본에 EBIT 와 나란히", () => {
+    const p = parsePcrRules(SAMPLE); if (!p.ok) throw new Error(p.error);
+    const r = buildQuotationBody(run, null, { qty: 2, pcrRules: { fingerprint: "f12", file: "pcr-rules.sample.json", rules: p.rules } }, "QR-0-01", "A", "2026-09-30");
+    if (!r.ok) throw new Error(r.error);
+    expect(snapshotProfit(r.body)).toBe(2_907_520 - 1_321_600 * 2);
+    const html = renderDocumentHtml({ docNo: "QR-0-01", currentRev: "A", status: "draft", docType: "quotation", body: r.body } as never);
+    expect(html).toContain('data-testid="pcr-snapshot-profit" data-value="264320"');
+    expect(html).toContain("264,320");
   });
   it("요율표가 없으면 PCR 세부 · 마진 없이(옛 견적과 같은 모양 · 단가 = 원가)", () => {
     const r = buildQuotationBody(run, null, {}, "QR-0-01", "A", "2026-09-30");

@@ -774,13 +774,17 @@ with sync_playwright() as p:
     # ccmd L · LB-3 · p58 — 툴바 '설계 심볼': 이 스냅샷에 도면이 없으면 잠기고(이유) · 도면을 등록하면 목록에 뜨고 · 고르면 그 도면 편집기의 심볼 패널
     pg.wait_for_function("()=>{const s=document.querySelector('[data-cmd=symbol]'); return s && s.dataset.runId && s.dataset.count!=='-1';}",timeout=30000)
     sym0=pg.eval_on_selector("[data-cmd=symbol]","e=>({run:e.dataset.runId,n:e.dataset.count,off:e.disabled,why:e.title})")
-    d41=ctx.request.post(BASE+"/api/drawings",headers=J0,data=json.dumps({"runId":sym0["run"],"type":"assembly"})).json()
-    pg.focus("[data-cmd=symbol]"); pg.wait_for_function("()=>{const s=document.querySelector('[data-cmd=symbol]'); return s && Number(s.dataset.count)>=1 && !s.disabled;}",timeout=30000)
+    # 화면에서 등록한다 — Design 탭 '도면 등록' 조립도 버튼(같은 스냅샷) → 툴바 목록이 다시 읽힌다(이벤트)
+    pg.click("[data-tab=design]"); pg.wait_for_selector("[data-testid=drawing-make-assembly]:not([disabled])",timeout=30000)
+    with pg.expect_response(lambda q: q.url.endswith("/api/drawings") and q.request.method=="POST",timeout=60000) as dr41:
+        pg.click("[data-testid=drawing-make-assembly]")
+    d41=dr41.value.json()
+    pg.wait_for_function("()=>{const s=document.querySelector('[data-cmd=symbol]'); return s && Number(s.dataset.count)>=1 && !s.disabled;}",timeout=30000)
     sym1=pg.eval_on_selector_all("[data-cmd=symbol] option","es=>es.map(e=>e.value)")
     pg.select_option("[data-cmd=symbol]",d41.get("id")); pg.wait_for_selector("[data-testid=symbol-panel][data-ready='1']",timeout=60000)
-    ok("S41s 툴바 '설계 심볼' — 스냅샷에 도면이 없으면 잠김 + '먼저 DWG View 에서 도면을 등록하세요' · 등록하면 그 도면이 목록에 · 고르면 /drawings/{id}/annotate 의 설계 심볼 패널이 열린다",
+    ok("S41s 툴바 '설계 심볼' — 스냅샷에 도면이 없으면 잠김 + '먼저 도면을 등록하세요' · Design 탭에서 등록하면 그 도면이 목록에 · 고르면 /drawings/{id}/annotate 의 설계 심볼 패널이 열린다",
        (sym0["n"], sym0["off"], sym0["why"][:30], d41.get("id") in sym1, pg.url.replace(BASE,"")[:60], pg.is_visible("[data-testid=symbol-panel]")),
-       sym0["n"]=="0" and sym0["off"] and "먼저 DWG View 에서 도면을 등록하세요" in sym0["why"] and d41.get("id") in sym1
+       sym0["n"]=="0" and sym0["off"] and "먼저 도면을 등록하세요" in sym0["why"] and d41.get("id") in sym1 and d41.get("bomRunId",sym0["run"])==sym0["run"]
        and f"/drawings/{d41.get('id')}/annotate" in pg.url and pg.url.endswith("#symbol-panel") and pg.is_visible("[data-testid=symbol-panel]"))
     pg.goto(NODE4,wait_until="domcontentloaded"); wait_canvas()   # 뒤 단계(S41l~)는 작업대 화면에서 이어진다
     pg.click("[data-cmd=approval]")
@@ -2546,6 +2550,20 @@ with sync_playwright() as p:
        bool(ebit80) and all(v_==d80.get("contract") for v_ in vsum80) and base80==round(b80["pcr"]["material"])+round(b80["pcr"]["manufacturing"])
        and all(e_<=d80["contract"]-base80 for e_ in ebit80) and base80+oh80==b80["pcr"]["fullCost"]==15487170 and d80.get("contract")==17035887
        and "원가 기준" in basis80 and f"{base80:,}" in basis80 and f"{oh80:,}" in basis80)
+    # ccmd N · STEP 3 — 참고 줄: 스냅샷 원가 기준 이익 = 견적 − 스냅샷 원가(인쇄본 · Excel 둘 다) · 두 고정값 불변
+    pf80=pg.get_attribute("[data-testid=pcr-snapshot-profit]","data-value") if pg.is_visible("[data-testid=pcr-snapshot-profit]") else None
+    pft80=pg.inner_text("[data-testid=pcr-snapshot-profit]") if pf80 is not None else ""
+    import openpyxl
+    _xb=ctx.request.get(DOCS+f"/{q80.get('id')}/export?format=xlsx").body()
+    _wb=openpyxl.load_workbook(io.BytesIO(_xb)); xl80=[]
+    for _ws in _wb.worksheets:
+        for _row in _ws.iter_rows(values_only=True):
+            _c=[v_ for v_ in _row if v_ is not None]
+            if any(isinstance(v_,str) and "스냅샷 원가 기준 이익" in v_ for v_ in _c): xl80+= [v_ for v_ in _c if isinstance(v_,(int,float))]
+    ok("S80e 참고 줄 — 스냅샷 원가 기준 이익 = 견적 − 스냅샷 원가 = 1,548,717 · 인쇄본(값 · 글자)과 Excel 에 같은 값 · 원가 ₩15,487,170 · 견적 ₩17,035,887 불변",
+       (pf80, pft80[:40], xl80, q80.get("total"), b80["pcr"]["fullCost"]),
+       pf80 is not None and int(pf80)==q80.get("total")-b80["pcr"]["fullCost"]==1548717 and "1,548,717" in pft80 and xl80==[1548717]
+       and b80["pcr"]["fullCost"]==15487170 and q80.get("total")==17035887)
     # ── S81 (ccmd M · p25 · p26 · p21) — UI 개발 AI(결정론) · Canvas · 저장·삭제·등록 · 실행 설정(Call) · Object Inspector · Signal/Slot · Work Hierarchy 노드별 UI ──
     UF=BASE+"/api/ui-forms"; NODE81="a0000000-0000-4000-8000-000000000004"; FN81="E2E AI 폼"
     # 쓰기 시험용 샘플 표(E2E-UIF · reset:demo 가 지운다) — Item = Sub Code B(10 · 12 · 25 · 55)

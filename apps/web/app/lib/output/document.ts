@@ -369,11 +369,16 @@ ${b.applied ? `<h2>견적 적용 Table</h2>
 ${b.applied.map((a) => `<tr><td>${a.no}</td><td class="mono">${esc(a.code)}</td><td>${esc(a.part)}</td><td class="n">${a.qty}</td><td class="n">${won(a.unitPrice)}</td><td class="n">${won(a.amount)}</td><td>${esc(a.supplier || "—")}</td><td>${a.table}</td><td>${esc(a.note)}</td></tr>`).join("")}
 <tr><th colspan="5">합계 = PCR Material Cost</th><td class="n"><b>${won(b.applied.reduce((x, a) => x + a.amount, 0))}</b></td><td colspan="3"></td></tr>
 </table>` : ""}
-${b.pcrDetail ? pcrDetailHtml(b.pcrDetail, b.pcr.currency) : ""}`;
+${b.pcrDetail ? pcrDetailHtml(b.pcrDetail, b.pcr.currency, snapshotProfit(b)) : ""}`;
 }
 
 /** ccmd M · p66 PCR(Table) — Business Type 열마다. 샘플 요율표면 표지를 단다. */
-function pcrDetailHtml(d: PcrDetail, cur: string): string {
+/** ccmd N · STEP 3 — 참고 줄: 스냅샷 원가 기준 이익 = 견적 합계 − 스냅샷 원가(Full cost) × 수량. 하드코딩 없이 이 견적 body 에서 센다. */
+export function snapshotProfit(b: QuotationBody): number {
+  return b.total - b.pcr.fullCost * b.totalQty;
+}
+
+function pcrDetailHtml(d: PcrDetail, cur: string, profit: number): string {
   const cells = (v: number[]) => v.map((x) => `<td class="n">${won(x)}</td>`).join("");
   const row = (label: string, v: number[], basis = "", strong = false) =>
     `<tr${strong ? ' style="font-weight:700"' : ""}><td>${label}</td>${cells(v)}<td style="font-size:10px;color:#666">${esc(basis)}</td></tr>`;
@@ -389,6 +394,7 @@ ${row("Full costs", d.fullCost, "Direct + Sales & Adm.", true)}
 <tr style="font-weight:700" data-testid="pcr-ebit"><td>EBIT</td>${cells(d.ebit)}<td style="font-size:10px;color:#666">견적 금액 − Full costs</td></tr>
 </table>
 <p data-testid="pcr-cost-basis" style="font-size:11px;color:#555">${esc(pcrCostBasisText(d))}</p>
+<p data-testid="pcr-snapshot-profit" data-value="${profit}" style="font-size:11px;color:#555">참고 — 스냅샷 원가 기준 이익 = 견적 − 스냅샷 원가 = <b>${won(profit)}</b> ${esc(cur)} (위 EBIT 는 요율표 기준 · 두 숫자를 나란히 본다)</p>
 <p data-testid="pcr-rules-stamp" style="font-size:11px;color:#555">요율표 ${esc(d.file)} · 판 ${esc(d.version)} · 지문 <span class="mono">${esc(d.fingerprint)}</span> · 마진율 ${d.marginPct ?? 0}% · 통화 ${esc(cur)}${d.sample ? ` — ${esc(d.sample)}` : ""}</p>`;
 }
 
