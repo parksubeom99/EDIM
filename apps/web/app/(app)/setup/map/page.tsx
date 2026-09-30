@@ -44,7 +44,7 @@ const MAP: { col: string; groups: Group[] }[] = [
       { id: "s16", label: "6) Arrangement Set-up (S1-6)", href: "/workbench" },
     ] },
     { title: "2. Design", items: [{ id: "s411", label: "1) Design (S-4-1-1)", href: "/workbench" }] },
-    { title: "3. Work Process", items: [{ id: "s412", label: "1) Work Process (S-4-1-2) · All Department", none: "필요한 입력: 부서별 작업 절차(Work Process) 정의" }] },
+    { title: "3. Work Process", items: [{ id: "s412", label: "1) Work Process (S-4-1-2) · All Department", href: "/setup/work-process" }] },
   ] },
   { col: "ERP (Set-Up / User)", groups: [
     { title: "Company info.", items: [

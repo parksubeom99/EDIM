@@ -29,6 +29,7 @@
     "learning:test": "dotenv -e ../../.env -- tsx prisma/learning-test.ts",
     "special:test": "dotenv -e ../../.env -- tsx prisma/special-test.ts",
     "consulting:test": "dotenv -e ../../.env -- tsx prisma/consulting-test.ts",
+    "mes:test": "dotenv -e ../../.env -- tsx prisma/mes-test.ts",
     "bench:seed": "dotenv -e ../../.env -- tsx prisma/seed-bench.ts"
   },
   "dependencies": {

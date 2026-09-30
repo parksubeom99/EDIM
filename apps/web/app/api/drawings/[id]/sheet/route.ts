@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { withTenant, getDrawing } from "@edim/db";
+import { withTenant, getDrawing, qrTokenFor } from "@edim/db";
+import { qrSvg, canEditMes } from "@/app/lib/mes-run";
 import { getServerSession } from "@/app/lib/session";
 import { dxfToSvg } from "@/app/lib/output/dxf-svg";
 import type { SubDrawingRow } from "@/app/lib/drawing-template";
@@ -11,7 +12,7 @@ import type { SubDrawingRow } from "@/app/lib/drawing-template";
  */
 const esc = (v: unknown) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession();
   if (!session) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   const { id } = await params;
@@ -21,6 +22,11 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   const subs = Array.isArray(meta.subDrawings) ? meta.subDrawings : null;
   const notes = Array.isArray(meta.notes) ? meta.notes : null;
   const { svg } = dxfToSvg(row.dxf);
+  // ccmd L · LA7 · p69 — 발행 도면 인쇄본에 QR 칸(/q/{토큰}: 도면 · 서류 · 이력 · 할 일). 토큰은 쓰기 역할만 새로 만든다.
+  const qrTok = row.status === "issued"
+    ? await withTenant(session.tenantId, (tx) => canEditMes(session.role) ? qrTokenFor(tx, "drawing", id, session.userId) : tx.qrToken.findFirst({ where: { targetKind: "drawing", targetId: id, revokedAt: null } }))
+    : null;
+  const qrHtml = qrTok ? `<div data-testid="sheet-qr" style="float:right;text-align:center;font-size:9px">${qrSvg(`${req.nextUrl.origin}/q/${qrTok.token}`, 3)}<div>QR — 도면 · 서류 · 이력 · 할 일</div></div>` : "";
   const subHtml = subs === null
     ? `<p class="muted" data-testid="sheet-subs-none">이 도면은 도면 템플릿(0028) 이전에 떠서 하부 도면 목록이 없습니다.</p>`
     : subs.length === 0
@@ -40,7 +46,7 @@ table{border-collapse:collapse;font-size:12px}th,td{border:1px solid #bbb;paddin
 ol{font-size:12px;margin:0;padding-left:20px}
 @media print{body{margin:8mm}}
 </style></head><body data-testid="drawing-sheet-page">
-<h1>${esc(row.drawingNo)} · Rev ${esc(row.currentRev)}</h1>
+${qrHtml}<h1>${esc(row.drawingNo)} · Rev ${esc(row.currentRev)}</h1>
 <p class="muted">종류 ${esc(row.drawingType)} · 상태 ${esc(row.status)}${row.purpose ? ` · 용도 ${esc(row.purpose)}` : ""} · 코드 <span class="mono">${esc(row.code)}</span> · BOM 스냅샷 <span class="mono">${esc(row.bomRunId)}</span></p>
 <div class="sheet" data-testid="sheet-svg">${svg}</div>
 <h2>Call Sub Drawing · 하부 도면 (p40)</h2>${subHtml}

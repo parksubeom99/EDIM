@@ -198,6 +198,9 @@ model Project {
   description     String?
   /// 0021 · Company DB 고객(p64). client_name 글자 열은 그대로 둔다(옛 데이터 보존)
   clientId        String?  @map("client_id") @db.Uuid
+  /// 0038 · ccmd L · LA-2 MRP 입력 — 수량(기본 1) · 납기
+  qty             Int      @default(1)
+  dueDate         DateTime? @map("due_date") @db.Date
 
   tenant      Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   client      Partner?            @relation("ProjectClient", fields: [clientId], references: [id], onDelete: SetNull)
@@ -940,4 +943,227 @@ model DrawingSymbol {
 
   @@index([tenantId, drawingId], map: "drawing_symbol_drawing_idx")
   @@map("drawing_symbol")
+}
+
+// ── 0038 · ccmd L · LA-2 생산 · 창고 · 품질(p43 · p44) — 관계 없이 스칼라 칸(외래 키는 DB 가 지킨다) ──
+model WorkCenter {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  code        String
+  name        String
+  hoursPerDay Decimal  @default(8) @map("hours_per_day") @db.Decimal
+  isSample    Boolean  @default(false) @map("is_sample")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([tenantId, code], map: "work_center_tenant_code_key")
+  @@map("work_center")
+}
+
+model Machine {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  workCenterId String   @map("work_center_id") @db.Uuid
+  code         String
+  kind         String
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([tenantId, code], map: "machine_tenant_code_key")
+  @@map("machine")
+}
+
+model Worker {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  code        String
+  displayName String   @map("display_name")
+  skillGrade  String   @map("skill_grade")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([tenantId, code], map: "worker_tenant_code_key")
+  @@map("worker")
+}
+
+model Warehouse {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  code      String
+  name      String
+  location  String   @default("")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([tenantId, code], map: "warehouse_tenant_code_key")
+  @@map("warehouse")
+}
+
+model ItemMaterial {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  itemCode    String   @map("item_code")
+  warehouseId String   @map("warehouse_id") @db.Uuid
+  minStack    Decimal  @default(0) @map("min_stack") @db.Decimal
+  supplier    String?
+  makeBuy     String   @map("make_buy")
+  leadDays    Int      @default(0) @map("lead_days")
+  unit        String   @default("ea")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([tenantId, itemCode], map: "item_material_tenant_item_key")
+  @@map("item_material")
+}
+
+model ProcessRoute {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  itemCode     String   @map("item_code")
+  seq          Int
+  name         String
+  workCenterId String   @map("work_center_id") @db.Uuid
+  persons      Int      @default(1)
+  skill        String
+  hours        Decimal  @db.Decimal
+  prevSeq      Int?     @map("prev_seq")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([tenantId, itemCode, seq], map: "process_route_tenant_item_seq_key")
+  @@map("process_route")
+}
+
+/// 추가만 — 현재고 = 합. 음수 재고는 DB 트리거가 거부한다.
+model StockMove {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  itemCode    String   @map("item_code")
+  warehouseId String   @map("warehouse_id") @db.Uuid
+  qty         Decimal  @db.Decimal
+  unitPrice   Decimal? @map("unit_price") @db.Decimal
+  reason      String
+  refKind     String?  @map("ref_kind")
+  refId       String?  @map("ref_id") @db.Uuid
+  createdBy   String   @map("created_by") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([tenantId, itemCode, warehouseId], map: "stock_move_item_idx")
+  @@map("stock_move")
+}
+
+model WorkOrder {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId  String    @map("tenant_id") @db.Uuid
+  woNo      String    @map("wo_no")
+  projectId String    @map("project_id") @db.Uuid
+  bomRunId  String    @map("bom_run_id") @db.Uuid
+  itemCode  String    @map("item_code")
+  qty       Decimal   @db.Decimal
+  dueDate   DateTime? @map("due_date") @db.Date
+  status    String    @default("draft")
+  createdBy String    @map("created_by") @db.Uuid
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([tenantId, woNo], map: "work_order_tenant_no_key")
+  @@map("work_order")
+}
+
+/// 지시 순간의 공정 순서 사본 — 추가만
+model WorkOrderStep {
+  id           String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId     String  @map("tenant_id") @db.Uuid
+  workOrderId  String  @map("work_order_id") @db.Uuid
+  seq          Int
+  name         String
+  workCenterId String  @map("work_center_id") @db.Uuid
+  persons      Int
+  skill        String
+  hours        Decimal @db.Decimal
+  prevSeq      Int?    @map("prev_seq")
+
+  @@unique([workOrderId, seq], map: "work_order_step_wo_seq_key")
+  @@map("work_order_step")
+}
+
+/// 추가만 — 착수 · 완료(누가 · 언제 · 실제 시간)
+model WorkStepLog {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  workOrderId String   @map("work_order_id") @db.Uuid
+  stepSeq     Int      @map("step_seq")
+  event       String
+  workerId    String?  @map("worker_id") @db.Uuid
+  actualHours Decimal? @map("actual_hours") @db.Decimal
+  createdBy   String   @map("created_by") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([workOrderId, stepSeq, event], map: "work_step_log_once")
+  @@map("work_step_log")
+}
+
+/// 추가만 — 자재 입고 · 완성품 · 설치완료 검수
+model Inspection {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  target    String
+  refId     String   @map("ref_id") @db.Uuid
+  itemCode  String?  @map("item_code")
+  result    String
+  memo      String   @default("")
+  createdBy String   @map("created_by") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([tenantId, refId], map: "inspection_ref_idx")
+  @@map("inspection")
+}
+
+model Defect {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  kind         String   @default("defect")
+  inspectionId String?  @map("inspection_id") @db.Uuid
+  refId        String?  @map("ref_id") @db.Uuid
+  title        String
+  status       String   @default("open")
+  createdBy    String   @map("created_by") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@map("defect")
+}
+
+/// 추가만 — 하자 상태 변경 기록
+model DefectLog {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  defectId  String   @map("defect_id") @db.Uuid
+  status    String
+  note      String   @default("")
+  createdBy String   @map("created_by") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("defect_log")
+}
+
+// ── 0039 · ccmd L · LA-3 모바일 · QR(p69) ──
+/// 추가만 — 회사 공지
+model Notice {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  title     String
+  body      String   @default("")
+  createdBy String   @map("created_by") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("notice")
+}
+
+model QrToken {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  token      String    @unique(map: "qr_token_token_key")
+  targetKind String    @map("target_kind")
+  targetId   String    @map("target_id") @db.Uuid
+  createdBy  String    @map("created_by") @db.Uuid
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  revokedAt  DateTime? @map("revoked_at") @db.Timestamptz(6)
+
+  @@index([tenantId, targetKind, targetId], map: "qr_token_target_idx")
+  @@map("qr_token")
 }

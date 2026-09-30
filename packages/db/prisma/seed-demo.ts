@@ -22,6 +22,7 @@ import { seedSymbols } from "./seed-symbols";
 import { seedBench } from "./seed-bench";
 import { seedLearning } from "./seed-learning";
 import { seedSpecial } from "./seed-special";
+import { seedMes } from "./seed-mes";
 
 export const DEMO_DSL =
   "=IF(CAP,CAP>25, SUM(Table1(A,4:4))*Var(NS,15)*Var(NS,20), SUM(Table1(A,1:1))*Var(NS,20))";
@@ -97,6 +98,8 @@ export async function seedDemo(opts: { forceCatalog?: boolean } = {}): Promise<v
   if (ln > 0) console.log(`Demo seed: ${ln} sample learning sources (DB① · 샘플).`);
   // 0034 · C Special '팬 선정' — 프로그램(단가 샘플) · DB① 팬 성능표(샘플) · 회사 A 자체 팬 표(샘플)
   await seedSpecial();
+  // 0038 · ccmd L — 생산 · 창고 · 품질 샘플 기준정보(SPF 샘플 제품만 · EU 시연 제품 · mfg_rate 불변)
+  if (await seedMes()) console.log("Demo seed: MES sample master (작업장 3 · 기계 3 · 작업자 A~D · 창고 2 · SPF 공정 · 샘플).");
 }
 
 const isMain = process.argv[1]?.endsWith("seed-demo.ts") ?? false;

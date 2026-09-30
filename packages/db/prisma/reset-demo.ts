@@ -18,6 +18,7 @@ import { IDS, seedAll } from "./seed";
 import { seedDemo } from "./seed-demo";
 import { resetLearning } from "./seed-learning";
 import { resetSpecial } from "./seed-special";
+import { resetMes } from "./seed-mes";
 
 async function resetDemo(): Promise<void> {
   if (process.env.NODE_ENV === "production") {
@@ -47,6 +48,8 @@ async function resetDemo(): Promise<void> {
   const apr = await adminPrisma.projectApproval.deleteMany({ where: { tenantId: t } });
   // 0034 · 0035: Special 사용 기록이 BOM 스냅샷을 참조한다(bom_run_id) → 스냅샷보다 먼저(부여 · 회사 자체 팬 표도 함께 — seedDemo 가 자체 표를 다시 넣는다).
   await resetSpecial();
+  // 0038 · 0039 · ccmd L: 작업지시가 BOM 스냅샷 · 프로젝트를 RESTRICT 로 가리킨다 → 스냅샷 · 프로젝트보다 먼저(기준정보도 지우고 seedDemo 가 다시 넣는다).
+  await resetMes();
   const run = await adminPrisma.bomCodeRun.deleteMany({ where: { tenantId: t } });
   const req = await adminPrisma.platformRequest.deleteMany({ where: { tenantId: t } });
   const aud = await adminPrisma.auditLog.deleteMany({ where: { tenantId: t } });

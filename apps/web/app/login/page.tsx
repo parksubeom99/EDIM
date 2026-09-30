@@ -6,6 +6,9 @@ import { LoginForm } from "./login-form";
  */
 export const dynamic = "force-dynamic";
 
-export default function LoginPage() {
-  return <LoginForm sso={!!process.env.EDIM_OIDC_ISSUER} />;
+/** ccmd L · LA7 — ?next= 는 같은 사이트의 상대 경로만(열린 리다이렉트 금지 — "//" · 스킴 거부). QR 페이지(/q/{토큰})가 로그인 뒤 돌아오려고 쓴다. */
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
+  const n = (await searchParams).next;
+  const next = typeof n === "string" && /^\/(?!\/)[A-Za-z0-9/_\-.?=&%]*$/.test(n) ? n : null;
+  return <LoginForm sso={!!process.env.EDIM_OIDC_ISSUER} next={next} />;
 }

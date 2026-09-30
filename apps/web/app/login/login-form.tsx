@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 
 /** 로그인 폼. 실패 문장은 하나 — 계정이 있는지 없는지 흘리지 않는다(서버가 같은 문장을 준다). */
-export function LoginForm({ sso }: { sso: boolean }) {
+export function LoginForm({ sso, next = null }: { sso: boolean; next?: string | null }) {
   const [email, setEmail] = useState("owner@acme.test");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -22,8 +22,8 @@ export function LoginForm({ sso }: { sso: boolean }) {
     });
     setBusy(false);
     if (res.ok) {
-      const data = (await res.json().catch(() => ({}))) as { redirect?: string };
-      window.location.href = data.redirect ?? "/";
+      const data = (await res.json().catch(() => ({}))) as { redirect?: string; platform?: boolean };
+      window.location.href = next && !data.platform ? next : data.redirect ?? "/";
     } else {
       const data = (await res.json().catch(() => ({}))) as { error?: string };
       setError(data.error ?? "이메일 또는 비밀번호가 맞지 않습니다");
