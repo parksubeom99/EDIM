@@ -2,7 +2,7 @@
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/hero-dark.svg">
-  <img alt="EDIM — 제품 코드 한 줄로 BOM · 도면 · 원가 · 견적 · 구매까지. e2e 348/348 · 단위 테스트 295 · DB 검증 11종 · 런타임 LLM 0" src="docs/assets/hero-light.svg" width="100%">
+  <img alt="EDIM — 제품 코드 한 줄로 BOM · 도면 · 원가 · 견적 · 구매까지. e2e 383/383 · 단위 테스트 345 · DB 검증 12종 · 런타임 LLM 0" src="docs/assets/hero-light.svg" width="100%">
 </picture>
 
 [![CI](https://github.com/parksubeom99/EDIM/actions/workflows/ci.yml/badge.svg)](https://github.com/parksubeom99/EDIM/actions/workflows/ci.yml)
@@ -12,9 +12,9 @@
 ![Prisma](https://img.shields.io/badge/Prisma-6-2D3748?logo=prisma&logoColor=white)
 ![pnpm](https://img.shields.io/badge/pnpm-monorepo%2011-F69220?logo=pnpm&logoColor=white)
 <br>
-![e2e](https://img.shields.io/badge/e2e-348%2F348%20dev%20·%20prod-0e7c6b)
-![unit](https://img.shields.io/badge/unit%20tests-295-0e7c6b)
-![DB checks](https://img.shields.io/badge/DB%20checks-11%20suites-0e7c6b)
+![e2e](https://img.shields.io/badge/e2e-383%2F383-0e7c6b)
+![unit](https://img.shields.io/badge/unit%20tests-345-0e7c6b)
+![DB checks](https://img.shields.io/badge/DB%20checks-12%20suites-0e7c6b)
 ![runtime LLM](https://img.shields.io/badge/runtime%20LLM%20calls-0-0e7c6b)
 ![local AI](https://img.shields.io/badge/local%20AI-Ollama%20(optional)-555555?logo=ollama&logoColor=white)
 
@@ -48,7 +48,7 @@
 ### 🛡️ 막는 것은 DB 가
 
 회사 격리는 **RLS FORCE**, 개정 이력은 **append-only 권한**, 발행 · 발주 잠금은 **트리거**.
-앱에 버그가 있어도 Postgres 가 거부한다 — DB 검증 스위트 11종.
+앱에 버그가 있어도 Postgres 가 거부한다 — DB 검증 스위트 12종.
 
 </td>
 <td width="33%" valign="top">
@@ -98,7 +98,7 @@ LLM 은 자연어 → 매크로 DSL 번역기 자리에만. 실행은 검증 · 
                 │            edim_platform : 플랫폼 스키마만 (회사 업무 테이블 권한 0)
                 │            admin         : 마이그레이션 · 시드 전용
                 ▼
-     PostgreSQL 16 ── 마이그레이션 0001~0034 · RLS · append-only 권한 · 발행/발주 잠금 트리거 · SECURITY DEFINER 다리 3개
+     PostgreSQL 16 ── 마이그레이션 0001~0037 · RLS · append-only 권한 · 발행/발주 잠금 트리거 · SECURITY DEFINER 다리 3개
 
 순수 엔진(부작용 없음 · DB 모름): bom-code · macro-dsl · macro-verify · macro-compile · hierarchy-address
 ```
@@ -269,7 +269,7 @@ flowchart TB
 
 ## 🖼️ 화면
 
-> 목업이 아니다 — `scripts/demo_e2e.py` 가 348단계를 걸으며 매번 새로 찍는다. 전체 64장: [`docs/screens/`](docs/screens)
+> 목업이 아니다 — `scripts/demo_e2e.py` 가 383단계를 걸으며 매번 새로 찍는다. 전체 68장: [`docs/screens/`](docs/screens)
 
 | 작업대 — 청사진의 다섯 구역 | 코드 조립 · 개정 Rev A→B | BOM Run → EBOM → Cost |
 |:---:|:---:|:---:|
@@ -280,6 +280,8 @@ flowchart TB
 | ![도면](docs/screens/43_drawings.webp) | ![문서](docs/screens/44_document_tab.webp) | ![구매](docs/screens/45_purchasing.webp) |
 | **견적서 인쇄본 — 합계 = 스냅샷 원가** | **설계 검증 — 승인된 매크로가 규칙이 된다** | **플랫폼 콘솔 — 고객사 업무 데이터는 없다** |
 | ![견적서](docs/screens/46_quotation_print.webp) | ![설계 검증](docs/screens/80_macro_verify.webp) | ![플랫폼](docs/screens/41_platform_console.webp) |
+| **PCR 세부 — Business Type 열 (샘플 요율표)** | **UI 개발 AI(결정론) · Object Inspector · Signal/Slot** | **구동 방식 → 조립도 모터 자리 (샘플 규칙서)** |
+| ![PCR](docs/screens/88_pcr_detail.webp) | ![UI Design](docs/screens/89_ui_ai_designer.webp) | ![구동 방식](docs/screens/91_install_motor.webp) |
 
 <br>
 
@@ -303,12 +305,19 @@ flowchart TB
 
 ## 🚀 로컬 실행
 
-Docker 만 있으면 된다.
+Docker 만 있으면 된다. **설치 → 실행 → 시연** 세 단계:
 
 ```bash
+git clone https://github.com/parksubeom99/EDIM.git && cd EDIM
 AUTH_SECRET=$(openssl rand -base64 32) docker compose -f docker-compose.prod.yml up -d --build
-# → http://localhost:3000/login
+docker compose -f docker-compose.prod.yml ps
 ```
+
+1. **설치** — 저장소만 받는다(이미지 빌드가 의존성을 담는다).
+2. **실행** — `db`(healthy) → `migrate`(Exited 0 · 마이그레이션 + 샘플 시드) → `web`(Up) 순서. 운영 모드(`next start`)다.
+3. **시연** — http://localhost:3000/login → 아래 샘플 계정 → `/workbench` 에서 코드 조립 → BOM Run → Cost → Document · Design. 장면 순서는 [`docs/DEMO.md`](docs/DEMO.md).
+
+AI 키가 없어도 모든 화면이 돈다(결정론 폴백 · [`DEPLOY.md` 7절](docs/DEPLOY.md)). 회사 실자료(카탈로그 · CAD 규칙서 · PCR 요율표)는 **파일만 바꿔** 넣는다 → [`DEPLOY.md` 9절](docs/DEPLOY.md).
 
 **샘플 계정**(공개 데모용 · 실제 계정 아님) — 비밀번호는 모두 `edim-demo-2026`
 
@@ -344,19 +353,19 @@ pnpm dev                                  # http://localhost:3000
 
 | 층 | 대상 | 수 | 무엇을 못 박는가 |
 |---|---|:---:|---|
-| 단위 | `bom-code` | 33 | 코드 관계 → BOM 산출 · 설계 검증 규칙(표 · 매크로) |
+| 단위 | `bom-code` | 58 | 코드 관계 → BOM 산출 · 설계 검증 규칙(표 · 매크로) · CAD 규칙서(세부 치수 · 구동 방식 · 방향 결합) |
 | 단위 | `macro-dsl` | 54 | 파서 · 실행기 · 함수 의미 · 오류 경로 |
 | 단위 | `macro-verify` · `macro-compile` · `macro-registry` | 19 · 13 · 15 | 정적 검사 · 시험 실행 · 역번역 · 승인/개정 규칙 |
 | 단위 | `hierarchy-address` | 18 | Work Hierarchy 주소 해석 |
-| 단위 | `apps/web` | 143 | 학습 AI(숨긴 공식 복원 · 잡음 검출 · 도구 수명주기 · 유사도) · 팬 선정(손 계산 대조) · 단가 기준일 · Office 내보내기 · 인쇄 양식 등 |
+| 단위 | `apps/web` | 168 | 학습 AI(숨긴 공식 복원 · 잡음 검출 · 도구 수명주기 · 유사도) · 팬 선정(손 계산 대조) · 단가 기준일 · Office 내보내기 · 인쇄 양식 · PCR 요율표 · UI Form(쓰기 · 결정론 설계) 등 |
 | 단위 | `auth` | 2 묶음 | scrypt 해시(잘린 해시 거부 포함) · 회사 결정 |
-| DB | `rls` · `platform` · `learning` · `special` | 11종 중 4 | 회사 격리 · 플랫폼 ↔ 회사 권한 교차 0 · 투영 · 부여는 함수로만 · 원자료 보호 · 사용 기록 불변 |
-| DB | `revision` · `macro` | 11종 중 2 | 코드 개정 append-only · 매크로 승인 · 개정 번호 규칙 |
-| DB | `drawing` · `document` · `project` · `backbone` · `hierarchy` | 11종 중 5 | 발행 · 발주 잠금이 **앱을 우회해도** 걸린다 · 스냅샷 참조 무결성 |
-| e2e | `scripts/demo_e2e.py` | **348** | 화면 + API + DXF(ezdxf) · Word/Excel(python-docx · openpyxl) 파싱 · 학습 → 투영 → 채택 · Special 과금 · 새 API 마다 열람자 403 · 타사 404 |
+| DB | `rls` · `platform` · `learning` · `special` · `consulting` | 12종 중 5 | 회사 격리 · 플랫폼 ↔ 회사 권한 교차 0 · 투영 · 부여는 함수로만 · 원자료 보호 · 사용 기록 불변 |
+| DB | `revision` · `macro` | 12종 중 2 | 코드 개정 append-only · 매크로 승인 · 개정 번호 규칙 |
+| DB | `drawing` · `document` · `project` · `backbone` · `hierarchy` | 12종 중 5 | 발행 · 발주 잠금이 **앱을 우회해도** 걸린다 · 스냅샷 참조 무결성 |
+| e2e | `scripts/demo_e2e.py` | **383** | 화면 + API + DXF(ezdxf) · Word/Excel(python-docx · openpyxl) 파싱 · 학습 → 투영 → 채택 · Special 과금 · 새 API 마다 열람자 403 · 타사 404 |
 
-> **머지 게이트**(모든 기능 브랜치): typecheck 11 패키지 → 단위 전부 → DB 초기화 후 DB 검증 11종 → e2e **개발 모드 1회 + 운영 모드 1회**(운영 중 `pg_stat_activity` 기록) → fast-forward 머지 → 머지된 main 에서 한 번 더.
-> **CI**: GitHub Actions — typecheck · 단위 · DB 검증 11종 (위 배지).
+> **머지 게이트**(모든 기능 브랜치): typecheck 11 패키지 → 단위 전부 → DB 초기화 후 DB 검증 12종 → e2e **개발 모드 1회 + 운영 모드 1회**(운영 중 `pg_stat_activity` 기록) → fast-forward 머지 → 머지된 main 에서 한 번 더.
+> **CI**: GitHub Actions — typecheck · 단위 · DB 검증 12종 (위 배지).
 
 <br>
 
@@ -415,18 +424,19 @@ pnpm dev                                  # http://localhost:3000
 | 학습 AI 1수준 | 발췌 · 정렬화 · 공식 탐구 · 사람 승인 · 단방향 투영 · 로컬 AI(선택) | 09-29 | ✅ |
 | Special 첫 사례 | 팬 선정 — 의뢰 · 부여 · 결정론 계산 · 사용 기록 · 과금 | 09-29 | ✅ |
 | D 청크 | CPQ 고도 계산 연결(BOM Run 안 Special) · CAD 1단계(세부 치수 · 규칙서 샘플 · 설계 심볼 · 부품 정보) · 컨설팅 두 트랙 | 09-30 | ✅ |
+| 마감 M | PCR 세부(Business Type · 샘플 요율표) · UI Form(저장·삭제·등록 · Canvas · Call · 노드별 UI · UI 개발 AI 결정론) · 구동 방식 · 방향 결합 · 파일 교체 경로 · 운영 킷 규칙 파일 | 09-30 | ✅ |
 | 다음 | MRP/작업지시 · 공정 · 품질 · 모바일 승인 · QR | — | ⏳ |
 
-청사진 70쪽 대조: 구현 대상 51쪽 중 **실동 34 · 부분 12 · 미착수 5**(확정판) → 최신 초안 **실동 37 · 부분 10 · 미착수 4**(재측정 전). 쪽마다 "있는 것 / 없는 것"은 [`page-map.md`](docs/00-corpus/page-map.md).
+청사진 70쪽 대조: 구현 대상 51쪽 중 **실동 38 · 부분 9 · 미착수 4**(엘 확정판 4 · 09-30) → ccmd M 초안 **실동 42(그중 실동(샘플) 3) · 부분 5 · 미착수 4**(엘 재측정 전). 쪽마다 "있는 것 / 없는 것"은 [`page-map.md`](docs/00-corpus/page-map.md).
 
 <br>
 
 ## ⚠️ 정직 고지
 
 - 실측 환경: Windows 11 로컬(Node 24 · pnpm 9.15.4 · Docker PG16 · Python 3.12) · Linux 샌드박스 재측정 · GitHub Actions CI. **클라우드 배포는 0회**(배포 킷까지).
-- **단가 · 기술 표 · 치수 표 · CAD 규칙 · 원가 배율 · 학습용 도면 68장과 기술문서 · 팬 성능표와 Special 단가는 모두 샘플**이다(파일 이름 · 화면에 '샘플' 표지). 실 견적은 회사 단가표가 들어와야 한다.
+- **단가 · 기술 표 · 치수 표 · CAD 규칙(구동 방식 · 방향 결합 포함) · 원가 배율 · PCR 요율표 · 학습용 도면 68장과 기술문서 · 팬 성능표와 Special 단가는 모두 샘플**이다(파일 이름 · 화면에 '샘플' 표지). 실 견적은 회사 단가표가 들어와야 한다 — 파일 교체 경로는 [`DEPLOY.md` 9절](docs/DEPLOY.md).
 - 도면은 선과 글자 수준(뷰 여섯 종 · 주석)이며 제작도 깊이가 아니다. EDIM 안의 CAD 편집기는 아직 없다.
-- 자연어 → 매크로 번역은 **경로와 인터페이스만** 있고 실모델 호출은 0회다. 로컬 AI 는 플랫폼 학습 작업의 이름 맞추기 · 설명에만 쓰이고, 켜야 돈다(CI 는 꺼진 채).
+- 자연어 → 매크로 번역은 **경로와 인터페이스만** 있고 실모델 호출은 0회다. UI 개발 AI(p25)도 지금은 **결정론 설계기**다(AI 키 없음 → 규칙으로 설계 · 화면에 표기). 로컬 AI 는 플랫폼 학습 작업의 이름 맞추기 · 설명에만 쓰이고, 켜야 돈다(CI 는 꺼진 채).
 - 학습 AI 는 1수준이다 — 도면의 글자 · 선에서 뽑는다. 스캔 도면 OCR · 3D 형상 · PDF 문서 해석 · 비선형 규칙은 없다.
 - 이 프로젝트는 AI 코딩 에이전트와 함께 개발했다. 요구사항 · 설계 결정 · 승인 · 검증 게이트 설계와 판정은 사람이 맡았다 → [`docs/ai/agentic-development.md`](docs/ai/agentic-development.md)
 
@@ -439,11 +449,11 @@ pnpm dev                                  # http://localhost:3000
 |---|---|
 | `apps/web` | Next.js — 화면 + API(run · dxf · documents · purchase-requests · setup · platform · learning · special …) |
 | `apps/web/app/lib/learning` · `lib/special` | 학습 AI(도구 등록부 · 발췌 · 정렬 · 공식 탐구 · 유사도 · 로컬 AI) · 팬 선정 계산 |
-| `packages/bom-code` | 코드 관계 → BOM 순수 엔진 · 설계 검증 규칙 · 데모 카탈로그 |
+| `packages/bom-code` | 코드 관계 → BOM 순수 엔진 · 설계 검증 규칙 · 샘플 파일(`catalog/` 카탈로그 · `cad-rules/` CAD 규칙서 · `cost-rules/` PCR 요율표 — 회사 파일 `*.local.json` 으로 교체) |
 | `packages/macro-*` | DSL(파서 · 실행기) · 검증기 · 역번역 · 등록부 |
-| `packages/db` | Prisma 스키마 · 마이그레이션 0001~0034 · RLS · 트리거 · DB 검증 스크립트 · 샘플 학습 도면 · 샘플 팬 성능표 |
+| `packages/db` | Prisma 스키마 · 마이그레이션 0001~0037 · RLS · 트리거 · DB 검증 스크립트 · 샘플 학습 도면 · 샘플 팬 성능표 |
 | `packages/auth` · `hierarchy-address` · `core-ontology` · `ui` | 세션 · 주소 · 도메인 타입 · 디자인 시스템 |
-| `scripts/demo_e2e.py` · `make_learning_samples.ts` | 348단계 시나리오 e2e · 샘플 학습 도면 생성(시드 고정) |
+| `scripts/demo_e2e.py` · `make_learning_samples.ts` · `file_swap_check.py` | 383단계 시나리오 e2e · 샘플 학습 도면 생성(시드 고정) · 파일 교체 전후 화면 확인 |
 | `docs/architecture` · `ai` · `adr` · `assets` | 구조 · AI 설계 · 설계 결정 · README 그림(`make_readme_art.py`) |
 | `docs/00-corpus` | 청사진 쪽 지도 · 설계 코퍼스 |
 | `docs/01-design` · `04-decisions` | 단계별 설계서 · 제품 결정 로그 |

@@ -223,3 +223,15 @@ ccmd K(main `a3b1853` KA · `da10672` KC · KB 는 이 절과 같은 브랜치)�
 
 - 합계(CC 주장): **이어짐 14 · 약함 0 · 없음 0 (총 14).** 엘 판정 전.
 - 곁가지(연결 칸 아님 · 참고): KC 세부 치수 · CAD 규칙서도 스냅샷(`dims.detail` · `dims.cadRules`)을 통해서만 도면에 닿는다(S76) · KB 컨설팅은 회사 **자기** 스냅샷만 읽고, 벤치마킹은 DB 함수가 집계 숫자만 준다(`consulting:test` · S79).
+
+## 2026-09-30 ccmd M 이후 (CC 주장 — 엘 판정 전)
+엘 확정판 4(09-30)가 위 ccmd J · K 절의 두 칸(DB①→DB② · Special→MainForm)을 **이어짐**으로 확정했다 — 합계 **이어짐 14 · 약함 0 · 없음 0**. ccmd M 은 14칸의 판정을 바꾸지 않는다(새 '없음' · '약함' 0). 대신 칸 사이를 한 줄 더 잇는 곁가지가 넷 생겼다(연결 칸 아님 · 참고 — 기준은 위 '판정 기준' 그대로):
+
+| 곁가지 | 흐름 | 근거 |
+|---|---|---|
+| Work Hierarchy 노드 → 사용자 UI Form → 매크로 Run (p21 · p26) | UI Design 작업장에서 폼의 `spec.nodes` 에 노드를 붙인다 → 작업대에서 그 노드를 고르면 Inspector · Toolbox UI Tool 탭에 그 폼 → 실행 설정 Call = **그 노드의** 승인 매크로를 Combo 값(= 코드 슬롯)으로 실행(`POST /api/run/edim` — 기존 경로 그대로) | e2e S81b · S81e |
+| 사용자 UI Form → Set-Up 제품 표 → BOM (p25) | 버튼 저장 · 삭제 · 등록이 대상 표 한 행을 서버가 쓴다(`POST /api/ui-forms/[id]/run` — 저장된 폼으로 판정 · `parseTables` · 감사) → 같은 표를 BOM · 매크로가 읽는다. 사람이 Set-Up 화면에 다시 치지 않는다 | e2e S81c · S81d |
+| BOM 스냅샷 → 견적 PCR 세부 (p66) | 스냅샷 재료비 · 인건비 = Ex-Work · Manufacturing 줄 · 견적 금액 = 스냅샷 원가 그대로 → 요율표(파일)로 Business Type 열 · 요율표 판 · 지문이 견적 body 에 박힌다(앞 견적 불변) | e2e S80a~c |
+| Arrangement(구동 방식 · 방향) → 스냅샷 → 조립도 모터 자리 (p36) | 구획의 `install` · `dir` → `dims.sections` → CAD 규칙서(`installation` · `direction`)로 모터 mm 자리 → 앞 스냅샷 도면 불변 | e2e S82a~d |
+
+- 합계(CC 주장 · 엘 확정판 4 그대로): **이어짐 14 · 약함 0 · 없음 0 (총 14).**
