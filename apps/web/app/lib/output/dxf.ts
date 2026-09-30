@@ -96,18 +96,21 @@ export interface DxfCad {
 function cadEntities(cad: DxfCad, secs: { name: string; len: number; dir?: string; components?: { code: string; at: string; level: string }[] }[], offs: number[], W: number): { s: string; n: number } {
   let s = ""; let n = 0;
   const compAt = new Map<string, { x: number; y: number }>();
+  const labels: { x: number; y: number; h: number; v: string }[] = [];
   secs.forEach((sec, i) => {
     for (const d of datumMm(cad.rules, offs[i]!, sec.len, W, sec.dir)) {
       s += line(d.x - 60, d.y, d.x + 60, d.y, "CADRULE") + line(d.x, d.y - 60, d.x, d.y + 60, "CADRULE"); n += 2;
-      s += text(d.x + 70, d.y + 20, 40, `${d.name.toUpperCase()} ${d.x},${d.y}`, "CADRULE"); n++;
+      labels.push({ x: d.x + 70, y: d.y + 20, h: 40, v: `${d.name.toUpperCase()} ${d.x},${d.y}` });
     }
     for (const c of sec.components ?? []) {
       const p = componentMm(cad.rules, offs[i]!, sec.len, W, c.at as At, c.level as Level);
       if (!compAt.has(c.code)) compAt.set(c.code, p);
       s += circle(p.x, p.y, 40, "CADRULE"); n++;
-      s += text(p.x + 50, p.y - 20, 45, `${c.code.toUpperCase()} @${p.x},${p.y}`, "CADRULE"); n++;
+      labels.push({ x: p.x + 50, y: p.y - 20, h: 45, v: `${c.code.toUpperCase()} @${p.x},${p.y}` });
     }
   });
+  // ccmd L · LB-2 — CADRULE 글자끼리 겹치면(기준점 Shaft 와 가운데 부품 좌표처럼) 뒤 글자를 한 줄씩 아래로 비킨다(결정론 · 순서 = 위 등록 순서)
+  for (const l of placeLabels(labels)) { s += text(l.x, l.y, l.h, l.v, "CADRULE"); n++; }
   const anchorX = (target: string): number => {
     const i = secs.findIndex((x) => x.name === target);
     if (i >= 0) return datumMm(cad.rules, offs[i]!, secs[i]!.len, W, secs[i]!.dir).find((d) => d.name === cad.rules.detail.anchor)?.x ?? offs[i]!;

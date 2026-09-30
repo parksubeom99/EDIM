@@ -59,13 +59,20 @@ export function AnnotEditor({ drawingId, svg, frame, locked, canEdit }: { drawin
   }
   const X = (x: number) => x - frame.minX + frame.pad, Y = (y: number) => frame.maxY - y + frame.pad;
 
+  // ccmd L · LB-1 — 저장 요청 · 다시 읽기가 도는 동안 data-busy="1"(화면 동작은 그대로 · 시험이 이 값을 기다린다)
+  const [busy, setBusy] = useState(0);
   async function call(url: string, method: string, body: unknown, okText: string) {
-    setMsg(null);
-    const r = await fetch(url, { method, headers: { "content-type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) });
-    const j = (await r.json().catch(() => ({}))) as { error?: string };
-    setMsg(r.ok ? { ok: true, text: okText } : { ok: false, text: `거부 (${r.status}): ${j.error ?? ""}` });
-    await load();
-    return r.ok;
+    setBusy((n) => n + 1);
+    try {
+      setMsg(null);
+      const r = await fetch(url, { method, headers: { "content-type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) });
+      const j = (await r.json().catch(() => ({}))) as { error?: string };
+      setMsg(r.ok ? { ok: true, text: okText } : { ok: false, text: `거부 (${r.status}): ${j.error ?? ""}` });
+      await load();
+      return r.ok;
+    } finally {
+      setBusy((n) => n - 1);
+    }
   }
 
   function down(ev: RPE<SVGSVGElement>) {
@@ -143,7 +150,7 @@ export function AnnotEditor({ drawingId, svg, frame, locked, canEdit }: { drawin
 
   const tools: ("select" | AnnotKind)[] = ["select", "line", "rect", "text", "dim"];
   return (
-    <section data-testid="annot-editor" data-ready={ready ? "1" : "0"} data-count={rows.length} data-locked={locked ? "1" : "0"} style={{ display: "grid", gap: 10, marginTop: 10 }}>
+    <section data-testid="annot-editor" data-ready={ready ? "1" : "0"} data-count={rows.length} data-locked={locked ? "1" : "0"} data-busy={busy > 0 ? "1" : "0"} style={{ display: "grid", gap: 10, marginTop: 10 }}>
       <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
         {tools.map((t) => <button key={t} type="button" data-testid={`annot-tool-${t}`} disabled={!editable} onClick={() => { setTool(t); setSel(null); }} style={btn(tool === t)}>{t === "select" ? "고르기·옮기기" : ANNOT_LABEL[t]}</button>)}
         <input data-testid="annot-text-input" value={label} disabled={!editable} onChange={(e) => setLabel(e.target.value)} placeholder="글자 주석" style={{ fontSize: "var(--fs-12)", padding: "4px 7px", border: "1px solid var(--line)", borderRadius: 4, width: 180 }} />

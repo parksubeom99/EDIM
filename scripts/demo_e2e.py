@@ -1936,15 +1936,24 @@ with sync_playwright() as p:
     P=lambda fx,fy: (ob["x"]+ob["width"]*fx, ob["y"]+ob["height"]*fy)
     def drag_on(a,b_):
         pg.mouse.move(*a); pg.mouse.down(); pg.mouse.move(*b_, steps=6); pg.mouse.up()
-    def want_count(n): pg.wait_for_selector(f"[data-testid=annot-editor][data-count='{n}']",timeout=30000)
-    pg.click("[data-testid=annot-tool-line]"); drag_on(P(.2,.7),P(.6,.7)); want_count(1)
-    pg.click("[data-testid=annot-tool-rect]"); drag_on(P(.3,.2),P(.5,.4)); want_count(2)
-    pg.click("[data-testid=annot-tool-text]"); pg.fill("[data-testid=annot-text-input]","용접 주의"); pg.mouse.click(*P(.7,.3)); want_count(3)
-    pg.click("[data-testid=annot-tool-dim]"); drag_on(P(.1,.85),P(.8,.85)); want_count(4)
+    def want_count(n,t=30000): pg.wait_for_selector(f"[data-testid=annot-editor][data-count='{n}']",timeout=t)
+    def idle(): pg.wait_for_selector("[data-testid=annot-editor][data-busy='0']",timeout=30000)
+    # ccmd L · LB-1 — 도구를 누르기 전 저장 · 다시 읽기가 끝나기를(data-busy='0') 기다린다. 끌기 뒤 5초 안에 개수가 안 늘면
+    # 같은 끌기를 1회만 다시 하고, 다시 한 사실을 S69a 단언 값에 남긴다(조용히 통과하지 않는다).
+    retry69=[]
+    def drag_tool(tool,a,b_,n):
+        idle(); pg.click(f"[data-testid=annot-tool-{tool}]"); drag_on(a,b_)
+        try: want_count(n,5000)
+        except Exception:
+            retry69.append(tool); idle(); drag_on(a,b_); want_count(n)
+    drag_tool("line",P(.2,.7),P(.6,.7),1)
+    drag_tool("rect",P(.3,.2),P(.5,.4),2)
+    idle(); pg.click("[data-testid=annot-tool-text]"); pg.fill("[data-testid=annot-text-input]","용접 주의"); pg.mouse.click(*P(.7,.3)); want_count(3)
+    drag_tool("dim",P(.1,.85),P(.8,.85),4)
     nuke(pg); pg.screenshot(path=f"{OUT}/79_draw_module.png",full_page=True)
     AN=DRW+f"/{DID}/annotations"; rows=ctx.request.get(AN).json()["rows"]
     ok("S69a 도면 위에 선 · 사각형 · 글자 · 치수선을 끌어/눌러 더한다 — 도면 좌표(mm)로 저장",
-       sorted((r["kind"], r.get("text")) for r in rows), sorted(r["kind"] for r in rows)==["dim","line","rect","text"] and [r["text"] for r in rows if r["kind"]=="text"]==["용접 주의"])
+       (sorted((r["kind"], r.get("text")) for r in rows), "다시 끈 도구", retry69), sorted(r["kind"] for r in rows)==["dim","line","rect","text"] and [r["text"] for r in rows if r["kind"]=="text"]==["용접 주의"])
     ln0=[r for r in rows if r["kind"]=="line"][0]
     pg.click("[data-testid=annot-tool-select]")
     lb=pg.locator(f"[data-testid=annot-{ln0['id']}]").bounding_box(); drag_on((lb["x"]+lb["width"]/2, lb["y"]+lb["height"]/2),(lb["x"]+lb["width"]/2+80, lb["y"]+lb["height"]/2))
