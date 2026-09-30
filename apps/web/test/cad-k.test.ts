@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { parseCadRules } from "@edim/bom-code";
-import { buildAssemblyDxf, type DxfInput, type DxfCad } from "../app/lib/output/dxf";
+import { buildAssemblyDxf, placeLabels, type DxfInput, type DxfCad } from "../app/lib/output/dxf";
 import { readDxfEntities, dxfToSvg } from "../app/lib/output/dxf-svg";
 import { validatePrims, validatePlace, expand, symbolEntities, withSymbols } from "../app/lib/symbol";
 import { partInfoOf } from "../app/lib/part-info";
@@ -98,5 +98,25 @@ describe("KC-4 부품 정보(스냅샷 기준)", () => {
     expect(items[1]!.assembly).toEqual({ order: 2, of: 2, section: "Fan" });
     expect(items[1]!.remarksInfo).toBe("주의사항 1 · DWG 1 · 세부 치수 C=350");
     expect(items[1]!.supplier).toBe("샘플 모터");
+  });
+});
+
+describe("ccmd L · LB-2 CADRULE 글자 겹침", () => {
+  const box = (l: { x: number; y: number; h: number; v: string }) => ({ x0: l.x, x1: l.x + l.v.length * l.h * 0.6, y0: l.y, y1: l.y + l.h });
+  it("겹치는 글자는 한 줄씩 아래로 · 안 겹치는 글자는 그대로 · 같은 입력 = 같은 답 · 결과 상자 교차 0", () => {
+    const L = [
+      { x: 100, y: 500, h: 40, v: "SHAFT 100,500" },
+      { x: 120, y: 510, h: 45, v: "SFN 1 @120,510" },
+      { x: 5000, y: 500, h: 40, v: "FAR 5000,500" },
+    ];
+    const a = placeLabels(L), b = placeLabels(L);
+    expect(a).toEqual(b);
+    expect(a[0]).toEqual(L[0]);
+    expect(a[2]).toEqual(L[2]);
+    expect(a[1]!.y).toBeLessThan(L[1]!.y);
+    for (let i = 0; i < a.length; i++) for (let j = i + 1; j < a.length; j++) {
+      const p = box(a[i]!), q = box(a[j]!);
+      expect(p.x0 < q.x1 && q.x0 < p.x1 && p.y0 < q.y1 && q.y0 < p.y1).toBe(false);
+    }
   });
 });

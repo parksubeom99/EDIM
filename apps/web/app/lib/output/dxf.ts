@@ -93,6 +93,20 @@ export interface DxfCad {
  *   DIM    : 세부 치수선 — 대상 구획의 anchor 기준점(또는 대상 부품의 mm 중심)에서 값만큼, 외형 위 띠에 한 줄씩
  *   KAD    : KAD-□ 슬롯 줄(샘플 대응표 · RCCS 문법 미확정) + 규칙서 판 · 지문
  */
+/** ccmd L · LB-2 — 글자 상자(폭 ≈ 글자 수 × 높이 × 0.6 · 높이 h)가 앞서 놓인 글자와 겹치면 한 줄(1.2h)씩 아래로 비킨다.
+ * 결정론: 들어온 순서대로 놓고, 겹침이 없어질 때까지 같은 규칙으로만 움직인다. 안 겹치는 글자는 자리 그대로(바이트 불변). */
+export function placeLabels<T extends { x: number; y: number; h: number; v: string }>(labels: T[]): T[] {
+  const box = (l: T) => ({ x0: l.x, x1: l.x + l.v.length * l.h * 0.6, y0: l.y, y1: l.y + l.h });
+  const hit = (a: ReturnType<typeof box>, b: ReturnType<typeof box>) => a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1;
+  const out: T[] = [];
+  for (const l of labels) {
+    let cur = l;
+    for (let k = 0; k < 50 && out.some((o) => hit(box(cur), box(o))); k++) cur = { ...cur, y: Math.round(cur.y - cur.h * 1.2) };
+    out.push(cur);
+  }
+  return out;
+}
+
 function cadEntities(cad: DxfCad, secs: { name: string; len: number; dir?: string; components?: { code: string; at: string; level: string }[] }[], offs: number[], W: number): { s: string; n: number } {
   let s = ""; let n = 0;
   const compAt = new Map<string, { x: number; y: number }>();

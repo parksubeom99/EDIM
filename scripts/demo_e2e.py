@@ -2337,6 +2337,14 @@ with sync_playwright() as p:
     ok("S76e 기존 시연 제품(EU)은 세부 치수 · 규칙서를 쓰지 않는다 — 스냅샷에 detail · cadRules 없음 · 조립도에 CADRULE · KAD 레이어 없음",
        (("detail" in (s76e.get("dims") or {})), ("cadRules" in (s76e.get("dims") or {})), dxf_stats(asm76e)["layers"]),
        "detail" not in (s76e.get("dims") or {}) and "cadRules" not in (s76e.get("dims") or {}) and not ({"CADRULE","KAD"} & set(dxf_stats(asm76e)["layers"])))
+    # ccmd L · LB-2 — CADRULE 층 글자 상자(폭 = 글자 수 × 높이 × 0.6)끼리 교차 0 (ezdxf 실측)
+    def text_boxes(txt, layer):
+        return [(e.dxf.insert.x, e.dxf.insert.x+len(e.dxf.text)*e.dxf.height*0.6, e.dxf.insert.y, e.dxf.insert.y+e.dxf.height, e.dxf.text)
+                for e in ezdxf.read(io.StringIO(txt)).modelspace() if e.dxftype()=="TEXT" and e.dxf.layer==layer]
+    bx76=text_boxes(asm76,"CADRULE")
+    hit76=[(a[4],b_[4]) for i_,a in enumerate(bx76) for b_ in bx76[i_+1:] if a[0]<b_[1] and b_[0]<a[1] and a[2]<b_[3] and b_[2]<a[3]]
+    ok("S76f CADRULE 층 글자끼리 겹치지 않는다(겹치면 한 줄씩 아래로 · 결정론) — 글자 상자 교차 0 · 글자 내용은 그대로",
+       (len(bx76), hit76, sorted(b_[4] for b_ in bx76)==cad76), len(bx76)>0 and not hit76 and sorted(b_[4] for b_ in bx76)==cad76)
     # ── S77 KC-3 (ccmd K) — p58 설계 심볼 라이브러리: 놓기 · 옮기기 · 회전 · 지우기 · DXF SYMBOL 레이어 · 발행 도면 잠금 ──
     DRW=BASE+"/api/drawings"
     d77=ctx.request.post(DRW,headers=J0,data=json.dumps({"runId":rid76,"type":"assembly"})).json(); D77=d77.get("id"); SY=DRW+f"/{D77}/symbols"
