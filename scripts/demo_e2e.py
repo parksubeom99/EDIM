@@ -342,7 +342,9 @@ with sync_playwright() as p:
     ok("S28b 추적: Rev A 슬롯으로 돌린 BOM 은 코드 개정 Rev A 까지 거슬러 올라간다 · 그 BOM 은 미승인", ((ta.get("codeRevision") or {}).get("rev"), ta.get("approved")), (ta.get("codeRevision") or {}).get("rev")==1 and ta.get("approved") is False)
     ok("S28e F 가 붙은 실행(S18 의 RUN1 = 630SS-1-21-13-15)도 근거 개정이 있다 — Rev A (F 포함 전엔 빈 값이었다)", ((t1.get("codeRevision") or {}).get("rev"), (t1.get("codeRevision") or {}).get("code")), (t1.get("codeRevision") or {}).get("rev")==1 and str((t1.get("codeRevision") or {}).get("code","")).endswith("1-21-13-15"))
     other=[x for x in ctx.request.get(BASE+"/api/purchase-requests").json().get("rows",[]) if x.get("id")!=pj.get("id")][0]; ONO=other["prNo"]
-    nuke(pg); pg.click(f"[data-testid='pr-trace-{PRNO}']", force=True); time.sleep(1.5); nuke(pg); pg.click(f"[data-testid='pr-trace-{ONO}']", force=True); time.sleep(1.5)
+    # ccmd M — 고정 1.5초 두 번 대신 추적 패널 수를 기다린다(09-30 실측: 개발 서버가 느린 순간 두 번째 패널이 1.5초 안에 안 떠 ['1'] 로 실패)
+    _ntrace=lambda n_: pg.wait_for_function("(n)=>document.querySelectorAll('[data-testid=pr-trace]').length>=n", arg=n_, timeout=30000)
+    nuke(pg); pg.click(f"[data-testid='pr-trace-{PRNO}']", force=True); _ntrace(1); nuke(pg); pg.click(f"[data-testid='pr-trace-{ONO}']", force=True); _ntrace(2)
     tp=[(e.get_attribute("data-approved"), e.inner_text()) for e in pg.query_selector_all("[data-testid=pr-trace]")]
     ok("S28c 화면: 추적 패널이 승인된 BOM 과 미승인 BOM 을 가려 보여 준다", [x[0] for x in tp], sorted(x[0] for x in tp)==["0","1"] and any("승인된 BOM" in x[1] and "매크로" in x[1] for x in tp))
     OCARD=f"[data-testid=pr-card]:has([data-testid='pr-export-{ONO}'])"
@@ -2557,13 +2559,55 @@ with sync_playwright() as p:
     pg.wait_for_selector("[data-testid=toolbox-node-forms][data-ready='1']",timeout=30000); tbn81=pg.get_attribute("[data-testid=toolbox-node-forms]","data-count")
     ok("S81e p26 · p21 Work Hierarchy 노드별 UI — 작업대에서 PS-61313-5 를 고르면 Inspector 에 붙인 폼 · 열어 찾기(Item 10 → 1행) · 실행 설정 Call = 이 노드의 승인 매크로 실행 · Toolbox UI Tool 탭에도 같은 폼",
        (find81[:40], call81[:60], tbn81), "찾기" in find81 and "매크로 실행" in call81 and "승인 매크로" in call81 and tbn81=="1")
+    # ── S82 (ccmd M · p36) — Installation Code(구동 방식 DD · BI · BA) · 방향 L0~R270 ↔ 기준점 결합 · 편집 화면 — 모터 자리는 CAD 규칙서(샘플 파일)가 정한다 ──
+    ARR=BASE+"/api/setup/arrangement"
+    arr0=ctx.request.get(ARR+"?code=SPF").json().get("sections",[])      # 끝나면 되돌릴 원래 배치
+    def arr_body(secs_):
+        return {"code":"SPF","sections":[{k_:v_ for k_,v_ in {"name":x_["name"],"len":x_.get("len"),"dir":x_.get("dir"),"install":x_.get("install"),"components":x_.get("components",[])}.items() if v_ is not None} for x_ in secs_]}
+    pg.goto(BASE+"/workbench?node=a0000000-0000-4000-8000-000000000002",wait_until="domcontentloaded"); hydrated(pg); nuke(pg)
+    sel82=pg.query_selector_all("[data-testid=code-builder] select"); sel82[0].select_option(value="SPF"); sel82[1].select_option(value="55")
+    pg.locator("button", has_text=re.compile(r"^Design$")).first.click(force=True); wait_sel(pg,"[data-testid=design-canvas][data-loaded='1']"); nuke(pg)
+    def arr_set(dir_, inst_):
+        if not pg.query_selector("[data-testid=arrangement-panel]"):
+            pg.click("[data-testid=arrangement-edit]", force=True); pg.wait_for_selector("[data-testid=arrangement-panel]", timeout=15000)
+        pg.wait_for_selector("[data-testid=arr-inst-Fan]",timeout=30000); nuke(pg)
+        pg.select_option("[data-testid=arr-dir-Fan]",dir_); pg.select_option("[data-testid=arr-inst-Fan]",inst_)
+        with pg.expect_response(lambda r_: r_.url.endswith("/api/setup/arrangement") and r_.request.method=="POST", timeout=30000) as rs_: pg.click("[data-testid=arr-save]", force=True)
+        return rs_.value.status
+    def motor_run():
+        j_=run_spf().json(); rid_=j_.get("runId")
+        a_=ctx.request.get(BASE+f"/api/dxf?runId={rid_}&type=assembly").text(); m_=ctx.request.get(BASE+f"/api/dxf?runId={rid_}&type=assembly&meta=1").json()
+        return rid_, a_, m_
+    def pt(t_):  # "NAME x,y" · "... @x,y" → (x, y)
+        xy_=t_.split("@")[-1].split(" ")[-1].split(","); return (float(xy_[0]), float(xy_[1]))
+    st82a=arr_set("L0","DD"); arrA=[x_ for x_ in ctx.request.get(ARR+"?code=SPF").json().get("sections",[]) if x_["name"]=="Fan"][0]
+    ridA, asmA, metaA = motor_run(); cadA=layer_texts(asmA,"CADRULE")
+    motA=[t_ for t_ in cadA if t_.startswith("MOTOR ")]; shaftA=max((pt(t_) for t_ in cadA if t_.startswith("SHAFT ")), key=lambda q_: q_[0])
+    ok("S82a 편집 화면(Design ▸ Arrangement)에서 Fan 구획 방향 L0 · 구동 방식 DD(Direct Driven) 저장 → BOM Run → 조립도 CADRULE 에 모터 자리 = Fan 기준점 Shaft + (450, 0)(규칙서 샘플) · meta.motors",
+       (st82a, arrA.get("dir"), arrA.get("install"), motA, shaftA, metaA.get("motors")),
+       st82a==200 and arrA.get("dir")=="L0" and arrA.get("install")=="DD" and len(motA)==1 and motA[0].startswith("MOTOR DD DIRECT DRIVEN @")
+       and pt(motA[0])==(shaftA[0]+450, shaftA[1]) and metaA.get("motors")==[{"section":"Fan","install":"DD","dir":"L0","x":shaftA[0]+450,"y":shaftA[1]}])
+    st82b=arr_set("R0","BI"); ridB, asmB, metaB = motor_run(); cadB=layer_texts(asmB,"CADRULE"); L82=metaB.get("lengthMm")
+    motB=[t_ for t_ in cadB if t_.startswith("MOTOR ")]; footB=max((pt(t_) for t_ in cadB if t_.startswith("FOOT ")), key=lambda q_: q_[0])
+    ok("S82b 방향 R0 · 구동 방식 BI(Belt In-Line) → Fan 기준점 Foot 이 구획 안에서 뒤집힌다(전장 − 50) · 모터 = Foot + (−300, 250)(R 이면 dx 반전) — 코드에 좌표 없음(규칙서 installation · direction)",
+       (st82b, L82, footB, motB), st82b==200 and footB==(L82-50, 0.0) and len(motB)==1 and motB[0].startswith("MOTOR BI BELT IN-LINE @") and pt(motB[0])==(L82-50-300, 250.0))
+    st82c=arr_set("L90","BA"); ridC, asmC, metaC = motor_run(); cadC=layer_texts(asmC,"CADRULE")
+    motC=[t_ for t_ in cadC if t_.startswith("MOTOR ")]; footC=max((pt(t_) for t_ in cadC if t_.startswith("FOOT ")), key=lambda q_: q_[0])
+    dxf_png(asmC, f"{OUT}/91_install_motor.png", "SPF 샘플 조립도 — Fan 구획 L90 · Belt Along 모터 자리(CADRULE · 규칙서 샘플) — ezdxf re-render")
+    badI=ctx.request.post(ARR,headers=J0,data=json.dumps({**arr_body(arr0),"sections":[{**x_,"install":"XX"} if x_["name"]=="Fan" else x_ for x_ in arr_body(arr0)["sections"]]}))
+    ok("S82c 방향 L90 · 구동 방식 BA(Belt Along) → 모터 벡터 (0, 650) 이 90° 돌아 Foot + (−650, 0) · 앞 스냅샷(DD) 도면은 그대로 · 구동 방식 값이 아니면 400",
+       (motC, footC, badI.status), len(motC)==1 and motC[0].startswith("MOTOR BA BELT ALONG @") and pt(motC[0])==(footC[0]-650, footC[1])
+       and ctx.request.get(BASE+f"/api/dxf?runId={ridA}&type=assembly").text()==asmA and badI.status==400)
+    rs82=ctx.request.post(ARR,headers=J0,data=json.dumps(arr_body(arr0)))   # 원래 배치로 되돌림(구동 방식 · 방향 없음)
+    ok("S82d 원래 배치로 되돌리면 모터 자리가 도면에서 빠진다(구동 방식을 고르지 않은 제품 · 구획은 옛 도면 그대로)",
+       (rs82.status, [t_ for t_ in layer_texts(motor_run()[1],"CADRULE") if t_.startswith("MOTOR ")]), rs82.status==200 and not [t_ for t_ in layer_texts(motor_run()[1],"CADRULE") if t_.startswith("MOTOR ")])
     # S37 은 맨 끝에서 센다 — 중간(옛 자리)에서는 뒤에 찍히는 5장(40·41·42·52·53)이 아직 없어,
     # 빈 폴더에서는 25장이라 실패하고 이전 실행 잔재가 있을 때만 통과했다(2026-09-24 실측).
     _want=["00_login","05_project_mgmt","06_module_cpq_stub","10_project_bound","11_code_builder","11b_revisions","12_macro_tab",
            "13_macro_approved","14_edim_run","15_bom_cost","16_design_tab","20_setup_subcode","21_setup_product_table",
            "22_setup_relationship","23_codebuilder_from_subcode","30_toolbox_program","31_toolbox_ui_tool","40_company_admin",
            "41_platform_console","42_user_management","43_drawings","44_document_tab","45_purchasing","46_quotation_print",
-           "47_techdata_print","48_dxf_plan","49_dxf_assembly","51_accepted","52_register","53_schedule","54_toolbar","55_project_mgmt","56_print_setup","57_ui_design","58_material","59_arrangement_code","60_spec_input","61_drawing_purpose","62_company_db","63_input_data","64_viewer3d","65_price_to_cost","66_project_contacts","67_partner_edit","68_spec_import","69_code_approval","70_dwg_view","71_techdata_list","72_mfg_rate","73_erp_master","74_sub_drawing","75_output_template","76_coding_list","77_wizards","78_print_layout","79_draw_module","80_macro_verify","81_learning_job","82_formula_cards","83_projection","84_toolbox_suggestion","85_special_request","86_fan_result","87_special_meter","75_cpq_special_bom","75_cpq_special_drawing","76_detail_dim","77_symbol","78_part_info","79_consulting_internal","79_consulting_benchmark","88_pcr_detail","89_ui_ai_designer","90_node_ui_form"]
+           "47_techdata_print","48_dxf_plan","49_dxf_assembly","51_accepted","52_register","53_schedule","54_toolbar","55_project_mgmt","56_print_setup","57_ui_design","58_material","59_arrangement_code","60_spec_input","61_drawing_purpose","62_company_db","63_input_data","64_viewer3d","65_price_to_cost","66_project_contacts","67_partner_edit","68_spec_import","69_code_approval","70_dwg_view","71_techdata_list","72_mfg_rate","73_erp_master","74_sub_drawing","75_output_template","76_coding_list","77_wizards","78_print_layout","79_draw_module","80_macro_verify","81_learning_job","82_formula_cards","83_projection","84_toolbox_suggestion","85_special_request","86_fan_result","87_special_meter","75_cpq_special_bom","75_cpq_special_drawing","76_detail_dim","77_symbol","78_part_info","79_consulting_internal","79_consulting_benchmark","88_pcr_detail","89_ui_ai_designer","90_node_ui_form","91_install_motor"]
     _miss=[w for w in _want if not os.path.exists(f"{OUT}/{w}.png") or os.path.getmtime(f"{OUT}/{w}.png")<T0]
     ok(f"S37 캡처 {len(_want)}장이 이번 실행에서 전부 나온다 (잔재 파일은 세지 않음)", _miss or len(_want), not _miss)
     b.close()
