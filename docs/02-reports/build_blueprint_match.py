@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""EDIM 청사진 70장 대조 보고서 (엘 확정판 4(09-30) + ccmd M CC 초안 — 엘 재측정 전: p21 · p25 · p26 · p36 · p38 · p58 · p66) — 생성기
+"""EDIM 청사진 70장 대조 보고서 — 엘 판정 확정(2026-09-30 · 확정판 5) — 생성기
+
+**판정의 유일한 원천(SSOT)은 이 파일의 PAGES 다**(ccmd M-1 · 09-30). 보고서 HTML · PDF · docs/00-corpus/page-map.md 는
+전부 이 데이터의 출력일 뿐이다 — 판정을 올리거나 내리려면 **여기 PAGES 한 곳만** 고친다(보고서 · page-map 을 손으로 고치지 않는다).
+  검사: python3 build_blueprint_match.py --check   → 저장소의 page-map.md 가 지금 PAGES 의 출력과 한 글자라도 다르면 종료코드 1
+각 쪽은 판정자(judge)와 판정 근거(why — 무엇이 돌아서 / 무엇이 없어서 그 판정인지 한 줄)를 가진다.
 
 왼쪽: 청사진(EDIM.pdf) 원본 쪽  /  오른쪽: 지금 실제로 도는 화면(demo_e2e 산출 스크린샷)
 판정 데이터 PAGES 하나에서 세 가지가 나온다: 다크 HTML(화면용) · 흰 HTML(→ A4 가로 PDF) · docs/00-corpus/page-map.md
@@ -14,11 +19,17 @@ usage: python3 build_blueprint_match.py <corpus_dir> <shots_dir> <out_dir> [main
   C 개념·표지 — 구현 대상이 아닌 장(표지·간지·개념 설명). 반영된 곳이 있으면 적는다
 """
 import base64, html, io, os, sys
-from PIL import Image
 
-CORPUS, SHOTS, OUTDIR = sys.argv[1], sys.argv[2], sys.argv[3]
-MAIN = sys.argv[4] if len(sys.argv) > 4 else "p6"
+CHECK = len(sys.argv) > 1 and sys.argv[1] == "--check"
+if not CHECK:
+    from PIL import Image
+    CORPUS, SHOTS, OUTDIR = sys.argv[1], sys.argv[2], sys.argv[3]
+MAIN = sys.argv[4] if len(sys.argv) > 4 and not CHECK else "—"
 DATE = "2026-09-30"
+PAGE_MAP = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "00-corpus", "page-map.md")
+# 판정자 — 기본은 엘 확정판 4. ccmd M 에서 바뀐 쪽은 회장님 결정(09-30)으로 엘이 확정했다(엘 저장소 실측 아님 · lmd 교차검증).
+JUDGE_4 = "엘 확정판 4 (2026-09-30)"
+JUDGE_M1 = "엘 판정 확정 (2026-09-30 · 회장님 결정) — 엘 저장소 실측 아님 · lmd M 교차검증 기준"
 HERE = os.path.dirname(os.path.abspath(__file__))
 DECK = os.path.join(HERE, "..", "deck")
 
@@ -29,9 +40,18 @@ SECTIONS = [
 ]
 ST = {"L": "실동", "P": "부분", "N": "미착수", "C": "개념·표지"}
 
-def pg(st, tag, title, have=(), gap=(), ev="", shot=None, nx="", sample=False):
+def pg(st, tag, title, have=(), gap=(), ev="", shot=None, nx="", sample=False, judge=None, why=None):
     # sample=True — 실동(샘플): 화면에서 끝까지 돌고 e2e 가 못 박지만 외부 실자료가 없어 샘플로 돈다(D-4 · 화면·문서에 '샘플' 표지). 실동 수에 들고 따로도 센다.
-    return dict(st=st, tag=tag, title=title, have=list(have), gap=list(gap), ev=ev, shot=shot, nx=nx, sample=sample)
+    # judge — 판정자(없으면 JUDGE_4) · why — 판정 근거 한 줄(없으면 판정 데이터에서 만든다: 실동 = 첫 '도는 것', 부분 · 미착수 = 첫 '없는 것')
+    return dict(st=st, tag=tag, title=title, have=list(have), gap=list(gap), ev=ev, shot=shot, nx=nx, sample=sample, judge=judge or JUDGE_4, why=why)
+
+def why_of(m):
+    """판정 근거 한 줄 — 명시한 why, 없으면 판정 데이터에서(지어내지 않는다)."""
+    if m.get("why"): return m["why"]
+    strip = lambda x: x.replace("**", "")
+    if m["st"] == "C": return "구현 대상이 아닌 장(표지 · 간지 · 개념)"
+    if m["st"] == "L": return "도는 것: " + strip(m["have"][0]) if m["have"] else "도는 것 — (데이터 없음)"
+    return "없는 것: " + strip(m["gap"][0]) if m["gap"] else "없는 것 — (데이터 없음)"
 
 # ── 판정 데이터 (청사진 70쪽 전수 정독 2026-09-21 · 2026-09-23 재실측 갱신 · 2026-09-27 ②~⑩ 반영 — CC 초안을 엘이 재측정·확정(main 2d5db0f · e2e 234/234 ×2, KST 새벽 조건 포함) · repo main 실측 · 화면은 스크린샷을 눈으로 확인) ──
 PAGES = {
@@ -67,7 +87,7 @@ PAGES = {
         ["**이메일 + 비밀번호**(0032 · scrypt 해시 · timingSafeEqual) → 세션 → 테넌트 결정 → 역할(RBAC) 가드 ✓", "권한 없는 역할의 등록 시도는 403",
          "틀리면 한 문장('이메일 또는 비밀번호가 맞지 않습니다' — 계정 존재를 흘리지 않음) · **5회/10분 잠금 429** · 비밀번호 없는 옛 계정은 운영 모드에서 거절 · 플랫폼 관리자도 같은 판정"],
         ["SSO — 필요한 입력: 고객사 IdP 주소 · client id (EDIM_OIDC_ISSUER 가 있으면 버튼 자리만 보인다 · docs/DEPLOY.md)", "NOVA Solution 브랜딩 — 회사 로고·문구"],
-        "auth password.test · auth-tenant.test · e2e S0 · S0a~e · S11", "00_login", "SSO 는 고객사 IdP 가 들어오면(CC 초안 — 엘 재측정 전)"),
+        "auth password.test · auth-tenant.test · e2e S0 · S0a~e · S11", "00_login", "SSO 는 고객사 IdP 가 들어오면"),
  12: pg("L", "ERP / Sale / Project Management", "프로젝트 등록·관리",
         ["/m/project — 등록(Registration Process) · 헤더(Type·Client·담당자·Remarks·Description) 수정 · **영업 단계 전이** · 접수 자료(File) 등록·내려받기(②)",
          "Client 를 **Company DB 고객 목록**에서 고르면 id 와 이름이 함께 남는다(⑧ · 옛 글자 데이터 보존)",
@@ -117,7 +137,8 @@ PAGES = {
          "**Special 탭**(ccmd J) — 부여된 회사만 'Special: 팬 선정' · 입력 화면은 회사가 만든 UI Form 그대로",
          "**UI Tool 탭 = 이 노드의 UI Form**(ccmd M) — UI Design 에서 Work Hierarchy 노드에 붙인 폼이 Toolbox UI Tool 탭 · Inspector 에 뜨고 그 자리에서 Run(Canvas 그래프 · 저장·등록 · 매크로 Call 포함)"],
         ["Enterprise DB 호출([EDIM Information Call] — Type of source 로 회사 자료 가져오기) · 직접 입력 DB(공학 자료) — 필요한 결정: 회사 자료 원천(M2)", "회사 실자료 학습 — 지금은 전부 샘플(p23)"],
-        "e2e S13a · S15a~S15c · S72f · S74b · S81e", "90_node_ui_form", "CC 초안(ccmd M) — 엘 재측정 전 · 부분 유지"),
+        "e2e S13a · S15a~S15c · S72f · S74b · S81e", "90_node_ui_form", "회사 자료 원천(M2)이 정해지면 Enterprise DB 호출 · 직접 입력 DB", judge=JUDGE_M1,
+        why="부분: UI Tool 탭 · 학습 제안 · Special 은 돌지만 Enterprise DB 호출 · 직접 입력 DB 가 없다(엘 09-30: 회사 자료 원천 전까지 부분 유지)"),
  22: pg("L", "EDIM Tool programming Process", "① Data Set-up → … → ⑥ Programming → ⑦ 검증·승인",
         ["① 표 등록 → ③ Item 호출 → ④ 작업 대상 호출 → ⑤ Toolbox 호출 → ⑥ 매크로 작성 → ⑦ 검증·승인이 이어져 돈다", "Toolbox 의 Run 이 곧 MainForm 의 Run(같은 값)"],
         ["② 사용자 제작 UI 는 Command button 수준"], "e2e S13a~S13f · S4a~S4c", "30_toolbox_program"),
@@ -127,7 +148,7 @@ PAGES = {
          "**이중 프로젝션** — 승인 공식만 π_user 로 회사 착지 표에 한쪽 방향(SECURITY DEFINER 함수) · 구조 유사도 계기판 · 운영 감시(새 도면이 승인 공식에 어긋나면 계기판)",
          "역류 0 을 DB 권한으로 — learning:test 24"],
         ["3D 형상 학습(상) · 스캔 도면 OCR · PDF → DXF — 필요한 입력: 회사 3D/스캔 자료 · 도면 표준", "일반 서류(ERP 연동 문서) 학습 · PDF 문서 해석 — 필요한 입력: 문서 양식", "실제 회사 도면 — 지금은 전부 샘플(M2 회장님 DXF 연구 결과)"],
-        "learning:test · e2e S72a~h", "82_formula_cards", "CC 초안 — 엘 재측정 전"),
+        "learning:test · e2e S72a~h", "82_formula_cards", "회장님 DXF 연구 · 회사 도면이 들어오면"),
  24: pg("L", "EDIM AI Tool · 도면 DB", "Projects · Drawings · Revisions",
         ["Revisions: 개정 번호(A,B,…)·사유·개정자, **append-only**(앱 역할에 UPDATE/DELETE 권한 없음)", "개정 = **슬롯 A~F 전체 코드**(2026-09-22 회장님 결정) — F 가 붙은 실행도 자기 근거 개정으로 추적된다", "Drawings: 번호·유형·현재 개정·상태(작성중/검토/승인/발행), 발행은 DB 트리거가 잠근다"],
         ["Parts · BOM · Material 테이블은 코드 카탈로그 + BOM 스냅샷 구조로 대체(GAP1 결정)", "scale · size 열 없음"],
@@ -140,14 +161,16 @@ PAGES = {
          "**Canvas**(ccmd M) — 제품 표의 수로 된 열을 그래프로(행을 쓰면 점이 따라 바뀐다) · **실행 설정 Call** — 하이퍼링크(EDIM 안 경로) · 매크로 실행(연결 노드의 승인 매크로 · Combo 값 = 코드 슬롯)",
          "**UI 개발 AI**(ccmd M) — UI Templet 대화 상자(용도 · 항목 · 필요 DB Table) + Application 설명 → 폼 자동 설계. 지금은 **결정론 설계기**(AI 키 없음 → D-6 폴백 · 화면에 표기)"],
         ["실행 설정의 '프로그램 실행 · 개체 실행 · 소리' 는 없다(하이퍼링크 · 매크로 실행만)", "UI 개발 AI 에 실모델을 붙이는 것 — 필요한 입력: AI 키(회장님)"],
-        "e2e S14a · S14b · S44a~f · S74b · S81a~e · ui-form.test", "89_ui_ai_designer", "CC 초안(ccmd M) — 엘 재측정 전"),
+        "e2e S14a · S14b · S44a~f · S74b · S81a~e · ui-form.test", "89_ui_ai_designer", "AI 키가 들어오면 UI 개발 AI 에 실모델(없으면 D-6 결정론 폴백이 정상)", judge=JUDGE_M1,
+        why="실동: 저장·삭제·등록 · Canvas · Call · UI 개발 AI(결정론 · D-6 정상 동작) — e2e S81a~e"),
  26: pg("L", "S-2-1 · Set-Up / EDIM UI Design", "UI Design 작업장",
         ["**/setup/ui 작업장**(④) — 팔레트에서 24×16 캔버스로 끌어다 놓기(겹침 없는 자리 자동) · 위젯별 Set-up · Sample Templet 호출(복사) · 저장·Run",
          "Number 위젯 set-up(입력 이름 · 단위) · Run 에서 숫자 입력(ccmd J)",
          "**Work Hierarchy 노드별 UI**(ccmd M) — 작업장 오른쪽 트리에서 노드를 고르면(spec.nodes) 작업대에서 그 노드를 고를 때 Inspector · Toolbox 에 그 폼이 뜬다 · 매크로 Call 은 그 노드의 승인 매크로",
          "**Object Inspector**(Object · Class — QDialog · QComboBox · QChartView …) · **Signal/Slot**(Combo → 버튼 · 버튼 → 표/매크로/링크 · Number → 열) · Canvas · UI 개발 AI(결정론)(ccmd M)"],
         ["Signal/Slot 은 Set-up 에서 나오는 연결을 보여 주는 표다 — 표에서 직접 잇지는 않는다(잇는 것은 위젯 Set-up)", "Qt Designer 의 Layout · Spacer · 속성 전부(font · palette …)는 없다 — 격자 배치 + 위젯별 Set-up"],
-        "e2e S44a~f · S81a~e · ui-form.test", "89_ui_ai_designer", "CC 초안(ccmd M) — 엘 재측정 전"),
+        "e2e S44a~f · S81a~e · ui-form.test", "89_ui_ai_designer", "", judge=JUDGE_M1,
+        why="실동: Work Hierarchy 노드별 UI · Object Inspector · Signal/Slot · Canvas · UI 개발 AI(결정론) — e2e S81a~e"),
  27: pg("L", "S-2-2 · EDIM Toolbox Macro", "매크로 — 제안 → 검토 → 승인",
         ["Verify(정적 검증 + dry-run) → 초안 → 승인 → revision 상승, 승인본만 공식 Run", "Table 참조 · Flowchart · Description(결정론 역번역) ✓"],
         ["Prompt → Macro 는 경로만 있고 **실모델 호출 0회**(API 키 없음)", "함수 마법사 · 그래프 마법사 · Address 찾기 없음"],
@@ -156,7 +179,8 @@ PAGES = {
         ["조립도에 Item 표와 풍선번호가 들어간다", "Item 표 4열(Item · Description · Q'ty · Remarks info) · 줄 · 풍선번호 **더블클릭 = 부품 정보**(공급처 · 단가 출처 · 조립순서 · 세부 치수 · 주의사항 — 스냅샷 기준)(ccmd K)",
          "KAD 슬롯 줄 — CAD 규칙서의 **샘플 대응표**(슬롯 ↔ 치수 키) · 판 · 지문이 조립도에(ccmd K)"],
         ["KAD 슬롯 문법 = RCCS 결정(회장님 · 사장님) — 지금은 샘플 대응표로 표지", "부품 단위 조립순서"],
-        "e2e S18f · S76a~d · S78a~c", "78_part_info", "엘 확정판 4(09-30) — 부분 → 실동(샘플)", sample=True),
+        "e2e S18f · S76a~d · S78a~c", "78_part_info", "RCCS 문법이 확정되면 KAD 대응표 교체", sample=True,
+        why="실동(샘플): Item 표 · 더블클릭 부품 정보 · KAD 슬롯 줄이 돌고, 남은 것은 KAD 문법(외부 결정)뿐 — 확정판 4 승격"),
  29: pg("C", "간지", "BOM Code Set-Up — 관계형 BOM Code / RCCS™"),
  30: pg("L", "Code Set-Up 개요", "여섯 가지 등록",
         ["Sub Code ✓ · Product code ✓ · Product Code Relationship ✓",
@@ -193,20 +217,22 @@ PAGES = {
          "**Installation Code(구동 방식)**(ccmd M) — 구획마다 Direct Driven · Belt In-Line · Belt Along 을 Design ▸ Arrangement **편집 화면**에서 고른다 → 스냅샷 → 조립도 모터 자리(규칙서 installation = 기준점 + dx · dy)",
          "**방향 L0~R270 ↔ 기준점 결합**(ccmd M) — 규칙서 direction.mirrorR: R 이면 구획 안 기준점이 길이 방향으로 뒤집히고 모터 벡터가 방향 각도만큼 돈다 · 코드에 좌표 없음(파일만 바꾸면 다음 BOM Run 부터)"],
         ["mm 규칙 · 기준점 · 구동 방식 치수는 **샘플 규칙서** — 필요한 입력: 회사 실 CAD 규칙(CAD 담당)", "구획별 치수는 길이 + 세부 치수(A~K) — 폭 · 높이 자체는 제품 전체 값"],
-        "e2e S31c~f · S32d · S38a~f · S40a~f · S76a~d · S82a~d · cad.test", "76_detail_dim", "CC 초안(ccmd M) — 엘 재측정 전", sample=True),
+        "e2e S31c~f · S32d · S38a~f · S40a~f · S76a~d · S82a~d · cad.test", "76_detail_dim", "회사 실 CAD 규칙이 들어오면 규칙서 파일 교체", sample=True, judge=JUDGE_M1,
+        why="실동(샘플): 세부 치수 · 구동 방식 · 방향 ↔ 기준점 결합 · 편집 화면이 돌고 mm 규칙은 샘플 규칙서 — e2e S76 · S82"),
  37: pg("C", "간지", "EDIM Drawing Management — DWG Set-Up",
         ["간지 — 반영: 도면은 뷰 여섯 종 + 용도 구분(⑦) + 브라우저 3D 보기(⑩)까지 같은 BOM 스냅샷에서 나온다"], [], "e2e S48 · S51", "64_viewer3d"),
  38: pg("P", "PLM / Design Drawing / Set-Up / Macro", "치수 전파 — 표를 고치면 도면이 바뀐다",
         ["Key Dimension 표(W·H·L) → DXF. 한 칸 2472→2600 이면 **폭만** 따라 바뀐다(ezdxf 로 파싱해 확인)", "한 번의 저장으로 BOM 수량·원가·구매 수량·도면 폭이 **함께** 바뀌고 앞 스냅샷은 그대로(S30)", "평면도·조립도 2종 · 번호·개정·상태·발행 잠금", "**치수가 BOM 스냅샷에 박힌다(0011)** — 도면은 스냅샷 치수만 읽고, 09-21 의 임시 가드(409)는 걷어냈다(옛 스냅샷은 422)", "**한 칸이 둘 다에 닿는다**: 사양 문자열이 cap.face 대신 dim.W/H 를 읽어, W 한 칸을 고치면 BOM 사양·도면·원가가 함께 바뀐다(S30b2 — 09-21 의 중복 해소)"],
         ["부품도(Sub Item DWG ①~⑤ 개별 도면) — 부품 형상이 없다. 코드별 DWG 첨부(F4) · 하부 도면 표(H5)는 있으나 EDIM 이 그리는 부품도는 없음 — 필요한 입력: 회사 부품 CAD 자료(CAD 담당)",
          "제작도 수준 · 치수선이 연관 치수(DIMENSION) 개체가 아니다(선 + 글자) — 필요한 결정: EDIM 안 CAD 편집기(M4 · M5)", "KAD 슬롯 문법 = RCCS 결정(회장님 · 사장님) — 지금은 샘플 대응표"],
-        "e2e S18a~S18f · S19a~S19e · S30a~g · S31 · S40(설계 검증 422) · S76 · S82 · drawing:test 30", "43_drawings", "ccmd M 분류: 남은 것은 (다) CAD 담당 · 편집기 결정 — 부분 유지"),
+        "e2e S18a~S18f · S19a~S19e · S30a~g · S31 · S40(설계 검증 422) · S76 · S82 · drawing:test 30", "43_drawings", "부품 CAD 자료(CAD 담당) · 편집기 결정(M4 · M5) 후", judge=JUDGE_M1,
+        why="부분: 치수 전파 · 세부 치수 · 모터 자리는 돌지만 부품도(Sub Item DWG) · 제작도 수준 · 연관 치수 개체가 없다"),
  39: pg("L", "Set-Up / PLM / Work Process / Design", "도면 Templet 호출 설정 6단계",
         ["1) Product Item 호출 ✓ · 도면 치수 ✓ · 사용 승인 절차(상태 4단계) ✓", "**용도별 구분**(⑦) — 승인도·제작도·견적도 · 발행 전까지만 용도 변경",
          "**도면 템플릿**(H5) — 제품마다 **하부 도면(Sub Drawing) 호출** · **설계 우선순위**(작을수록 먼저, 같으면 코드 순) · 도면을 뜨는 순간 스냅샷에 있는 하위 코드만 도면에 박힌다",
          "**Macro 로 쓰는 설계 검증**(E6) — 규칙 표 op=macro(값 = 승인 매크로 이름) → 승인 매크로를 스냅샷 값으로 결정론 실행 · 0 이면 위반 → 도면 422 · 없음/미승인/오류도 위반 · 판정은 스냅샷에 박힘"],
         [],
-        "e2e S7 · S18a · S48a~d · S64a~e · S70a~d", "80_macro_verify", "CC 초안 — 엘 재측정 전"),
+        "e2e S7 · S18a · S48a~d · S64a~e · S70a~d", "80_macro_verify", ""),
  40: pg("L", "Work Process / Design", "Call Sub Drawing · Assembling · Detail Design",
         ["조립도 1장에 Item 표 + 풍선번호", "**분해도(Exploded)** — 조립 순서 번호(Arrangement 구획 순서 그대로 · 0013)",
          "**Call Sub Drawing**(H5) — 도면 시트에 하부 도면 표(Item · Description · Q'ty · Remarks · 코드에 첨부한 DWG) · **Detail Design 주의사항** 목록 · 템플릿을 고쳐도 뜬 도면은 그대로"],
@@ -234,7 +260,7 @@ PAGES = {
          "**인쇄 양식 편집기**(H9) — 제목 · 필드 · 표 · 도면 · 그래프 · 서명칸 · 로고 · 글상자를 끌어 배치·크기 조절 → 새 버전 · 인쇄본이 배치를 따르고 **발행본은 발행 순간 버전에 고정**",
          "**File 내보내기(Office)**(E7) — 인쇄본 상단 Word · Excel → 같은 스냅샷 body 를 .docx · .xlsx 로(양식 순서 · 엑셀은 숫자 값 · 합계 SUM 식 · 한글 파일명) · viewer 403"],
         [],
-        "e2e S22c · S43 · S68a~e · S71a~c(python-docx · openpyxl 로 열어 인쇄본과 대조)", "78_print_layout", "CC 초안 — 엘 재측정 전"),
+        "e2e S22c · S43 · S68a~e · S71a~c(python-docx · openpyxl 로 열어 인쇄본과 대조)", "78_print_layout", ""),
  49: pg("C", "간지", "User Set-Up"),
  50: pg("L", "Set-Up / User ERP / Sale / Project Management", "프로젝트 관리(사용자 ERP)",
         ["p12 와 같은 화면(②) — 등록 · 헤더 · 담당자 · 영업 단계 전이 · 접수 자료(File)", "Client = Company DB 고객(⑧)",
@@ -270,7 +296,8 @@ PAGES = {
          "**그림 제작 Module 1단계**(H10) — 도면 위 주석(선 · 사각형 · 글자 · 치수선) 추가·이동·삭제 · 원 도면 불변 · DXF 내보내기에 ANNOT 레이어 · 발행 도면은 잠김",
          "**설계 심볼**(ccmd K · 0036) — 편집기에서 샘플 심볼 5종 놓기 · 옮기기 · 90° · 지우기 · SYMBOL 레이어 · 발행 도면 409"],
         ["작업대 툴바 '설계 심볼' 자리는 아직 잠김 — ccmd L(LB)에서 도면 고르기 → 편집기로 연결 중(이 ccmd 는 건드리지 않음)", "Free CAD — 필요한 결정: EDIM 안 CAD 편집기(M4 · M5)"],
-        "e2e S41a~l · S69a~f · S77a~c", "79_draw_module", "엘 확정판 4 부분 유지 · 툴바 연결은 ccmd L 몫"),
+        "e2e S41a~l · S69a~f · S77a~c", "79_draw_module", "툴바 '설계 심볼' 연결은 ccmd L · Free CAD 는 편집기 결정 후", judge=JUDGE_M1,
+        why="부분: 툴바 명령 · 그림 제작 · 설계 심볼(편집기)은 돌지만 작업대 툴바 '설계 심볼' 자리 · Free CAD 가 없다"),
  59: pg("L", "E-3 · Key Work Place", "Hierarchy 와 Run 심볼",
         ["Work Hierarchy 트리에서 노드를 고르면 작업 대상이 호출된다", "EDIM Run · BOM Run · EBOM Run · Cost · Approval Request ✓"], ["Hierarchy(Edit) · Data Up-Load · DWG 폴더 없음"],
         "hierarchy:test · e2e S1 · S3", "10_project_bound"),
@@ -300,7 +327,8 @@ PAGES = {
          "**PCR 세부 · Business Type 열**(ccmd M) — Procurement(Ex-Work = 스냅샷 재료비 · 운송 · 관세 · 내륙 · 조달 간접 · 이자) · Sub-manufacturing(Manufacturing = 스냅샷 인건비 · 현장 설치 …) · Other direct · Direct total · Contribution margin · Sales & Adm. · Full costs · EBIT — 견적 금액은 그대로, 요율표로 나눠 본다",
          "요율표 = **샘플 파일**(packages/bom-code/cost-rules/pcr-rules.sample.json) · 회사 파일(pcr-rules.local.json · EDIM_PCR_RULES)로 바꾸면 **다음 견적부터**(코드 수정 0) · 판 · 지문이 견적 body 에 박혀 앞 견적은 그대로 · 틀린 파일 422 · 인쇄본 · Excel 에 '샘플' 표지"],
         ["요율 · 단가는 샘플 — 필요한 입력: 회사 실 요율표 · 단가표(회장님 · 사장님)"],
-        "e2e S22a~S22f · S62a~f · S80a~c · pcr.test · document:test", "88_pcr_detail", "CC 초안(ccmd M) — 엘 재측정 전", sample=True),
+        "e2e S22a~S22f · S62a~f · S80a~c · pcr.test · document:test", "88_pcr_detail", "회사 실 요율표 · 단가표 · 마진 정책이 들어오면 파일 교체", sample=True, judge=JUDGE_M1,
+        why="실동(샘플): PCR 세부 · Business Type · 견적 = 원가 × (1 + 마진율) · EBIT 양수 — 요율 · 마진율은 샘플 파일 · e2e S80a~c"),
  67: pg("L", "D-4 · Product cost Management", "단가 관리 Table",
         ["구매품 **단가 이력**(⑤-a) — 날짜별로 쌓고 현재·예정·지난을 가른다 · **Supplier** = Company DB 공급처(⑧)",
          "단가 이력 → 원가(E) — BOM Run 순간의 현재 단가가 줄에 박힌다(출처: 이력 날짜 · 관계값)",
@@ -353,11 +381,11 @@ def counts(a=1, b=70):
 def s_cover():
     c = counts()
     return f'''<section class="slide title"><div class="stage">
-<div class="kick">EDIM · 청사진 70장 대조 · 엘 확정판</div>
+<div class="kick">EDIM · 청사진 70장 대조 · 엘 판정 확정 (2026-09-30) · 확정판 5</div>
 <h1>70장 중<br><em>어디까지</em> 왔나</h1>
 <p class="sub">청사진(EDIM.pdf) 70쪽을 한 장씩 실제 화면 옆에 놓았습니다. 도는 것은 도는 대로, 없는 것은 없는 대로 적었습니다.</p>
 <div class="big4"><div class="b L"><i>{c["L"]}</i>실동</div><div class="b P"><i>{c["P"]}</i>부분</div><div class="b N"><i>{c["N"]}</i>미착수</div><div class="b C"><i>{c["C"]}</i>개념·표지</div></div>
-<div class="meta">main {MAIN} · 2026-09-30 · 엘 확정판 4 + ccmd M CC 초안(엘 재측정 전) — typecheck 11 · 단위 345 · DB 검증 12종 · e2e 383/383(개발 모드 · reset 직후) · 회장님 조정 대상</div></div></section>'''
+<div class="meta">main {MAIN} · 엘 판정 확정 (2026-09-30) — 근거: 엘 저장소 실측 아님 · lmd M 교차검증 기준 · 판정 원천 = 이 생성기의 PAGES 한 곳</div></div></section>'''
 
 def s_grid():
     rows = ""
@@ -388,7 +416,7 @@ def s_sections():
         bars += f'<div class="bar"><div class="bn">{esc(name)}</div><div class="bt">{seg}</div><div class="bv">{c["L"]} · {c["P"]} · {c["N"]} · {c["C"]}</div></div>'
     return f'''<section class="slide"><div class="stage"><header><span class="no">02</span><h2>절마다 — 어디가 두껍고 어디가 비었나</h2></header>
 <div class="bars">{bars}<div class="bar bl"><div class="bn"></div><div class="bt lg"><span><i class="L"></i>실동</span><span><i class="P"></i>부분</span><span><i class="N"></i>미착수</span><span><i class="C"></i>개념·표지</span></div><div class="bv">실동·부분·미착수·표지</div></div></div>
-<footer>두꺼운 곳: <b>Form(작업대)</b> · <b>BOM Code Set-Up</b> · <b>Product Selection(산출물)</b>. 빈 곳: <b>Arrangement</b>(p13·35·36·46) · <b>Drawing Data Set-Up</b>(p42~44) · <b>AI 학습 DB</b>(p23 — 학습 1수준 · 샘플 자료뿐이라 부분 <i>CC 초안</i>). <span class="src">빈 곳 셋은 각각 회장님 우선순위 결정 · CAD 담당 입력 · DXF 연구 결과를 기다린다.</span></footer></div></section>'''
+<footer>두꺼운 곳: <b>Form(작업대)</b> · <b>BOM Code Set-Up</b> · <b>Product Selection(산출물)</b>. 빈 곳: <b>Arrangement</b>(p13·35·36·46) · <b>Drawing Data Set-Up</b>(p42~44) · <b>AI 학습 DB</b>(p23 — 학습 1수준 · 샘플 자료뿐이라 부분). <span class="src">빈 곳 셋은 각각 회장님 우선순위 결정 · CAD 담당 입력 · DXF 연구 결과를 기다린다.</span></footer></div></section>'''
 
 def s_page(p):
     m = PAGES[p]; st = m["st"]
@@ -402,7 +430,8 @@ def s_page(p):
         right = f'<div class="slot {st}"><div class="slot-k">{ST[st]}</div><div class="slot-n">{msg}</div></div>'
         lab = f'<b>{ST[st]}</b><i>화면 없음</i>'
     ev = f'<div class="ev"><b>근거</b> {esc(m["ev"])}</div>' if m["ev"] else ""
-    nx = f'<span class="src">다음 — {esc(m["nx"])}</span>' if m["nx"] else ""
+    nx = (f'<span class="src">판정 — {esc(m["judge"])} · 근거 — {esc(why_of(m))}</span>'
+          + (f'<span class="src">다음 — {esc(m["nx"])}</span>' if m["nx"] else ""))
     lists = (f'<ul class="ok">{have}</ul>' if have else "") + (f'<ul class="ng">{gap}</ul>' if gap else "")
     return f'''<section class="slide"><div class="stage"><header><span class="no">p{p}</span><h2>{esc(m["title"])}</h2><span class="badge {st}">{ST[st]}</span></header>
 <div class="pair"><figure class="bp"><div class="lab"><b>청사진</b><i>p{p} · {esc(m["tag"])}</i></div><img src="{bp_img(p)}" alt=""></figure>
@@ -417,8 +446,8 @@ def s_remaining():
 <tr><td>E4</td><td>EDIM 안 CAD 편집기 · 설계 심볼 · 제작도 수준 도면 — 주석 레이어 1단계(H10)는 끝, 실제 도형 편집은 아직</td><td>도면 선·치수 전파는 결정론으로 돈다</td><td>회사 CAD 규칙(M4) · 편집기 결정(M5)</td><td>p58 · 38</td></tr>
 <tr><td>E5</td><td>발표 덱 · 진행현황 보고서를 이번 main 반영본으로 재생성</td><td>생성기가 repo 에 있다</td><td>이 판정을 엘이 재측정·확정한 뒤</td><td>덱 · 진행현황 새 판</td></tr>
 </tbody></table>
-<p class="onote">09-29(ccmd J) 끝낸 것: 학습 AI 1수준 + 이중 프로젝션(로컬 AI 선택) · Special 첫 사례 팬 선정 → p23 미착수 → 부분(CC 초안 — 엘 재측정 전).</p>
-<p class="onote">09-28 밤(ccmd I) 끝낸 것: E6 Macro 설계 검증(p39) · E7 Office 내보내기(p48) · E8 툴바 Delete 미리 잠금(p58) · 비밀번호 로그인(p11 · 0032) · 배포 킷 · CI 배선(M6 → 초록) · 저장소 공개 → 3쪽 부분 → 실동(CC 초안 — 엘 재측정 전).</p>
+<p class="onote">09-29(ccmd J) 끝낸 것: 학습 AI 1수준 + 이중 프로젝션(로컬 AI 선택) · Special 첫 사례 팬 선정 → p23 미착수 → 부분(확정판 4 확정).</p>
+<p class="onote">09-28 밤(ccmd I) 끝낸 것: E6 Macro 설계 검증(p39) · E7 Office 내보내기(p48) · E8 툴바 Delete 미리 잠금(p58) · 비밀번호 로그인(p11 · 0032) · 배포 킷 · CI 배선(M6 → 초록) · 저장소 공개 → 3쪽 부분 → 실동(확정판 4 확정).</p>
 <p class="onote">09-27 밤(ccmd H) 끝낸 것: 연결 고갈 수리 머지 · 시연 안전판 태그 · H4 ERP 기준정보 6종 · H5 Sub Drawing·주의사항 · H6 Output·그래프·Table List · H7 Coding List · H8 함수·그래프 마법사·Data Management · H9 인쇄 양식 편집기 · H10 도면 주석 → 5쪽 부분 → 실동(엘 확정).</p>
 </div></div></section>
 
@@ -488,14 +517,25 @@ def page_map_md():
     c = counts()
     out = [f"# 청사진 페이지 색인 — 70장의 지금 (main `{MAIN}` · {DATE})", "",
            "> 이 파일은 `docs/02-reports/build_blueprint_match.py` 의 판정 데이터에서 **자동 생성**된다. 손으로 고치지 말 것.",
-           f"> 실동 {c['L']}(그중 실동(샘플) {c['LS']}) · 부분 {c['P']} · 미착수 {c['N']} · 개념·표지 {c['C']} (합 70). 판정은 엘의 것 — 회장님 조정 대상. CC 초안이 붙은 쪽은 엘 재측정 전.", ""]
+           f"> 실동 {c['L']}(그중 실동(샘플) {c['LS']}) · 부분 {c['P']} · 미착수 {c['N']} · 개념·표지 {c['C']} (합 70). **엘 판정 확정 (2026-09-30)** — 근거: 엘 저장소 실측 아님 · lmd 교차검증 기준. 판정 원천은 생성기의 PAGES 한 곳(이 파일 · 보고서는 출력).", ""]
     for name, a, b in SECTIONS:
-        out += [f"## {name} (p{a}–{b})", "", "| 쪽 | 판정 | 제목 | 도는 것 | 없는 것 | 근거 |", "|---|---|---|---|---|---|"]
+        out += [f"## {name} (p{a}–{b})", "", "| 쪽 | 판정 | 판정자 | 판정 근거 | 제목 | 도는 것 | 없는 것 | 근거 |", "|---|---|---|---|---|---|---|---|"]
         for p in range(a, b + 1):
             m = PAGES[p]; f = lambda xs: "<br>".join(x.replace("**", "").replace("|", "/") for x in xs) or "—"
-            out.append(f"| p{p} | {ST[m['st']] + ('(샘플)' if m.get('sample') else '')} | {m['title'].replace('|','/')} | {f(m['have'])} | {f(m['gap'])} | {m['ev'] or '—'} |")
+            out.append(f"| p{p} | {ST[m['st']] + ('(샘플)' if m.get('sample') else '')} | {m['judge']} | {why_of(m).replace('|','/')} | {m['title'].replace('|','/')} | {f(m['have'])} | {f(m['gap'])} | {m['ev'] or '—'} |")
         out.append("")
     return "\n".join(out)
+
+if __name__ == "__main__" and CHECK:
+    have = open(PAGE_MAP, encoding="utf-8").read() if os.path.exists(PAGE_MAP) else ""
+    want = page_map_md()
+    # 머리 줄의 main 표지는 실행마다 다를 수 있어 뺀다 — 판정 · 수 · 칸은 한 글자도 같아야 한다
+    strip = lambda t: "\n".join(t.split("\n")[1:])
+    c = counts(); print("pages 70 ·", " · ".join(f"{ST[k]} {c[k]}" for k in "LPNC"), f"(실동(샘플) {c['LS']})")
+    if strip(have) != strip(want):
+        print("DRIFT — docs/00-corpus/page-map.md 가 판정 데이터(PAGES)의 출력과 다르다. 보고서 · page-map 을 손으로 고치지 말고 생성기를 다시 돌린다.")
+        sys.exit(1)
+    print("OK — page-map.md = PAGES 출력"); sys.exit(0)
 
 if __name__ == "__main__":
     os.makedirs(OUTDIR, exist_ok=True)
