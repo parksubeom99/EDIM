@@ -6,6 +6,7 @@ import { canEditProject } from "@/app/lib/project-perms";
 import { documentSourceFromRun } from "@/app/lib/output/document-source";
 import { buildQuotationBody, buildTechDataBody, noCoreOf, resolveInputData, type InputDataValue } from "@/app/lib/output/document";
 import { resolveOutputs, snapshotGraphs, type OutputDataValue, type GraphSnap } from "@/app/lib/output-template";
+import { loadPcrRules } from "@/app/lib/pcr-rules";
 
 /** GET = 문서 목록 · POST = BOM 스냅샷에서 견적(p66)·Tech Data(p15~16)를 떠서 남긴다. */
 export async function GET(req: NextRequest) {
@@ -61,9 +62,16 @@ export async function POST(req: NextRequest) {
     deliveryTerms: str(b.deliveryTerms), paymentTerms: str(b.paymentTerms),
     validity: str(b.validity), warranty: str(b.warranty),
   };
+  // ccmd M · p66 — PCR 요율표 파일을 지금 읽어 견적 body 에 박는다(파일 없음 = 세부 없이 · 파일이 틀리면 422)
+  let pcrRules: { fingerprint: string; file: string; rules: import("@/app/lib/pcr").PcrRules } | undefined;
+  if (type === "quotation") {
+    const pr = loadPcrRules();
+    if (pr.ok) pcrRules = pr.snap;
+    else if (!pr.missing) return NextResponse.json({ error: pr.error }, { status: 422 });
+  }
   const make = (docNo: string, rev: string) =>
     type === "quotation"
-      ? buildQuotationBody(src.run, src.project, opts, docNo, rev, date)
+      ? buildQuotationBody(src.run, src.project, { ...opts, ...(pcrRules ? { pcrRules } : {}) }, docNo, rev, date)
       : buildTechDataBody(src.run, src.project, docNo, rev, date, inputData, extra);
   const probe = make("-", "-");
   if (!probe.ok) return NextResponse.json({ error: probe.error }, { status: probe.status });

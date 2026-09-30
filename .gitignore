@@ -24,3 +24,6 @@ shots/
 
 # ccmd K · KC-2 — 회사 자기 CAD 규칙서(샘플을 대신해 읽힘 · 저장소에 올리지 않는다)
 packages/bom-code/cad-rules/cad-rules.local.json
+
+# ccmd M · p66 — 회사 자기 PCR 요율표(샘플을 대신해 읽힘 · 저장소에 올리지 않는다)
+packages/bom-code/cost-rules/pcr-rules.local.json

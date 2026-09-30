@@ -1,0 +1,35 @@
+{
+  "version": "sample-1",
+  "sample": "샘플 PCR 요율표 — 회사 실 요율 아님 · 회사 파일(pcr-rules.local.json 또는 EDIM_PCR_RULES)로 바꾸면 다음 견적부터 반영",
+  "businessTypes": ["Own acc.", "Biz Type 1 · 수출", "Biz Type 2 · 현장 설치"],
+  "_note": "p66 PCR(Table). kind: bom = 스냅샷 재료비(Ex-Work) · mfg = 스냅샷 인건비(F10) · rate = base 금액 × % (businessTypes 순서대로). base: exwork = Ex-Work · contract = 견적 금액",
+  "sections": [
+    { "name": "Procurement cost", "group": "direct", "rows": [
+      { "label": "Ex-Work", "kind": "bom" },
+      { "label": "Air/Sea freight", "kind": "rate", "base": "exwork", "pct": [0, 3.5, 0] },
+      { "label": "Customs tax & cost", "kind": "rate", "base": "exwork", "pct": [0, 1.2, 0] },
+      { "label": "Inland trucking, etc", "kind": "rate", "base": "exwork", "pct": [0.5, 0.8, 1.0] },
+      { "label": "Procurement overhead", "kind": "rate", "base": "exwork", "pct": [1.0, 1.0, 1.0] },
+      { "label": "Avoidable interest", "kind": "rate", "base": "exwork", "pct": [0.3, 0.6, 0.3] }
+    ] },
+    { "name": "Sub-manufacturing cost", "group": "direct", "rows": [
+      { "label": "Manufacturing (F10)", "kind": "mfg" },
+      { "label": "Site installation", "kind": "rate", "base": "exwork", "pct": [0, 0, 4.0] },
+      { "label": "Equipment rental", "kind": "rate", "base": "exwork", "pct": [0, 0, 0.8] },
+      { "label": "Vendor assembly", "kind": "rate", "base": "exwork", "pct": [0.5, 0.5, 0.5] },
+      { "label": "Site management", "kind": "rate", "base": "exwork", "pct": [0, 0, 1.5] },
+      { "label": "A/S Commissioning", "kind": "rate", "base": "exwork", "pct": [0.4, 0.4, 0.8] }
+    ] },
+    { "name": "Other direct cost", "group": "direct", "rows": [
+      { "label": "Provision for delivery", "kind": "rate", "base": "contract", "pct": [0.3, 0.5, 0.3] },
+      { "label": "Provision for risks", "kind": "rate", "base": "contract", "pct": [0.5, 1.0, 1.0] }
+    ] },
+    { "name": "Sales & Adm. cost", "group": "sna", "rows": [
+      { "label": "Sales overhead", "kind": "rate", "base": "contract", "pct": [1.5, 2.0, 1.5] },
+      { "label": "Adm overhead", "kind": "rate", "base": "contract", "pct": [1.0, 1.0, 1.0] },
+      { "label": "Bad dept provision", "kind": "rate", "base": "contract", "pct": [0.2, 0.5, 0.2] },
+      { "label": "Tech. R&D Cost", "kind": "rate", "base": "contract", "pct": [0.5, 0.5, 0.5] },
+      { "label": "Travel cost", "kind": "rate", "base": "contract", "pct": [0.1, 0.4, 0.2] }
+    ] }
+  ]
+}

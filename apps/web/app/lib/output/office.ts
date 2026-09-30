@@ -50,6 +50,18 @@ function partsOf(doc: ExportDoc): { title: Section; fields: Section; tables: Sec
       fmt: ["int", null, null, "num", "won", "won", null, null, null],
       rows: b.applied.map((a) => [a.no, a.code, a.part, a.qty, a.unitPrice, a.amount, a.supplier || "—", a.table, a.note]),
       total: ["합계 = PCR Material Cost", "", "", "", "", b.applied.reduce((x, a) => x + a.amount, 0), "", "", ""] });
+    // ccmd M · p66 PCR 세부 — 인쇄본과 같은 줄 · 같은 순서(Business Type 열)
+    const d = b.pcrDetail;
+    if (d) {
+      const line = (l: string, v: number[]): Cell[] => [l, ...v];
+      const rows: Cell[][] = [line("Sales price · Contract Amount", d.businessTypes.map(() => d.contract))];
+      for (const s of d.sections.filter((x) => x.group === "direct")) rows.push(...s.rows.map((r) => line(`${s.name} · ${r.label}`, r.values)));
+      rows.push(line("Direct costs total", d.directTotal), line("Contribution margin", d.contribution));
+      for (const s of d.sections.filter((x) => x.group === "sna")) rows.push(...s.rows.map((r) => line(`${s.name} · ${r.label}`, r.values)));
+      rows.push(line("Full costs", d.fullCost));
+      tables.push({ kind: "table", id: "pcrdetail", name: `PCR 세부 · Business Type${d.sample ? " (샘플 요율)" : ""} · ${d.file} ${d.fingerprint}`,
+        head: ["항목", ...d.businessTypes], fmt: [null, ...d.businessTypes.map(() => "won" as const)], rows, total: line("EBIT", d.ebit) });
+    }
     return { title: { kind: "title", text: "견 적 서" }, fields: { kind: "fields", rows: fields }, tables, graphs: [], source: { kind: "text", text: sourceText(b.source) } };
   }
   const fields: [string, Cell][] = [...head, ["Project", p ? `${p.projectNo} · ${p.name}` : "—"], ["Document Code", b.code]];

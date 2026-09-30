@@ -8,6 +8,7 @@
 import type { LaborBasis } from "./bom";
 import { graphSvg, type OutputDataValue, type GraphSnap } from "../output-template";
 import { renderLayoutPage, LAYOUT_CSS, SIGNATURE_HTML, type LayoutElement } from "../print-layout";
+import { buildPcrDetail, type PcrDetail, type PcrRules } from "../pcr";
 
 export interface SnapshotLike {
   id: string;
@@ -75,6 +76,8 @@ export interface QuotationOptions {
   paymentTerms?: string;
   validity?: string;
   warranty?: string;
+  /** ccmd M · p66 PCR 요율표(파일에서 읽은 것 · 지문 포함). 없으면 PCR 세부 없이 나간다. */
+  pcrRules?: { fingerprint: string; file: string; rules: PcrRules };
 }
 
 export interface QuotationBody {
@@ -99,6 +102,8 @@ export interface QuotationBody {
   laborBasis?: LaborBasis;
   /** F10 · p67 [견적 적용 Table] — Code No · Price · Supplier · Price table(견적/구매). 스냅샷 줄 그대로, Σ 금액 = PCR Material Cost. */
   applied?: AppliedRow[];
+  /** ccmd M · p66 PCR 세부(Business Type 열) — 만들 때의 요율표로 편 표(판 · 지문). 견적 금액은 바꾸지 않는다. 옛 견적엔 없다. */
+  pcrDetail?: PcrDetail;
 }
 
 export interface AppliedRow { no: number; code: string; part: string; qty: number; unitPrice: number; amount: number; supplier: string; table: "견적" | "구매"; note: string }
@@ -162,6 +167,7 @@ export function buildQuotationBody(
       ...(priceBasisOf(run) ? { priceBasis: priceBasisOf(run)! } : {}),
       ...(cost.laborBasis ? { laborBasis: cost.laborBasis } : {}),
       ...(appliedOf(run) ? { applied: appliedOf(run)! } : {}),
+      ...(opts.pcrRules ? { pcrDetail: buildPcrDetail({ material: cost.material * qty, labor: cost.labor * qty, contract: amount }, opts.pcrRules.rules, opts.pcrRules) } : {}),
     },
   };
 }
@@ -355,7 +361,27 @@ ${b.applied ? `<h2>견적 적용 Table</h2>
 <tr><th>No</th><th>Code No.</th><th>품목</th><th class="n">수량</th><th class="n">Price</th><th class="n">금액</th><th>Supplier</th><th>Price table</th><th>비고</th></tr>
 ${b.applied.map((a) => `<tr><td>${a.no}</td><td class="mono">${esc(a.code)}</td><td>${esc(a.part)}</td><td class="n">${a.qty}</td><td class="n">${won(a.unitPrice)}</td><td class="n">${won(a.amount)}</td><td>${esc(a.supplier || "—")}</td><td>${a.table}</td><td>${esc(a.note)}</td></tr>`).join("")}
 <tr><th colspan="5">합계 = PCR Material Cost</th><td class="n"><b>${won(b.applied.reduce((x, a) => x + a.amount, 0))}</b></td><td colspan="3"></td></tr>
-</table>` : ""}`;
+</table>` : ""}
+${b.pcrDetail ? pcrDetailHtml(b.pcrDetail, b.pcr.currency) : ""}`;
+}
+
+/** ccmd M · p66 PCR(Table) — Business Type 열마다. 샘플 요율표면 표지를 단다. */
+function pcrDetailHtml(d: PcrDetail, cur: string): string {
+  const cells = (v: number[]) => v.map((x) => `<td class="n">${won(x)}</td>`).join("");
+  const row = (label: string, v: number[], basis = "", strong = false) =>
+    `<tr${strong ? ' style="font-weight:700"' : ""}><td>${label}</td>${cells(v)}<td style="font-size:10px;color:#666">${esc(basis)}</td></tr>`;
+  return `<h2>PCR 세부 · Business Type${d.sample ? ' <span data-testid="pcr-sample" style="font-size:11px;font-weight:700;color:#b45309;border:1px solid #b45309;border-radius:3px;padding:0 4px">샘플</span>' : ""}</h2>
+<table data-testid="pcr-detail" data-types="${d.businessTypes.length}">
+<tr><th>Business Type</th>${d.businessTypes.map((t) => `<th class="n">${esc(t)}</th>`).join("")}<th>근거</th></tr>
+${row("<b>Sales price · Contract Amount</b>", Array(d.businessTypes.length).fill(d.contract), "이 견적서 금액(스냅샷 원가 그대로)", true)}
+${d.sections.filter((s) => s.group === "direct").map((s) => `<tr><th colspan="${d.businessTypes.length + 2}" style="text-align:left">${esc(s.name)}</th></tr>${s.rows.map((r) => row(`&nbsp;&nbsp;${esc(r.label)}`, r.values, r.basis)).join("")}`).join("")}
+${row("Direct costs total", d.directTotal, "Σ 위 구역", true)}
+${row("Contribution margin", d.contribution, "견적 금액 − Direct")}
+${d.sections.filter((s) => s.group === "sna").map((s) => `<tr><th colspan="${d.businessTypes.length + 2}" style="text-align:left">${esc(s.name)}</th></tr>${s.rows.map((r) => row(`&nbsp;&nbsp;${esc(r.label)}`, r.values, r.basis)).join("")}`).join("")}
+${row("Full costs", d.fullCost, "Direct + Sales & Adm.", true)}
+<tr style="font-weight:700" data-testid="pcr-ebit"><td>EBIT</td>${cells(d.ebit)}<td style="font-size:10px;color:#666">견적 금액 − Full costs</td></tr>
+</table>
+<p data-testid="pcr-rules-stamp" style="font-size:11px;color:#555">요율표 ${esc(d.file)} · 판 ${esc(d.version)} · 지문 <span class="mono">${esc(d.fingerprint)}</span> · 통화 ${esc(cur)}${d.sample ? ` — ${esc(d.sample)}` : ""}</p>`;
 }
 
 /** 인쇄본의 인건비 기준 한 줄(HTML 이스케이프됨) — 스냅샷에 박힌 laborBasis 를 글로 옮긴다. */
