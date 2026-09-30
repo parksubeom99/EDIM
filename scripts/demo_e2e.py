@@ -122,7 +122,10 @@ with sync_playwright() as p:
     # S10 표 한 칸을 고치면 BOM이 바뀐다 — 코드 수정 0 (p33 Edit Table)
     pg.click("[data-tab=product]"); pg.wait_for_selector("[data-pc='EU']"); pg.click("[data-pc='EU']"); time.sleep(0.8); nuke(pg)
     cell=pg.locator("[data-cell='cap:55:fanKw']"); ok("S10a Product Code table shows the registered value (22)", cell.input_value(), cell.input_value()=="22")
-    cell.fill("30"); pg.click("[data-testid=pc-save]"); time.sleep(1.5); pg.screenshot(path=f"{OUT}/21_setup_product_table.png",full_page=True)
+    # ccmd M — 고정 1.5초 대신 저장 응답을 기다린다(09-30 실측: 서버가 새 경로를 컴파일하는 동안 1.5초 안에 저장이 안 끝나 S10b 가 22kW 를 읽었다)
+    cell.fill("30")
+    with pg.expect_response(lambda r_: "/api/setup/product-codes" in r_.url and r_.request.method=="POST", timeout=30000): pg.click("[data-testid=pc-save]")
+    pg.screenshot(path=f"{OUT}/21_setup_product_table.png",full_page=True)
     j=ctx.request.post(BASE+"/api/setup/part-list-run",headers=J,data=json.dumps({"slots":S55})).json(); fan=[l for l in j.get("lines",[]) if l["childCode"]=="KFP 1"]
     ok("S10b table edit 22→30 changes the Plug fan line with no code change", fan[0]["spec"][:4] if fan else None, bool(fan) and fan[0]["spec"].startswith("30kW"))
     # 같은 등록 표를 Macro도 읽는다: Table1(A,4:4) = 그 칸 → 30 × 1.15 × 18 = 621
@@ -2445,13 +2448,122 @@ with sync_playwright() as p:
        (v79, v79p, {k_:(v_["n"],v_["mine"]) for k_,v_ in gbr.items()}, "Acme" in g79txt, "00000000-0000-4000-8000-00000000000a" in g79txt, g79i),
        v79==(403,403,403) and v79p and gbr.get("fan_eta",{}).get("mine") is None and gbr.get("fan_eta",{}).get("p50")==fe.get("p50")
        and "Acme" not in g79txt and "00000000-0000-4000-8000-00000000000a" not in g79txt and g79i==404)
+    # ── S80 (ccmd M · p66) — PCR 세부(Business Type 열) · 요율표 = 샘플 파일 · 파일만 바꾸면 다음 견적부터(코드 수정 0) ──
+    DOCS=BASE+"/api/documents"
+    q80=ctx.request.post(DOCS,headers=J0,data=json.dumps({"runId":RUN1,"type":"quotation"})).json()
+    b80=ctx.request.get(DOCS+f"/{q80.get('id')}").json().get("body",{}); d80=b80.get("pcrDetail") or {}
+    sec80={s_["name"]:s_ for s_ in d80.get("sections",[])}
+    exw=[r_ for s_ in d80.get("sections",[]) for r_ in s_["rows"] if r_["label"]=="Ex-Work"]
+    mfg80=[r_ for s_ in d80.get("sections",[]) for r_ in s_["rows"] if r_["label"].startswith("Manufacturing")]
+    ok("S80a 견적 body 에 PCR 세부 — Business Type 3열 · Procurement · Sub-manufacturing · Other direct · Sales & Adm. · Ex-Work = 스냅샷 재료비 · Manufacturing = 스냅샷 인건비 · Contract = 견적 합계(그대로) · Full + EBIT = Contract · 요율표 판 · 지문",
+       (d80.get("businessTypes"), sorted(sec80), d80.get("contract"), q80.get("total"), d80.get("file"), d80.get("fingerprint"), d80.get("ebit")),
+       len(d80.get("businessTypes",[]))==3 and sorted(sec80)==["Other direct cost","Procurement cost","Sales & Adm. cost","Sub-manufacturing cost"]
+       and d80.get("contract")==q80.get("total")==b80["pcr"]["fullCost"] and exw and exw[0]["values"]==[round(b80["pcr"]["material"])]*3 and mfg80 and mfg80[0]["values"]==[round(b80["pcr"]["manufacturing"])]*3
+       and all(f_+e_==d80["contract"] for f_,e_ in zip(d80.get("fullCost",[]),d80.get("ebit",[]))) and d80.get("file")=="pcr-rules.sample.json" and len(d80.get("fingerprint",""))==12)
+    pg.goto(DOCS+f"/{q80.get('id')}/print",wait_until="load"); pg.wait_for_selector("[data-testid=pcr-detail]",timeout=30000)
+    vis80=(pg.is_visible("[data-testid=pcr-detail]"), pg.is_visible("[data-testid=pcr-sample]"), pg.inner_text("[data-testid=pcr-sample]"), pg.get_attribute("[data-testid=pcr-detail]","data-types"))
+    pg.locator("[data-testid=pcr-detail]").scroll_into_view_if_needed(); pg.screenshot(path=f"{OUT}/88_pcr_detail.png",full_page=True)
+    xl80=ctx.request.get(DOCS+f"/{q80.get('id')}/export?format=xlsx")
+    ok("S80b 인쇄본 화면에 PCR 세부 표 + '샘플' 표지가 실제로 보인다 · Excel 내보내기 200",
+       (vis80, xl80.status), vis80[0] and vis80[1] and vis80[2]=="샘플" and vis80[3]=="3" and xl80.status==200)
+    # 요율표 교체 — 회사 파일 자리(pcr-rules.local.json · .gitignore)에 Air/Sea freight 수출 요율 3.5 → 7.0 을 두면 다음 견적만 바뀐다. 틀린 파일은 422. 끝나면 지운다.
+    _root=os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)),".."))
+    _smp=os.path.join(_root,"packages","bom-code","cost-rules","pcr-rules.sample.json"); _loc=os.path.join(_root,"packages","bom-code","cost-rules","pcr-rules.local.json")
+    _rules=json.load(open(_smp,encoding="utf-8")); _rules["version"]="e2e-local-1"
+    for r_ in _rules["sections"][0]["rows"]:
+        if r_["label"]=="Air/Sea freight": r_["pct"]=[0,7.0,0]
+    try:
+        with open(_loc,"w",encoding="utf-8",newline="\n") as f_: json.dump(_rules,f_,ensure_ascii=False)
+        q80b=ctx.request.post(DOCS,headers=J0,data=json.dumps({"runId":RUN1,"type":"quotation"})).json()
+        d80b=ctx.request.get(DOCS+f"/{q80b.get('id')}").json().get("body",{}).get("pcrDetail") or {}
+        with open(_loc,"w",encoding="utf-8",newline="\n") as f_: f_.write("{ not json")
+        bad80=ctx.request.post(DOCS,headers=J0,data=json.dumps({"runId":RUN1,"type":"quotation"}))
+    finally:
+        if os.path.exists(_loc): os.remove(_loc)
+    d80a=ctx.request.get(DOCS+f"/{q80.get('id')}").json().get("body",{}).get("pcrDetail") or {}
+    fr=lambda d_: [r_["values"] for r_ in d_.get("sections",[{}])[0].get("rows",[]) if r_["label"]=="Air/Sea freight"]
+    ok("S80c 요율표 파일만 바꾸면(pcr-rules.local.json) 다음 견적의 수출 운송비가 2배(원 단위 반올림 ±1) · 판 · 지문이 바뀐다 · 앞 견적은 그대로 · 틀린 파일은 422(숨기지 않는다) · 파일을 지우면 샘플로 돌아간다",
+       (fr(d80), fr(d80b), d80b.get("version"), d80b.get("file"), d80b.get("fingerprint")!=d80.get("fingerprint"), fr(d80a)==fr(d80), bad80.status),
+       fr(d80b) and fr(d80) and abs(fr(d80b)[0][1]-2*fr(d80)[0][1])<=1 and fr(d80b)[0][0]==0 and d80b.get("version")=="e2e-local-1" and d80b.get("file")=="pcr-rules.local.json"
+       and d80b.get("fingerprint")!=d80.get("fingerprint") and fr(d80a)==fr(d80) and bad80.status==422 and "PCR 요율표" in bad80.text() and not os.path.exists(_loc))
+    # ── S81 (ccmd M · p25 · p26 · p21) — UI 개발 AI(결정론) · Canvas · 저장·삭제·등록 · 실행 설정(Call) · Object Inspector · Signal/Slot · Work Hierarchy 노드별 UI ──
+    UF=BASE+"/api/ui-forms"; NODE81="a0000000-0000-4000-8000-000000000004"; FN81="E2E AI 폼"
+    # 쓰기 시험용 샘플 표(E2E-UIF · reset:demo 가 지운다) — Item = Sub Code B(10 · 12 · 25 · 55)
+    pc81=ctx.request.post(BASE+"/api/setup/product-codes",headers=J0,data=json.dumps({"code":"E2E-UIF","name":"E2E UI Form 쓰기 시험 표(샘플)","kind":"part",
+        "tables":{"t":{"no":1,"by":"B","default":"10","cols":[{"key":"A","name":"airflow","label":"풍량"},{"key":"B","name":"pressure","label":"정압"}],
+                       "rows":[{"item":"10","cells":{"A":1000,"B":200}},{"item":"12","cells":{"A":1400,"B":260}}]}}}))
+    def uif_rows():
+        c_=ctx.request.get(BASE+"/api/setup/catalog").json(); t_=[p_ for p_ in c_.get("productCodes",[]) if p_.get("code")=="E2E-UIF"]
+        return {r_["item"]:r_["cells"] for r_ in (t_[0]["tables"]["t"]["rows"] if t_ else [])}
+    pg.goto(BASE+"/setup/ui",wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=ui-designer][data-ready='1']",timeout=60000); nuke(pg)
+    pg.click("[data-testid=ui-ai-open]"); pg.wait_for_selector("[data-testid=ui-ai-engine]")
+    eng81=pg.inner_text("[data-testid=ui-ai-engine]")
+    pg.fill("[data-testid=ui-ai-name]",FN81); pg.check("[data-testid=ui-ai-item-B]")
+    pg.wait_for_selector("[data-testid=ui-ai-table] option[value='E2E-UIF|t']",state="attached",timeout=30000); pg.select_option("[data-testid=ui-ai-table]","E2E-UIF|t")
+    pg.fill("[data-testid=ui-ai-text]","용량을 골라 표에서 찾고, 값을 저장하거나 등록 · 삭제하고, 곡선 그래프로 보고, 매크로 계산도 한다")
+    pg.click("[data-testid=ui-ai-go]"); pg.wait_for_selector(f"[data-testid='ui-form-{FN81}'][data-selected='1']",timeout=30000)
+    f81=[f_ for f_ in ctx.request.get(UF).json().get("rows",[]) if f_["name"]==FN81][0]; w81=f81["spec"]["widgets"]
+    acts81=[w_.get("action") for w_ in w81 if w_["type"]=="button"]
+    notes81=pg.inner_text("[data-testid=ui-ai-notes]") if pg.query_selector("[data-testid=ui-ai-notes]") else ""
+    ok("S81a p25 UI 개발 AI — UI Templet 대화 상자(용도 · 항목 B · 필요 DB Table E2E-UIF.t · 설명)로 폼을 설계해 만든다 · 설명 낱말 → 찾기 · 저장 · 등록 · 삭제 · Call · 그래프 → Canvas · 화면에 '결정론 설계기 — AI 키 없음'",
+       (eng81, sorted({w_["type"] for w_ in w81}), acts81, notes81[:80]),
+       pc81.status==200 and "결정론" in eng81 and "AI 키 없음" in eng81 and {"combo","table","canvas","number","button","label"}<={w_["type"] for w_ in w81}
+       and acts81==["find","save","register","delete","call"] and "Canvas" in notes81)
+    pg.check(f"[data-testid='ui-node-PS-61313-5 Micron']"); pg.click("[data-testid=ui-save]"); wait_text(pg,"[data-testid=ui-msg]","저장했습니다")
+    f81=[f_ for f_ in ctx.request.get(UF).json().get("rows",[]) if f_["name"]==FN81][0]
+    oi81=len(pg.query_selector_all("[data-testid=ui-object-inspector] [data-object]")); ss81=pg.get_attribute("[data-testid=ui-signal-slot]","data-count")
+    cls81=pg.inner_text("[data-testid=ui-object-inspector]")
+    pg.screenshot(path=f"{OUT}/89_ui_ai_designer.png",full_page=True)
+    ok("S81b p26 Object Inspector(Object · Class — QDialog · QComboBox · QChartView …) · Signal/Slot(Combo → 버튼 · 버튼 → 표/매크로 · Number → 열) · Work Hierarchy 노드 PS-61313-5 에 붙여 저장(spec.nodes)",
+       (oi81, len(f81["spec"]["widgets"]), ss81, f81["spec"].get("nodes")),
+       oi81==len(f81["spec"]["widgets"]) and "QDialog" in cls81 and "QChartView" in cls81 and int(ss81 or 0)>=7 and f81["spec"].get("nodes")==[NODE81])
+    # Run — 등록(25) · 저장(10) · 삭제(25) : 대상 표 한 행을 서버가 쓴다(Set-Up 표와 같은 검사 · 감사)
+    pg.click("[data-testid=ui-mode-run]"); pg.wait_for_selector("[data-testid=ui-run] [data-run-table=table1][data-rows='2']",timeout=30000)
+    pts81a=pg.get_attribute("[data-run-canvas=canvas1]","data-points")
+    def run_btn(act_, combo_, a_=None, b_=None):
+        pg.select_option("[data-testid=ui-run] [data-run-combo=combo1]",combo_)
+        if a_ is not None: pg.fill("[data-testid=ui-run] [data-run-number=number1]",str(a_))
+        if b_ is not None: pg.fill("[data-testid=ui-run] [data-run-number=number2]",str(b_))
+        pg.click(f"[data-testid=ui-run] [data-run-button][data-action={act_}]")
+        pg.wait_for_selector("[data-testid=ui-run][data-busy='0']",timeout=30000)
+        return pg.inner_text("[data-testid=ui-run-note]") if pg.query_selector("[data-testid=ui-run-note]") else ""
+    n_reg=run_btn("register","25",1800,310); pg.wait_for_selector("[data-run-table=table1][data-rows='3']",timeout=30000); r_reg=uif_rows()
+    pts81b=pg.get_attribute("[data-run-canvas=canvas1]","data-points")
+    n_dup=run_btn("register","25",1800,310)
+    n_sav=run_btn("save","10",1500,222); r_sav=uif_rows()
+    n_del=run_btn("delete","25"); pg.wait_for_selector("[data-run-table=table1][data-rows='2']",timeout=30000); r_del=uif_rows()
+    ok("S81c p25 버튼 저장 · 삭제 · 등록 — 등록 25(풍량 1800 · 정압 310) → 3행 · 같은 Item 다시 등록 409 · 저장 10 → 1500 · 222 · 삭제 25 → 2행 · Set-Up 카탈로그가 같은 값 · Canvas 점 2 → 3",
+       (n_reg[:40], r_reg.get("25"), n_dup[:30], r_sav.get("10"), sorted(r_del), pts81a, pts81b),
+       r_reg.get("25")=={"A":1800,"B":310} and "409" in n_dup and r_sav.get("10")=={"A":1500,"B":222} and sorted(r_del)==["10","12"] and pts81a=="2" and pts81b=="3")
+    RUN81=UF+f"/{f81['id']}/run"
+    bad81=ctx.request.post(RUN81,headers=J0,data=json.dumps({"button":"button3","item":"99","values":{"number1":1}}))
+    nb81=ctx.request.post(RUN81,headers=J0,data=json.dumps({"button":"button1","item":"10","values":{}}))
+    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data=LOGIN("viewer@acme.test")); v81=vw.request.post(RUN81,headers=J0,data=json.dumps({"button":"button2","item":"10","values":{"number1":1}})).status; vw.close()
+    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data=LOGIN("owner@globex.test")); g81=gb.request.post(RUN81,headers=J0,data=json.dumps({"button":"button2","item":"10","values":{"number1":1}})).status; gb.close()
+    ok("S81d 쓰기 경계 — Sub Code 에 없는 Item 400 · 쓰기 버튼 아님(찾기) 400 · viewer 403 · 다른 회사 404 · 표는 그대로",
+       (bad81.status, bad81.text()[:60], nb81.status, v81, g81, sorted(uif_rows())), bad81.status==400 and nb81.status==400 and v81==403 and g81==404 and sorted(uif_rows())==["10","12"])
+    # 작업대 — 노드를 고르면 Inspector 에 이 노드의 UI Form · 열어서 찾기 · 매크로 실행(지금 노드의 승인 매크로)
+    pg.goto(BASE+"/workbench",wait_until="domcontentloaded"); pg.wait_for_selector("text=Code Builder",timeout=30000); hydrated(pg); nuke(pg)
+    if pg.query_selector("[data-testid=toolbox-window]"): pg.click("[data-testid=toolbox-close]"); pg.wait_for_selector("[data-testid=toolbox-window]",state="detached",timeout=10000)
+    pg.click("text=PS-61313"); pg.wait_for_selector("[data-testid=node-forms][data-ready='1'][data-count='1']",timeout=30000)
+    pg.click(f"[data-testid='node-forms-open-{FN81}']"); pg.wait_for_selector("[data-testid=node-forms-dialog][data-ready='1'] [data-run-table=table1]",timeout=30000)
+    pg.select_option("[data-testid=node-forms-run] [data-run-combo=combo1]","10"); pg.click("[data-testid=node-forms-run] [data-run-button][data-action=find]")
+    pg.wait_for_selector("[data-testid=node-forms-run] [data-run-table=table1][data-rows='1']",timeout=30000); find81=pg.inner_text("[data-testid=node-forms-run-note]")
+    pg.click("[data-testid=node-forms-run] [data-run-button][data-action=call]"); pg.wait_for_selector("[data-testid=node-forms-run][data-busy='0']",timeout=30000)
+    wait_text(pg,"[data-testid=node-forms-run-note]","매크로 실행"); call81=pg.inner_text("[data-testid=node-forms-run-note]")
+    pg.screenshot(path=f"{OUT}/90_node_ui_form.png",full_page=True)
+    pg.click("[data-testid=node-forms-close]")
+    pg.click("[data-testid=toolbox-toggle]"); pg.wait_for_selector("[data-testid=toolbox-window]",timeout=30000); pg.click("[data-toolbox-tab=ui]")
+    pg.wait_for_selector("[data-testid=toolbox-node-forms][data-ready='1']",timeout=30000); tbn81=pg.get_attribute("[data-testid=toolbox-node-forms]","data-count")
+    ok("S81e p26 · p21 Work Hierarchy 노드별 UI — 작업대에서 PS-61313-5 를 고르면 Inspector 에 붙인 폼 · 열어 찾기(Item 10 → 1행) · 실행 설정 Call = 이 노드의 승인 매크로 실행 · Toolbox UI Tool 탭에도 같은 폼",
+       (find81[:40], call81[:60], tbn81), "찾기" in find81 and "매크로 실행" in call81 and "승인 매크로" in call81 and tbn81=="1")
     # S37 은 맨 끝에서 센다 — 중간(옛 자리)에서는 뒤에 찍히는 5장(40·41·42·52·53)이 아직 없어,
     # 빈 폴더에서는 25장이라 실패하고 이전 실행 잔재가 있을 때만 통과했다(2026-09-24 실측).
     _want=["00_login","05_project_mgmt","06_module_cpq_stub","10_project_bound","11_code_builder","11b_revisions","12_macro_tab",
            "13_macro_approved","14_edim_run","15_bom_cost","16_design_tab","20_setup_subcode","21_setup_product_table",
            "22_setup_relationship","23_codebuilder_from_subcode","30_toolbox_program","31_toolbox_ui_tool","40_company_admin",
            "41_platform_console","42_user_management","43_drawings","44_document_tab","45_purchasing","46_quotation_print",
-           "47_techdata_print","48_dxf_plan","49_dxf_assembly","51_accepted","52_register","53_schedule","54_toolbar","55_project_mgmt","56_print_setup","57_ui_design","58_material","59_arrangement_code","60_spec_input","61_drawing_purpose","62_company_db","63_input_data","64_viewer3d","65_price_to_cost","66_project_contacts","67_partner_edit","68_spec_import","69_code_approval","70_dwg_view","71_techdata_list","72_mfg_rate","73_erp_master","74_sub_drawing","75_output_template","76_coding_list","77_wizards","78_print_layout","79_draw_module","80_macro_verify","81_learning_job","82_formula_cards","83_projection","84_toolbox_suggestion","85_special_request","86_fan_result","87_special_meter","75_cpq_special_bom","75_cpq_special_drawing","76_detail_dim","77_symbol","78_part_info","79_consulting_internal","79_consulting_benchmark"]
+           "47_techdata_print","48_dxf_plan","49_dxf_assembly","51_accepted","52_register","53_schedule","54_toolbar","55_project_mgmt","56_print_setup","57_ui_design","58_material","59_arrangement_code","60_spec_input","61_drawing_purpose","62_company_db","63_input_data","64_viewer3d","65_price_to_cost","66_project_contacts","67_partner_edit","68_spec_import","69_code_approval","70_dwg_view","71_techdata_list","72_mfg_rate","73_erp_master","74_sub_drawing","75_output_template","76_coding_list","77_wizards","78_print_layout","79_draw_module","80_macro_verify","81_learning_job","82_formula_cards","83_projection","84_toolbox_suggestion","85_special_request","86_fan_result","87_special_meter","75_cpq_special_bom","75_cpq_special_drawing","76_detail_dim","77_symbol","78_part_info","79_consulting_internal","79_consulting_benchmark","88_pcr_detail","89_ui_ai_designer","90_node_ui_form"]
     _miss=[w for w in _want if not os.path.exists(f"{OUT}/{w}.png") or os.path.getmtime(f"{OUT}/{w}.png")<T0]
     ok(f"S37 캡처 {len(_want)}장이 이번 실행에서 전부 나온다 (잔재 파일은 세지 않음)", _miss or len(_want), not _miss)
     b.close()
