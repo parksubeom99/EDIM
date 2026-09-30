@@ -14,6 +14,12 @@ def LOGIN(email,pw=PW): return {"email":email,"password":pw}
 BAD_LOGIN="이메일 또는 비밀번호가 맞지 않습니다"
 def nuke(pg): pg.evaluate("document.querySelectorAll('nextjs-portal').forEach(e=>e.remove())")
 def ok(k,v,cond): R[k]=(bool(cond),v); print(("PASS" if cond else "FAIL"),k,"→",v)
+# ccmd M-2 · D-5 — 운영 킷(docker) 대상으로 돌릴 때(EDIM_E2E_TARGET=kit) 호스트 자원(저장소 폴더 파일 · 호스트 DB)에 기대는 단계는 건너뛴다.
+# 조용히 빠지지 않게 SKIP 줄과 마지막 요약 · 결과 JSON 에 남긴다. 기본값 host = 전부 돈다.
+TARGET=os.environ.get("EDIM_E2E_TARGET","host"); SKIPPED={}
+def host_only(k,why):
+    if TARGET=="host": return True
+    SKIPPED[k]=why; print("SKIP(host-only)",k,"—",why); return False
 # 고정 sleep 대신 상태를 기다린다(ccmd C 0-1 규칙 · 2026-09-27). 못 오면 예외 대신 넘어가고, 뒤의 단언이 판정한다.
 def hydrated(pg,t=60000):
     try: pg.wait_for_selector("[data-testid=canvas-cmds][data-ready='1']",timeout=t)
@@ -2299,23 +2305,24 @@ with sync_playwright() as p:
     ok("S76c 설계 검증 규칙이 세부 치수에도 걸린다(detail.Fan.A max 1300 · 표를 1400 으로 고치면 도면 422 + 규칙 이름) · 세부 치수를 고쳐도 앞 스냅샷의 조립도는 한 글자도 안 바뀐다 · 되돌림 200",
        (up76.status, v76.status, (v76.json().get("error","") if v76.status!=200 else "")[:70], asm76_again==asm76, rs76.status),
        up76.status==200 and v76.status==422 and "팬 구획 세부 A 한계" in v76.json().get("error","") and asm76_again==asm76 and rs76.status==200)
-    # 파일 교체 시험(완료 정의 "파일 교체만으로 반영") — 회사 규칙서 자리(cad-rules.local.json)에 오프셋만 다른 사본 → 코드 변경 0 으로 좌표만 바뀐다
-    _rules_dir=os.path.join(os.path.dirname(os.path.abspath(__file__)),"..","packages","bom-code","cad-rules")
-    _local=os.path.join(_rules_dir,"cad-rules.local.json")
-    _sample=json.load(open(os.path.join(_rules_dir,"cad-rules.sample.json"),encoding="utf-8"))
-    _copy=json.loads(json.dumps(_sample)); _copy["version"]="sample-1-offset"; _copy["grid"]["offsetMm"]={"x":100,"y":-50}
-    try:
-        with open(_local,"w",encoding="utf-8",newline="\n") as f_: json.dump(_copy,f_,ensure_ascii=False,indent=2)
-        j76f=run_spf().json(); s76f=ctx.request.get(BASE+f"/api/bom-runs/{j76f.get('runId')}").json(); cr76f=(s76f.get("dims") or {}).get("cadRules") or {}
-        asm76f=ctx.request.get(BASE+f"/api/dxf?runId={j76f.get('runId')}&type=assembly").text()
-    finally:
-        if os.path.exists(_local): os.remove(_local)
-    j76b=run_spf().json(); cr76b=((ctx.request.get(BASE+f"/api/bom-runs/{j76b.get('runId')}").json().get("dims") or {}).get("cadRules") or {})
-    ok("S76d 규칙서 파일만 바꾸면(오프셋 +100 · -50 사본) 새 BOM Run 의 도면 좌표만 바뀐다 — 부품 @3250,1186 · 세부 치수 값 그대로 · 지문 · 판이 다르다 · 앞 스냅샷 도면 불변 · 파일을 치우면 샘플 지문으로 돌아온다",
-       (cr76f.get("file"), cr76f.get("version"), cr76f.get("fingerprint"), [t for t in layer_texts(asm76f,"CADRULE") if t.startswith("SFN")], cr76b.get("fingerprint")),
-       cr76f.get("file")=="cad-rules.local.json" and cr76f.get("version")=="sample-1-offset" and cr76f.get("fingerprint")!=cr76.get("fingerprint")
-       and "SFN 1 @3250,1186" in layer_texts(asm76f,"CADRULE") and layer_texts(asm76f,"DIM")==dim76
-       and ctx.request.get(BASE+f"/api/dxf?runId={rid76}&type=assembly").text()==asm76 and cr76b.get("fingerprint")==cr76.get("fingerprint"))
+    if host_only("S76d","저장소 폴더 packages/bom-code/cad-rules 에 cad-rules.local.json 을 둔다 — 킷 컨테이너는 호스트 폴더를 못 본다"):
+        # 파일 교체 시험(완료 정의 "파일 교체만으로 반영") — 회사 규칙서 자리(cad-rules.local.json)에 오프셋만 다른 사본 → 코드 변경 0 으로 좌표만 바뀐다
+        _rules_dir=os.path.join(os.path.dirname(os.path.abspath(__file__)),"..","packages","bom-code","cad-rules")
+        _local=os.path.join(_rules_dir,"cad-rules.local.json")
+        _sample=json.load(open(os.path.join(_rules_dir,"cad-rules.sample.json"),encoding="utf-8"))
+        _copy=json.loads(json.dumps(_sample)); _copy["version"]="sample-1-offset"; _copy["grid"]["offsetMm"]={"x":100,"y":-50}
+        try:
+            with open(_local,"w",encoding="utf-8",newline="\n") as f_: json.dump(_copy,f_,ensure_ascii=False,indent=2)
+            j76f=run_spf().json(); s76f=ctx.request.get(BASE+f"/api/bom-runs/{j76f.get('runId')}").json(); cr76f=(s76f.get("dims") or {}).get("cadRules") or {}
+            asm76f=ctx.request.get(BASE+f"/api/dxf?runId={j76f.get('runId')}&type=assembly").text()
+        finally:
+            if os.path.exists(_local): os.remove(_local)
+        j76b=run_spf().json(); cr76b=((ctx.request.get(BASE+f"/api/bom-runs/{j76b.get('runId')}").json().get("dims") or {}).get("cadRules") or {})
+        ok("S76d 규칙서 파일만 바꾸면(오프셋 +100 · -50 사본) 새 BOM Run 의 도면 좌표만 바뀐다 — 부품 @3250,1186 · 세부 치수 값 그대로 · 지문 · 판이 다르다 · 앞 스냅샷 도면 불변 · 파일을 치우면 샘플 지문으로 돌아온다",
+           (cr76f.get("file"), cr76f.get("version"), cr76f.get("fingerprint"), [t for t in layer_texts(asm76f,"CADRULE") if t.startswith("SFN")], cr76b.get("fingerprint")),
+           cr76f.get("file")=="cad-rules.local.json" and cr76f.get("version")=="sample-1-offset" and cr76f.get("fingerprint")!=cr76.get("fingerprint")
+           and "SFN 1 @3250,1186" in layer_texts(asm76f,"CADRULE") and layer_texts(asm76f,"DIM")==dim76
+           and ctx.request.get(BASE+f"/api/dxf?runId={rid76}&type=assembly").text()==asm76 and cr76b.get("fingerprint")==cr76.get("fingerprint"))
     r76e=run55("S76e"); s76e=ctx.request.get(BASE+f"/api/bom-runs/{r76e.get('runId')}").json()
     asm76e=ctx.request.get(BASE+f"/api/dxf?runId={r76e.get('runId')}&type=assembly").text()
     ok("S76e 기존 시연 제품(EU)은 세부 치수 · 규칙서를 쓰지 않는다 — 스냅샷에 detail · cadRules 없음 · 조립도에 CADRULE · KAD 레이어 없음",
@@ -2440,16 +2447,17 @@ with sync_playwright() as p:
        sorted(bro)==["cost_per_cmh","fan_eta","material_ratio"] and all(not v_["suppressed"] and v_["n"]>=4 and v_["p50"] is not None and v_["percentile"] is not None for v_ in bro.values())
        and abs((fe.get("mine") or 0)-(j79.get("special",{}).get("result",{}).get("eta") or -1))<1e-4
        and all(set(v_)=={"metric","label","unit","n","p25","p50","p75","mine","percentile","suppressed"} for v_ in bro.values()))
-    # 표본을 줄인 상태(테스트용 시드 옵션: 샘플 회사 1곳) → 표본 2곳 → 숨김 · 되돌림
-    sd1=subprocess.run("pnpm --filter @edim/db bench:seed -- 1",shell=True,capture_output=True)
-    bm1=ctx.request.get(CB).json(); b1={r_["metric"]:r_ for r_ in bm1.get("rows",[])}
-    pg.goto(BASE+f"/m/consulting?runId={rid79}",wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=consulting][data-ready='1']",timeout=60000)
-    hid=pg.query_selector_all("[data-testid^=bench-hidden-]"); hid_txt=pg.inner_text("[data-testid=bench-hidden-fan_eta]") if pg.query_selector("[data-testid=bench-hidden-fan_eta]") else ""
-    sd3=subprocess.run("pnpm --filter @edim/db bench:seed -- 3",shell=True,capture_output=True)
-    ok("S79d 표본을 2곳으로 줄이면(샘플 1 + 우리) 분포를 숨긴다 — suppressed · p25/p50/p75 · 백분위 NULL · 화면 '표본이 3곳 미만이라 보여 드리지 않습니다' · 시드 되돌림",
-       (sd1.returncode, {k_:(v_["n"],v_["suppressed"],v_["p50"]) for k_,v_ in b1.items()}, len(hid), hid_txt, sd3.returncode),
-       sd1.returncode==0 and sd3.returncode==0 and all(v_["suppressed"] and v_["n"]==2 and v_["p25"] is None and v_["p50"] is None and v_["p75"] is None and v_["percentile"] is None for v_ in b1.values())
-       and len(hid)==3 and "표본이 3곳 미만이라 보여 드리지 않습니다" in hid_txt)
+    if host_only("S79d","호스트 DB 에 bench:seed 를 돌린다 — 킷 DB 가 아니라 호스트 .env 의 DB 에 닿는다"):
+        # 표본을 줄인 상태(테스트용 시드 옵션: 샘플 회사 1곳) → 표본 2곳 → 숨김 · 되돌림
+        sd1=subprocess.run("pnpm --filter @edim/db bench:seed -- 1",shell=True,capture_output=True)
+        bm1=ctx.request.get(CB).json(); b1={r_["metric"]:r_ for r_ in bm1.get("rows",[])}
+        pg.goto(BASE+f"/m/consulting?runId={rid79}",wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=consulting][data-ready='1']",timeout=60000)
+        hid=pg.query_selector_all("[data-testid^=bench-hidden-]"); hid_txt=pg.inner_text("[data-testid=bench-hidden-fan_eta]") if pg.query_selector("[data-testid=bench-hidden-fan_eta]") else ""
+        sd3=subprocess.run("pnpm --filter @edim/db bench:seed -- 3",shell=True,capture_output=True)
+        ok("S79d 표본을 2곳으로 줄이면(샘플 1 + 우리) 분포를 숨긴다 — suppressed · p25/p50/p75 · 백분위 NULL · 화면 '표본이 3곳 미만이라 보여 드리지 않습니다' · 시드 되돌림",
+           (sd1.returncode, {k_:(v_["n"],v_["suppressed"],v_["p50"]) for k_,v_ in b1.items()}, len(hid), hid_txt, sd3.returncode),
+           sd1.returncode==0 and sd3.returncode==0 and all(v_["suppressed"] and v_["n"]==2 and v_["p25"] is None and v_["p50"] is None and v_["p75"] is None and v_["percentile"] is None for v_ in b1.values())
+           and len(hid)==3 and "표본이 3곳 미만이라 보여 드리지 않습니다" in hid_txt)
     vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data=LOGIN("viewer@acme.test"))
     v79=(vw.request.get(CI).status, vw.request.get(CB).status, vw.request.get(BASE+f"/api/consulting/print?runId={rid79}").status)
     vp=vw.new_page(); vp.goto(BASE+"/m/consulting",wait_until="domcontentloaded"); v79p=bool(vp.query_selector("[data-testid=consulting-forbidden]")); vw.close()
@@ -2477,27 +2485,28 @@ with sync_playwright() as p:
     xl80=ctx.request.get(DOCS+f"/{q80.get('id')}/export?format=xlsx")
     ok("S80b 인쇄본 화면에 PCR 세부 표 + '샘플' 표지가 실제로 보인다 · Excel 내보내기 200",
        (vis80, xl80.status), vis80[0] and vis80[1] and vis80[2]=="샘플" and vis80[3]=="3" and xl80.status==200)
-    # 요율표 교체 — 회사 파일 자리(pcr-rules.local.json · .gitignore)에 Air/Sea freight 수출 요율 3.5 → 7.0 을 두면 다음 견적만 바뀐다. 틀린 파일은 422. 끝나면 지운다.
-    _root=os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)),".."))
-    _smp=os.path.join(_root,"packages","bom-code","cost-rules","pcr-rules.sample.json"); _loc=os.path.join(_root,"packages","bom-code","cost-rules","pcr-rules.local.json")
-    _rules=json.load(open(_smp,encoding="utf-8")); _rules["version"]="e2e-local-1"; _rules["marginPct"]=20   # ccmd M-1 — 마진율도 파일에서만 바꾼다
-    for r_ in _rules["sections"][0]["rows"]:
-        if r_["label"]=="Air/Sea freight": r_["pct"]=[0,7.0,0]
-    try:
-        with open(_loc,"w",encoding="utf-8",newline="\n") as f_: json.dump(_rules,f_,ensure_ascii=False)
-        q80b=ctx.request.post(DOCS,headers=J0,data=json.dumps({"runId":RUN1,"type":"quotation"})).json()
-        b80b=ctx.request.get(DOCS+f"/{q80b.get('id')}").json().get("body",{}); d80b=b80b.get("pcrDetail") or {}
-        with open(_loc,"w",encoding="utf-8",newline="\n") as f_: f_.write("{ not json")
-        bad80=ctx.request.post(DOCS,headers=J0,data=json.dumps({"runId":RUN1,"type":"quotation"}))
-    finally:
-        if os.path.exists(_loc): os.remove(_loc)
-    b80a=ctx.request.get(DOCS+f"/{q80.get('id')}").json().get("body",{}); d80a=b80a.get("pcrDetail") or {}
-    fr=lambda d_: [r_["values"] for r_ in d_.get("sections",[{}])[0].get("rows",[]) if r_["label"]=="Air/Sea freight"]
-    ok("S80c 요율표 파일만 바꾸면(pcr-rules.local.json) 다음 견적의 수출 운송비가 2배(원 단위 반올림 ±1) · 마진율 10 → 20% 로 견적 합계 = 원가 × 1.2 · 원가(PCR Full cost)는 그대로 · 판 · 지문이 바뀐다 · 앞 견적은 합계까지 그대로 · 틀린 파일은 422(숨기지 않는다) · 파일을 지우면 샘플로 돌아간다",
-       (fr(d80), fr(d80b), d80b.get("version"), d80b.get("file"), d80b.get("fingerprint")!=d80.get("fingerprint"), fr(d80a)==fr(d80), bad80.status, q80b.get("total"), b80b.get("pcr",{}).get("fullCost"), b80a.get("total")),
-       fr(d80b) and fr(d80) and abs(fr(d80b)[0][1]-2*fr(d80)[0][1])<=1 and fr(d80b)[0][0]==0 and d80b.get("version")=="e2e-local-1" and d80b.get("file")=="pcr-rules.local.json"
-       and d80b.get("fingerprint")!=d80.get("fingerprint") and fr(d80a)==fr(d80) and bad80.status==422
-       and d80b.get("marginPct")==20 and q80b.get("total")==math.floor(b80["pcr"]["fullCost"]*1.2+0.5) and b80b.get("pcr",{}).get("fullCost")==b80["pcr"]["fullCost"] and b80a.get("total")==q80.get("total") and "PCR 요율표" in bad80.text() and not os.path.exists(_loc))
+    if host_only("S80c","저장소 폴더 packages/bom-code/cost-rules 에 pcr-rules.local.json 을 둔다 — 킷 컨테이너는 호스트 폴더를 못 본다"):
+        # 요율표 교체 — 회사 파일 자리(pcr-rules.local.json · .gitignore)에 Air/Sea freight 수출 요율 3.5 → 7.0 을 두면 다음 견적만 바뀐다. 틀린 파일은 422. 끝나면 지운다.
+        _root=os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)),".."))
+        _smp=os.path.join(_root,"packages","bom-code","cost-rules","pcr-rules.sample.json"); _loc=os.path.join(_root,"packages","bom-code","cost-rules","pcr-rules.local.json")
+        _rules=json.load(open(_smp,encoding="utf-8")); _rules["version"]="e2e-local-1"; _rules["marginPct"]=20   # ccmd M-1 — 마진율도 파일에서만 바꾼다
+        for r_ in _rules["sections"][0]["rows"]:
+            if r_["label"]=="Air/Sea freight": r_["pct"]=[0,7.0,0]
+        try:
+            with open(_loc,"w",encoding="utf-8",newline="\n") as f_: json.dump(_rules,f_,ensure_ascii=False)
+            q80b=ctx.request.post(DOCS,headers=J0,data=json.dumps({"runId":RUN1,"type":"quotation"})).json()
+            b80b=ctx.request.get(DOCS+f"/{q80b.get('id')}").json().get("body",{}); d80b=b80b.get("pcrDetail") or {}
+            with open(_loc,"w",encoding="utf-8",newline="\n") as f_: f_.write("{ not json")
+            bad80=ctx.request.post(DOCS,headers=J0,data=json.dumps({"runId":RUN1,"type":"quotation"}))
+        finally:
+            if os.path.exists(_loc): os.remove(_loc)
+        b80a=ctx.request.get(DOCS+f"/{q80.get('id')}").json().get("body",{}); d80a=b80a.get("pcrDetail") or {}
+        fr=lambda d_: [r_["values"] for r_ in d_.get("sections",[{}])[0].get("rows",[]) if r_["label"]=="Air/Sea freight"]
+        ok("S80c 요율표 파일만 바꾸면(pcr-rules.local.json) 다음 견적의 수출 운송비가 2배(원 단위 반올림 ±1) · 마진율 10 → 20% 로 견적 합계 = 원가 × 1.2 · 원가(PCR Full cost)는 그대로 · 판 · 지문이 바뀐다 · 앞 견적은 합계까지 그대로 · 틀린 파일은 422(숨기지 않는다) · 파일을 지우면 샘플로 돌아간다",
+           (fr(d80), fr(d80b), d80b.get("version"), d80b.get("file"), d80b.get("fingerprint")!=d80.get("fingerprint"), fr(d80a)==fr(d80), bad80.status, q80b.get("total"), b80b.get("pcr",{}).get("fullCost"), b80a.get("total")),
+           fr(d80b) and fr(d80) and abs(fr(d80b)[0][1]-2*fr(d80)[0][1])<=1 and fr(d80b)[0][0]==0 and d80b.get("version")=="e2e-local-1" and d80b.get("file")=="pcr-rules.local.json"
+           and d80b.get("fingerprint")!=d80.get("fingerprint") and fr(d80a)==fr(d80) and bad80.status==422
+           and d80b.get("marginPct")==20 and q80b.get("total")==math.floor(b80["pcr"]["fullCost"]*1.2+0.5) and b80b.get("pcr",{}).get("fullCost")==b80["pcr"]["fullCost"] and b80a.get("total")==q80.get("total") and "PCR 요율표" in bad80.text() and not os.path.exists(_loc))
     # ccmd M-2 · EBIT 타이 — 세로 합(구역 소계 + EBIT) = 견적 · EBIT ≤ 견적 − 표의 원가 기준(재료비 + 인건비) · 표의 원가 기준 + 스냅샷 Overhead = 스냅샷 원가 · 기준 한 줄이 인쇄본에 실제로 보인다
     base80=d80.get("costBase"); oh80=d80.get("snapshotOverhead"); ebit80=d80.get("ebit",[])
     vsum80=[sum(s_["subtotal"][i_] for s_ in d80.get("sections",[]))+e_ for i_,e_ in enumerate(ebit80)]
@@ -2630,5 +2639,5 @@ with sync_playwright() as p:
     _miss=[w for w in _want if not os.path.exists(f"{OUT}/{w}.png") or os.path.getmtime(f"{OUT}/{w}.png")<T0]
     ok(f"S37 캡처 {len(_want)}장이 이번 실행에서 전부 나온다 (잔재 파일은 세지 않음)", _miss or len(_want), not _miss)
     b.close()
-n=sum(1 for v in R.values() if v[0]); print(f"\n[demo_e2e] {n}/{len(R)} steps passed"); json.dump(R,open(f"{OUT}/demo_e2e_result.json","w",encoding="utf-8"),ensure_ascii=False,indent=1)
+n=sum(1 for v in R.values() if v[0]); print(f"\n[demo_e2e] target={TARGET} · {n}/{len(R)} steps passed"+(f" · host-only 건너뜀 {len(SKIPPED)}: {', '.join(SKIPPED)}" if SKIPPED else "")); json.dump({**R,"_skipped_host_only":SKIPPED} if SKIPPED else R,open(f"{OUT}/demo_e2e_result.json","w",encoding="utf-8"),ensure_ascii=False,indent=1)
 sys.exit(0 if n==len(R) else 1)
