@@ -54,6 +54,24 @@ describe("ccmd M · p66 견적 body · 인쇄본", () => {
     expect(html).toContain('data-testid="quote-margin"');
     expect(html).toContain('data-testid="margin-sample"');
   });
+  it("ccmd M-2 · 타이 — 세로 합(구역 소계 + EBIT) = 견적 · EBIT ≤ 견적 − 표의 원가 기준(재료비 + 인건비) · 스냅샷 Overhead 는 표 밖 · 원가 기준 한 줄이 인쇄본에", () => {
+    const p = parsePcrRules(SAMPLE); if (!p.ok) throw new Error(p.error);
+    const r = buildQuotationBody(run, null, { qty: 2, pcrRules: { fingerprint: "f12", file: "pcr-rules.sample.json", rules: p.rules } }, "QR-0-01", "A", "2026-09-30");
+    if (!r.ok) throw new Error(r.error);
+    const d = r.body.pcrDetail!;
+    expect(d.costBase).toBe(2_360_000);                           // (1,000,000 + 180,000) × 2
+    expect(d.snapshotOverhead).toBe(283_200);                     // 141,600 × 2 — 표에 안 들어간다
+    d.ebit.forEach((e, i) => {
+      expect(d.sections.reduce((a, s) => a + s.subtotal[i]!, 0) + e).toBe(d.contract);
+      expect(e).toBeLessThanOrEqual(d.contract - d.costBase!);
+    });
+    const html = renderDocumentHtml({ docNo: "QR-0-01", currentRev: "A", status: "draft", docType: "quotation", body: r.body } as never);
+    expect(html).toContain('data-testid="pcr-cost-basis"');
+    expect(html).toContain("2,360,000");
+    expect(html).toContain("283,200");
+    expect(html).toContain("마진율 10%)");
+    expect(html).not.toContain("스냅샷 원가 그대로");
+  });
   it("요율표가 없으면 PCR 세부 · 마진 없이(옛 견적과 같은 모양 · 단가 = 원가)", () => {
     const r = buildQuotationBody(run, null, {}, "QR-0-01", "A", "2026-09-30");
     if (!r.ok) throw new Error(r.error);

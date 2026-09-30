@@ -2498,6 +2498,15 @@ with sync_playwright() as p:
        fr(d80b) and fr(d80) and abs(fr(d80b)[0][1]-2*fr(d80)[0][1])<=1 and fr(d80b)[0][0]==0 and d80b.get("version")=="e2e-local-1" and d80b.get("file")=="pcr-rules.local.json"
        and d80b.get("fingerprint")!=d80.get("fingerprint") and fr(d80a)==fr(d80) and bad80.status==422
        and d80b.get("marginPct")==20 and q80b.get("total")==math.floor(b80["pcr"]["fullCost"]*1.2+0.5) and b80b.get("pcr",{}).get("fullCost")==b80["pcr"]["fullCost"] and b80a.get("total")==q80.get("total") and "PCR 요율표" in bad80.text() and not os.path.exists(_loc))
+    # ccmd M-2 · EBIT 타이 — 세로 합(구역 소계 + EBIT) = 견적 · EBIT ≤ 견적 − 표의 원가 기준(재료비 + 인건비) · 표의 원가 기준 + 스냅샷 Overhead = 스냅샷 원가 · 기준 한 줄이 인쇄본에 실제로 보인다
+    base80=d80.get("costBase"); oh80=d80.get("snapshotOverhead"); ebit80=d80.get("ebit",[])
+    vsum80=[sum(s_["subtotal"][i_] for s_ in d80.get("sections",[]))+e_ for i_,e_ in enumerate(ebit80)]
+    basis80=pg.inner_text("[data-testid=pcr-cost-basis]") if pg.is_visible("[data-testid=pcr-cost-basis]") else ""
+    ok("S80d EBIT 타이 — 세로 합 = 견적(열마다) · EBIT ≤ 견적 − 표의 원가 기준(스냅샷 재료비 + 인건비) · 원가 기준 + 스냅샷 Overhead = 스냅샷 원가 ₩15,487,170 · 견적 ₩17,035,887 불변 · 기준 한 줄이 인쇄본에 보인다",
+       (ebit80, vsum80, base80, oh80, b80["pcr"]["fullCost"], d80.get("contract"), basis80[:40]),
+       bool(ebit80) and all(v_==d80.get("contract") for v_ in vsum80) and base80==round(b80["pcr"]["material"])+round(b80["pcr"]["manufacturing"])
+       and all(e_<=d80["contract"]-base80 for e_ in ebit80) and base80+oh80==b80["pcr"]["fullCost"]==15487170 and d80.get("contract")==17035887
+       and "원가 기준" in basis80 and f"{base80:,}" in basis80 and f"{oh80:,}" in basis80)
     # ── S81 (ccmd M · p25 · p26 · p21) — UI 개발 AI(결정론) · Canvas · 저장·삭제·등록 · 실행 설정(Call) · Object Inspector · Signal/Slot · Work Hierarchy 노드별 UI ──
     UF=BASE+"/api/ui-forms"; NODE81="a0000000-0000-4000-8000-000000000004"; FN81="E2E AI 폼"
     # 쓰기 시험용 샘플 표(E2E-UIF · reset:demo 가 지운다) — Item = Sub Code B(10 · 12 · 25 · 55)

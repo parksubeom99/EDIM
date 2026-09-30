@@ -172,7 +172,7 @@ export function buildQuotationBody(
       ...(priceBasisOf(run) ? { priceBasis: priceBasisOf(run)! } : {}),
       ...(cost.laborBasis ? { laborBasis: cost.laborBasis } : {}),
       ...(appliedOf(run) ? { applied: appliedOf(run)! } : {}),
-      ...(opts.pcrRules ? { pcrDetail: buildPcrDetail({ material: cost.material * qty, labor: cost.labor * qty, contract: amount }, opts.pcrRules.rules, opts.pcrRules) } : {}),
+      ...(opts.pcrRules ? { pcrDetail: buildPcrDetail({ material: cost.material * qty, labor: cost.labor * qty, contract: amount, overhead: cost.overhead * qty }, opts.pcrRules.rules, opts.pcrRules) } : {}),
       ...(opts.pcrRules ? { margin: { pct: marginPct, costUnit: cost.total, unitPrice, file: opts.pcrRules.file, fingerprint: opts.pcrRules.fingerprint, sample: opts.pcrRules.rules.sample } } : {}),
     },
   };
@@ -380,7 +380,7 @@ function pcrDetailHtml(d: PcrDetail, cur: string): string {
   return `<h2>PCR 세부 · Business Type${d.sample ? ' <span data-testid="pcr-sample" style="font-size:11px;font-weight:700;color:#b45309;border:1px solid #b45309;border-radius:3px;padding:0 4px">샘플</span>' : ""}</h2>
 <table data-testid="pcr-detail" data-types="${d.businessTypes.length}">
 <tr><th>Business Type</th>${d.businessTypes.map((t) => `<th class="n">${esc(t)}</th>`).join("")}<th>근거</th></tr>
-${row("<b>Sales price · Contract Amount</b>", Array(d.businessTypes.length).fill(d.contract), "이 견적서 금액(스냅샷 원가 그대로)", true)}
+${row("<b>Sales price · Contract Amount</b>", Array(d.businessTypes.length).fill(d.contract), d.marginPct ? `이 견적서 금액 = 스냅샷 원가 × (1 + 마진율 ${d.marginPct}%)` : "이 견적서 금액(스냅샷 원가 그대로)", true)}
 ${d.sections.filter((s) => s.group === "direct").map((s) => `<tr><th colspan="${d.businessTypes.length + 2}" style="text-align:left">${esc(s.name)}</th></tr>${s.rows.map((r) => row(`&nbsp;&nbsp;${esc(r.label)}`, r.values, r.basis)).join("")}`).join("")}
 ${row("Direct costs total", d.directTotal, "Σ 위 구역", true)}
 ${row("Contribution margin", d.contribution, "견적 금액 − Direct")}
@@ -388,7 +388,18 @@ ${d.sections.filter((s) => s.group === "sna").map((s) => `<tr><th colspan="${d.b
 ${row("Full costs", d.fullCost, "Direct + Sales & Adm.", true)}
 <tr style="font-weight:700" data-testid="pcr-ebit"><td>EBIT</td>${cells(d.ebit)}<td style="font-size:10px;color:#666">견적 금액 − Full costs</td></tr>
 </table>
+<p data-testid="pcr-cost-basis" style="font-size:11px;color:#555">${esc(pcrCostBasisText(d))}</p>
 <p data-testid="pcr-rules-stamp" style="font-size:11px;color:#555">요율표 ${esc(d.file)} · 판 ${esc(d.version)} · 지문 <span class="mono">${esc(d.fingerprint)}</span> · 마진율 ${d.marginPct ?? 0}% · 통화 ${esc(cur)}${d.sample ? ` — ${esc(d.sample)}` : ""}</p>`;
+}
+
+/** ccmd M-2 · PCR 세부의 원가 기준 한 줄 — 이 표의 EBIT 가 "견적 − 스냅샷 원가"와 왜 다른지. 옛 body(costBase 없음)는 Ex-Work + Manufacturing 줄로 센다. */
+export function pcrCostBasisText(d: PcrDetail): string {
+  const pick = (k: "Ex-Work" | "Manufacturing") => d.sections.flatMap((s) => s.rows).find((r) => r.label.startsWith(k))?.values[0] ?? 0;
+  const base = d.costBase ?? pick("Ex-Work") + pick("Manufacturing");
+  const oh = d.snapshotOverhead;
+  return `원가 기준: 이 표는 스냅샷 재료비 + 인건비 ₩${won(base)} 에서 출발해 간접비를 위 요율표 줄로 다시 센다`
+    + (oh !== undefined ? ` — 스냅샷 원가의 Overhead(12% 일괄) ₩${won(oh)} 은 넣지 않는다(간접비 이중 계상 방지)` : " — 스냅샷 원가의 Overhead(12% 일괄)는 넣지 않는다(간접비 이중 계상 방지)")
+    + `. 그래서 EBIT = 견적 − 요율표 기준 Full costs 이며, 견적 − 스냅샷 원가${oh !== undefined ? `(₩${won(d.contract - base - oh)})` : ""} 와 다를 수 있다.`;
 }
 
 /** 인쇄본의 인건비 기준 한 줄(HTML 이스케이프됨) — 스냅샷에 박힌 laborBasis 를 글로 옮긴다. */

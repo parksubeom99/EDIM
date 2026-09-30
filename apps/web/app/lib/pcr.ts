@@ -3,6 +3,9 @@
  * **순수 함수**(파일·DB 모름). 입력 = 스냅샷 원가(재료비 · 인건비) + 견적 금액 + 요율표(샘플 파일 · pcr-rules.ts 가 읽는다).
  * ccmd M-1(회장님 결정 09-30) — 요율표의 marginPct 로 **견적 단가 = 스냅샷 원가 × (1 + 마진율)**. 원가(스냅샷)는 그대로다.
  * 이 표의 Contract Amount = 그 견적 금액 → EBIT = 견적 − Full costs.
+ * ccmd M-2 · 원가 기준 — 이 표는 스냅샷 **재료비 + 인건비**(costBase)에서 출발해 간접비를 요율표 줄로 **다시 센다**.
+ * 스냅샷 원가의 Overhead(12% 일괄 · snapshotOverhead)는 넣지 않는다(넣으면 간접비 이중 계상). 그래서 EBIT 는
+ * "견적 − 스냅샷 원가"와 다를 수 있고, 항상 EBIT ≤ 견적 − costBase 다(요율 줄은 0 이상).
  */
 export type PcrKind = "bom" | "mfg" | "rate";
 export type PcrBase = "exwork" | "contract";
@@ -54,6 +57,10 @@ export interface PcrDetail {
   marginPct: number;
   businessTypes: string[];
   contract: number;
+  /** ccmd M-2 · 이 표의 원가 기준 = 스냅샷 재료비 + 인건비(수량 곱) — 옛 견적 body 엔 없다 */
+  costBase?: number;
+  /** ccmd M-2 · 이 표에 넣지 않은 스냅샷 Overhead(수량 곱) — 옛 견적 body 엔 없다 */
+  snapshotOverhead?: number;
   sections: { name: string; group: "direct" | "sna"; rows: PcrDetailRow[]; subtotal: number[] }[];
   directTotal: number[]; contribution: number[]; snaTotal: number[]; fullCost: number[]; ebit: number[];
 }
@@ -67,7 +74,7 @@ const sum = (xs: number[][], n: number) => Array.from({ length: n }, (_, i) => x
 
 /** 스냅샷 재료비·인건비(수량 곱한 값)와 견적 금액으로 표를 편다. 모든 칸은 원 단위 반올림. */
 export function buildPcrDetail(
-  input: { material: number; labor: number; contract: number },
+  input: { material: number; labor: number; contract: number; overhead?: number },
   rules: PcrRules, meta: { fingerprint: string; file: string },
 ): PcrDetail {
   const n = rules.businessTypes.length;
@@ -86,7 +93,10 @@ export function buildPcrDetail(
   const fullCost = directTotal.map((d, i) => d + snaTotal[i]!);
   return {
     version: rules.version, fingerprint: meta.fingerprint, file: meta.file, sample: rules.sample, marginPct: rules.marginPct,
-    businessTypes: rules.businessTypes, contract, sections,
+    businessTypes: rules.businessTypes, contract,
+    costBase: Math.round(input.material) + Math.round(input.labor),
+    ...(input.overhead !== undefined ? { snapshotOverhead: Math.round(input.overhead) } : {}),
+    sections,
     directTotal, contribution: directTotal.map((d) => contract - d), snaTotal, fullCost, ebit: fullCost.map((f) => contract - f),
   };
 }
