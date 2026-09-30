@@ -1545,6 +1545,26 @@
           "rows": [
             { "item": "R1", "cells": { "A": "detail.Fan.A", "B": "max", "C": 1300, "D": "팬 구획 세부 A 한계(샘플)" } }
           ]
+        },
+        "pri": {
+          "no": 7,
+          "role": "priority",
+          "by": "B",
+          "default": "",
+          "cols": [
+            { "key": "A", "name": "target", "label": "Dim" },
+            { "key": "B", "name": "priority", "label": "설계 우선순위" },
+            { "key": "C", "name": "upper", "label": "상위설계 우선자료" },
+            { "key": "D", "name": "datum", "label": "설계 기준점 설정" },
+            { "key": "E", "name": "check", "label": "설계 오류 체크" },
+            { "key": "F", "name": "remarks", "label": "Remarks" }
+          ],
+          "rows": [
+            { "item": "P1", "cells": { "A": "W", "B": 1, "C": "예", "D": "Base", "E": "<= 3000", "F": "건물 반입구 폭(상위설계 · 샘플)" } },
+            { "item": "P2", "cells": { "A": "H", "B": 2, "C": "아니오", "D": "Base", "E": "<= 3000", "F": "샘플" } },
+            { "item": "P3", "cells": { "A": "detail.Fan.A", "B": 3, "C": "아니오", "D": "Shaft", "E": "<= 1300", "F": "샘플" } },
+            { "item": "P4", "cells": { "A": "L", "B": 4, "C": "아니오", "D": "Base", "E": "> 300", "F": "p42 예시 ④ > 300 · 샘플" } }
+          ]
         }
       },
       "sections": [

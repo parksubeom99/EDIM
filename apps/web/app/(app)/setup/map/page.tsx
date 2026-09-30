@@ -43,7 +43,7 @@ const MAP: { col: string; groups: Group[] }[] = [
       { id: "s15", label: "5) Arrangement Code (S-1-5)", href: "/setup/arrangement-code" },
       { id: "s16", label: "6) Arrangement Set-up (S1-6)", href: "/workbench" },
     ] },
-    { title: "2. Design", items: [{ id: "s411", label: "1) Design (S-4-1-1)", href: "/workbench" }] },
+    { title: "2. Design", items: [{ id: "s411", label: "1) Design (S-4-1-1)", href: "/workbench" }, { id: "s411p", label: "2) 설계 우선순위 · Material management (p42)", href: "/setup/design-priority" }] },
     { title: "3. Work Process", items: [{ id: "s412", label: "1) Work Process (S-4-1-2) · All Department", href: "/setup/work-process" }] },
   ] },
   { col: "ERP (Set-Up / User)", groups: [

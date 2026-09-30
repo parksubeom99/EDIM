@@ -67,8 +67,10 @@ export interface TechTable {
    * special = Special 호출 선언(ccmd K · KA) — 한 행 = 입력 한 개의 출처(program · input · from · required).
    *   BOM Run 이 이 표를 보고 서버에서 Special 을 부른다(사람이 입력을 다시 치지 않는다) · specialCallOf.
    * detail = Detail Dimension(ccmd K · KC-1 · p36 · p38) — 한 행 = 세부 치수 하나(target · label A~K · value · from) · detailDimsOf.
+   * priority = 설계 우선순위(ccmd L · LA6 · p42) — 한 행 = 치수 하나(target · priority · upper · datum · check · remarks) · priorityRowsOf.
+   *   check(오류 체크 식)는 **기존 설계 검증 규칙(max · min)으로 컴파일**되어 checkDesign 이 판정한다(새 판정기 없음).
    */
-  role?: "tech" | "dim" | "buy" | "rule" | "special" | "detail";
+  role?: "tech" | "dim" | "buy" | "rule" | "special" | "detail" | "priority";
   by: SlotKey;
   /**
    * ccmd K · KA — 행을 슬롯이 아니라 **이 BOM Run 의 Special 결과 필드**로 고른다(예: motorKw → "3.7" 행).
@@ -341,6 +343,53 @@ const MACRO_FAIL: Record<"missing" | "unapproved" | "error", string> = { missing
  * 규칙을 지금 치수·구획에 대 본다. 통과면 빈 배열. evalMacro 가 없으면 매크로 규칙은 "없음" 위반이다(조용히 통과시키지 않는다).
  * ccmd K · KC-1 — details(세부 치수)가 오면 detail.<대상>.<label> 규칙도 판정한다. 등록 안 된 세부 치수를 가리키는 규칙은 위반("없음").
  */
+/** ccmd L · LA6 · p42 — 설계 우선순위 표 한 행(Dim · 설계 우선순위 · 상위설계 우선자료 · 설계 기준점 · 설계 오류 체크 · Remarks) */
+export interface PriorityRow { target: string; priority: number; upper: boolean; datum: string; check: string; remarks: string }
+const PRIO_CHECK = /^\s*(<=|<|>=|>)\s*(-?\d+(?:\.\d+)?|(?:dim\.)?[WHL])\s*$/i;
+
+export function priorityRowsOf(product: ProductCode): PriorityRow[] {
+  const t = Object.values(product.tables ?? {}).find((x) => x.role === "priority");
+  if (!t) return [];
+  const colOf = (...nm: string[]) => t.cols.find((c) => nm.includes(c.name.toLowerCase()))?.key;
+  const kT = colOf("target", "dim"), kP = colOf("priority"), kU = colOf("upper"), kD = colOf("datum"), kC = colOf("check"), kR = colOf("remarks");
+  if (!kT || !kP) return [];
+  const yes = (v: unknown) => v === true || /^(y|yes|예|o|true|1)$/i.test(String(v ?? "").trim());
+  return t.rows.map((r) => ({
+    target: String(r.cells[kT] ?? "").trim(), priority: Number(r.cells[kP]), upper: yes(kU ? r.cells[kU] : ""),
+    datum: String(kD ? r.cells[kD] ?? "" : "").trim(), check: String(kC ? r.cells[kC] ?? "" : "").trim(), remarks: String(kR ? r.cells[kR] ?? "" : "").trim(),
+  })).filter((r) => r.target && Number.isFinite(r.priority));
+}
+
+/** 오류 체크 식 → 기존 설계 검증 규칙. `<= 2600` · `< W` → max · `>= 300` · `> 300` → min(경계값은 max · min 과 같이 포함으로 본다).
+ * 우변 W · H · L(또는 dim.W …)은 이 Run 의 치수로 바꾼다. 읽을 수 없는 식은 규칙을 만들지 않고 bad 로 돌려준다(조용히 통과시키지 않도록 판정에 남긴다). */
+export function compilePriorityRules(rows: PriorityRow[], facts: Record<string, number>): { rules: DesignRule[]; ruleOf: Map<string, PriorityRow>; bad: PriorityRow[] } {
+  const rules: DesignRule[] = []; const ruleOf = new Map<string, PriorityRow>(); const bad: PriorityRow[] = [];
+  for (const r of rows) {
+    if (!r.check) continue;
+    const m = PRIO_CHECK.exec(r.check);
+    const target = /^detail\./i.test(r.target) ? `detail.${r.target.slice(7)}` : r.target.replace(/^dim\./i, "").toUpperCase();
+    const rhs = m ? (/^-?\d/.test(m[2]!) ? Number(m[2]) : facts[m[2]!.replace(/^dim\./i, "").toUpperCase()]) : undefined;
+    if (!m || rhs === undefined || !Number.isFinite(rhs) || (!(RULE_TARGETS as readonly string[]).includes(target) && !DETAIL_TARGET.test(target))) { bad.push(r); continue; }
+    const name = `설계 우선순위 ${r.priority} · ${r.target} ${r.check}`;
+    rules.push({ name, target, op: m[1]!.startsWith("<") ? "max" : "min", value: rhs });
+    ruleOf.set(name, r);
+  }
+  return { rules, ruleOf, bad };
+}
+
+/** 위반이 여럿이면 **우선순위가 가장 낮은(숫자가 큰) 치수부터** "바꿀 후보" · 상위설계 우선자료 치수는 "바꾸지 말 것". */
+export function priorityVerdict(rows: PriorityRow[], comp: { ruleOf: Map<string, PriorityRow>; bad: PriorityRow[] }, violations: RuleViolation[]) {
+  const hit = violations.map((v) => comp.ruleOf.get(v.name)).filter((r): r is PriorityRow => !!r);
+  const order = [...hit].sort((a, b) => b.priority - a.priority || a.target.localeCompare(b.target));
+  return {
+    rows: rows.length,
+    violated: hit.length,
+    candidates: order.filter((r) => !r.upper).map((r) => ({ target: r.target, priority: r.priority, datum: r.datum, check: r.check })),
+    keep: order.filter((r) => r.upper).map((r) => ({ target: r.target, priority: r.priority, datum: r.datum, check: r.check, note: "상위설계 우선자료 — 바꾸지 말 것" })),
+    unreadable: comp.bad.map((r) => ({ target: r.target, check: r.check })),
+  };
+}
+
 export function checkDesign(
   rules: DesignRule[],
   dims: { W: number; H: number; L: number },

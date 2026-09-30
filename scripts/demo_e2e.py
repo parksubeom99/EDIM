@@ -1637,9 +1637,9 @@ with sync_playwright() as p:
     st={h: ctx.request.get(BASE+h).status for h in hrefs}
     ok("S61b 지도의 링크가 가리키는 화면이 모두 열린다(200)", st, len(hrefs)>=10 and all(v==200 for v in st.values()))
     nones=pg.eval_on_selector_all("[data-kind=none]","es=>es.map(e=>e.innerText)")
-    # H4(ccmd H) 이후 Department 는 ERP 기준정보 화면(/setup/erp)으로 링크 — 아직 없음은 Work Process · 그 밖의 ERP 둘.
-    ok("S61c 없는 것은 있는 척하지 않는다 — Work Process · 그 밖의 ERP 는 '아직 없음 — 필요한 입력' 으로", len(nones),
-       len(nones)==2 and all("아직 없음" in t and "필요한 입력" in t for t in nones))
+    # H4(ccmd H) 이후 Department 는 ERP 기준정보 화면(/setup/erp)으로 링크. ccmd L · LA1 이후 Work Process 도 링크(/setup/work-process) — 아직 없음은 그 밖의 ERP 하나.
+    ok("S61c 없는 것은 있는 척하지 않는다 — 그 밖의 ERP 는 '아직 없음 — 필요한 입력' · Work Process 는 p43 화면으로 링크(ccmd L)", (len(nones), kinds.get("s412")),
+       len(nones)==1 and all("아직 없음" in t and "필요한 입력" in t for t in nones) and kinds.get("s412")=="link")
     vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data=LOGIN("viewer@acme.test")); vm=vw.request.get(BASE+"/setup/map"); vw.close()
     ok("S61d 지도는 읽기 화면 — viewer 도 연다(200)", vm.status, vm.status==200)
     # ── S62 F10 · p66 · p67 제조 정보 표(공정별 시간 × 임율 · 장비) → 인건비 · 견적 적용(스냅샷 단가·출처) ──
@@ -2677,13 +2677,193 @@ with sync_playwright() as p:
     rs82=ctx.request.post(ARR,headers=J0,data=json.dumps(arr_body(arr0)))   # 원래 배치로 되돌림(구동 방식 · 방향 없음)
     ok("S82d 원래 배치로 되돌리면 모터 자리가 도면에서 빠진다(구동 방식을 고르지 않은 제품 · 구획은 옛 도면 그대로)",
        (rs82.status, [t_ for t_ in layer_texts(motor_run()[1],"CADRULE") if t_.startswith("MOTOR ")]), rs82.status==200 and not [t_ for t_ in layer_texts(motor_run()[1],"CADRULE") if t_.startswith("MOTOR ")])
+    # ── S83~S91 (ccmd L · LA-2 · LA-3 · p43 · p44 · p69) — 생산 · 창고 · 품질 · 모바일 · QR. 새 경로만(시연 장면 1~14 불변) · 샘플 기준정보(reset:demo) ──
+    ME=BASE+"/api/mes"; N4M="a0000000-0000-4000-8000-000000000004"
+    import datetime as _dt
+    DUE=(_dt.date.today()+_dt.timedelta(days=30)).isoformat()
+    m83=ctx.request.get(ME+"/master").json(); WH1=[w_["id"] for w_ in m83["warehouses"] if w_["code"]=="WH-1"][0]
+    pg.goto(BASE+"/setup/work-process",wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=wp-material] tbody tr",timeout=60000); nuke(pg)
+    pg.fill("[data-testid=wp-item-form] [data-f=itemCode]","E2E-BOLT"); pg.select_option("[data-testid=wp-item-form] [data-f=warehouseId]",WH1)
+    pg.fill("[data-testid=wp-item-form] [data-f=leadDays]","3"); pg.click("[data-testid=wp-item-save]"); wait_sel(pg,"[data-testid=wp-material] tr[data-item='E2E-BOLT']")
+    wp83=(pg.eval_on_selector_all("[data-testid=wp-material] tbody tr","es=>es.map(e=>e.dataset.item)"), pg.eval_on_selector_all("[data-testid=wp-process] tbody tr","es=>es.map(e=>e.dataset.route)"))
+    ok("S83a p43 Work Process — Material 표(Item · warehouse · Min Stack · 공급자 · 제조/구매 · Time) · Process 표(공정 · Work shop · Person · Skill · W. Time) · 기준정보(작업장 3 · 기계 3 · 작업자 A~D · 창고 2 · 샘플) · 화면에서 품목 등록",
+       (wp83, len(m83["workCenters"]), len(m83["machines"]), [w_["displayName"] for w_ in m83["workers"]], len(m83["warehouses"]), pg.is_visible("[data-testid=mes-sample]")),
+       "E2E-BOLT" in wp83[0] and {"SPF","SCS 1","SFN 1","SMT 1"}<=set(wp83[0]) and wp83[1]==["SCS 1#1","SCS 1#2","SPF#1","SPF#2","SPF#3"] and len(m83["workCenters"])==3 and len(m83["machines"])==3
+       and all(w_["displayName"].startswith("작업자 ") for w_ in m83["workers"]) and len(m83["workers"])==4 and len(m83["warehouses"])==2 and pg.is_visible("[data-testid=mes-sample]"))
+    vw=b.new_context(); vw.request.post(BASE+"/api/auth/login",data=LOGIN("viewer@acme.test"))
+    v83=(vw.request.get(ME+"/master").status, vw.request.post(ME+"/master",headers=J0,data=json.dumps({"kind":"worker","row":{"code":"W-X","displayName":"작업자 X","skillGrade":"H1"}})).status)
+    gb=b.new_context(); gb.request.post(BASE+"/api/auth/login",data=LOGIN("owner@globex.test"))
+    g83=gb.request.get(ME+"/master").json(); g83x=gb.request.post(ME+"/master",headers=J0,data=json.dumps({"kind":"item","row":{"itemCode":"X","warehouseId":WH1,"minStack":0,"makeBuy":"buy","leadDays":0}})).status
+    ok("S83b 기준정보 — viewer 읽기 200 · 쓰기 403 · 다른 회사(Globex)는 A 의 기준정보 0건 · A 의 창고 id 를 가리키면 404",
+       (v83, len(g83.get("workCenters",[])), len(g83.get("items",[])), g83x), v83==(200,403) and len(g83.get("workCenters",[]))==0 and len(g83.get("items",[]))==0 and g83x==404)
+    # MRP — SPF 샘플을 프로젝트 노드에서 BOM Run(스냅샷) · 수량 2 · 납기 → 총소요 · 순소요 · 시기
+    r84=ctx.request.post(BASE+"/api/run/bom",headers=J0,data=json.dumps({"slots":{"A":"SPF","B":"55","C":"2123"},"code":"SPF-55-2123","node":N4M})).json(); RUN84=r84.get("runId")
+    pq84=ctx.request.patch(ME+f"/projects/{PID}",headers=J0,data=json.dumps({"qty":2,"dueDate":DUE}))
+    SMT=lambda q_,p_: ctx.request.post(ME+"/stock",headers=J0,data=json.dumps({"kind":"receipt","itemCode":"SMT 1","warehouseId":WH1,"qty":q_,"unitPrice":p_}))
+    rc84=SMT(1,420000)
+    mA=ctx.request.get(ME+f"/mrp?project={PID}").json(); mB=ctx.request.get(ME+f"/mrp?project={PID}").json()
+    mr={r_["item"]:r_ for r_ in mA.get("rows",[])}
+    add=lambda d_,n_: (_dt.date.fromisoformat(d_)-_dt.timedelta(days=n_)).isoformat()
+    ok("S84a p44-1 MRP — 스냅샷(SPF 샘플) × 프로젝트 수량 2 → 총소요 · 재고(SMT 1 입고 1) · 순소요 · 시기(구매 = 납기 − 리드타임 · 제조 = 납기 − ⌈공정 시간 × 순소요 ÷ 8h⌉) · 머리에 스냅샷 id · 재고 합 · 오늘 · 같은 입력 = 같은 결과",
+       (pq84.status, rc84.status, mA.get("head"), {k_:(v_["kind"],v_["gross"],v_["onHand"],v_["net"],v_["startBy"]) for k_,v_ in mr.items()}),
+       pq84.status==200 and rc84.status==200 and mA.get("head",{}).get("snapshotId")==RUN84 and mA.get("head",{}).get("stockSum")==1 and mA==mB
+       and (mr["SPF"]["kind"],mr["SPF"]["gross"],mr["SPF"]["net"],mr["SPF"]["startBy"])==("make",2,2,add(DUE,2))
+       and (mr["SCS 1"]["kind"],mr["SCS 1"]["net"],mr["SCS 1"]["startBy"])==("make",2,add(DUE,1))
+       and (mr["SFN 1"]["kind"],mr["SFN 1"]["net"],mr["SFN 1"]["startBy"])==("buy",2,add(DUE,14))
+       and (mr["SMT 1"]["kind"],mr["SMT 1"]["onHand"],mr["SMT 1"]["net"],mr["SMT 1"]["startBy"])==("buy",1,1,add(DUE,7)))
+    pg.goto(BASE+"/m/mrp",wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=mrp-table] tbody tr",timeout=60000); nuke(pg)
+    ui84=pg.eval_on_selector_all("[data-testid=mrp-table] tbody tr","es=>es.map(e=>[e.dataset.item,e.dataset.net,e.dataset.kind])")
+    pr84=ctx.request.post(ME+"/mrp",headers=J0,data=json.dumps({"project":PID,"action":"purchase"})); pr84j=pr84.json()
+    pr84b=ctx.request.post(ME+"/mrp",headers=J0,data=json.dumps({"project":PID,"action":"purchase"}))
+    wo84=ctx.request.post(ME+"/mrp",headers=J0,data=json.dumps({"project":PID,"action":"work-orders"})).json()
+    WOS={w_["itemCode"]:w_ for w_ in wo84.get("workOrders",[])}
+    ok("S84b 화면(/m/mrp)이 같은 결과 · 구매 요청 초안 = 순소요 > 0 인 구매 품목(SFN 1 × 2 · SMT 1 × 1)을 **기존 구매 요청 흐름**으로 · 같은 스냅샷 두 번 409 · 작업지시 초안 = 제조 품목(SPF × 2 · SCS 1 × 2) · 공정 사본",
+       (ui84, pr84.status, pr84j.get("lines"), pr84b.status, [(w_["woNo"],w_["itemCode"],w_["qty"],w_["status"]) for w_ in wo84.get("workOrders",[])], wo84.get("skipped")),
+       sorted(ui84)==sorted([[k_,str(v_["net"]) if v_["net"]!=int(v_["net"]) else str(int(v_["net"])),v_["kind"]] for k_,v_ in mr.items()]) and pr84.status==200
+       and sorted((l_["childCode"],l_["qty"]) for l_ in pr84j.get("lines",[]))==[("SFN 1",2),("SMT 1",1)] and pr84b.status==409
+       and set(WOS)=={"SPF","SCS 1"} and WOS["SPF"]["qty"]==2 and all(w_["status"]=="draft" for w_ in WOS.values()) and wo84.get("skipped")==[])
+    # 작업지시 — 지시 전 착수 409 · 지시 · 앞 공정 미완료 409 · Capacity 초과 칸 · 완성품 검수 없이 마지막 완료 409 · 검수 합격 → 완료 · 재고 소모
+    WO=WOS["SPF"]["id"]; WOE=ME+f"/work-orders/{WO}"
+    e85=ctx.request.post(WOE,headers=J0,data=json.dumps({"action":"start","seq":1}))
+    pg.goto(BASE+f"/m/work-orders?id={WO}",wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=wo-detail][data-status=draft]",timeout=60000); nuke(pg)
+    pg.click("[data-testid=wo-release]"); pg.wait_for_selector("[data-testid=wo-detail][data-status=released]",timeout=30000)
+    pg.click("[data-testid=wo-start-2]"); pg.wait_for_selector("[data-testid=mes-msg][data-ok='0']",timeout=30000); rej85=pg.inner_text("[data-testid=mes-msg]")
+    ws85=[w_["id"] for w_ in m83["workers"]]
+    pg.select_option("[data-testid=wo-worker]",ws85[0]); pg.click("[data-testid=wo-start-1]"); pg.wait_for_selector("[data-testid=wo-steps] tr[data-seq='1'][data-started='1']",timeout=30000)
+    ok("S85a p44-2 · 3 작업지시 — 지시 전 착수 409 · 화면에서 지시 → 앞 공정(1) 미완료로 공정 2 착수 409(거부 이유가 화면에) · 작업자 A 가 공정 1 착수",
+       (e85.status, rej85[:60]), e85.status==409 and "409" in rej85 and "앞 공정" in rej85)
+    cap=ctx.request.get(ME+"/capacity").json(); asm=[c_ for c_ in cap.get("centers",[]) if c_["code"]=="WC-ASM"][0]
+    c85=[c_ for c_ in cap.get("cells",[]) if c_["workCenterId"]==asm["id"]]
+    pg.goto(BASE+"/m/capacity",wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=cap-table]",timeout=60000); nuke(pg)
+    red85=pg.eval_on_selector_all("[data-testid=cap-table] td[data-over='1']","es=>es.map(e=>e.dataset.cell)")
+    ok("S85b p44-3 Capacity — 조립장 부하 = 3h × 수량 2 × 인원 2 = 12 > 가용 8 → 초과(빨간 칸) · 지시된 단계만(초안 SCS 1 은 빼고)",
+       ([(c_["date"],c_["load"],c_["available"],c_["over"],c_["from"]) for c_ in c85], red85), len(c85)==1 and c85[0]["load"]==12 and c85[0]["over"] and any(r_.startswith("WC-ASM|") for r_ in red85))
+    step=lambda s_,e_: ctx.request.post(WOE,headers=J0,data=json.dumps({"action":e_,"seq":s_,"workerId":ws85[1],"actualHours":1.5}))
+    seq85=[step(1,"finish").status, step(2,"start").status, step(2,"finish").status, step(3,"start").status]
+    nq85=step(3,"finish"); nq85t=nq85.json().get("error","")
+    rcv=[ctx.request.post(ME+"/stock",headers=J0,data=json.dumps({"kind":"receipt","itemCode":"SFN 1","warehouseId":WH1,"qty":2,"unitPrice":1500000})).status, SMT(2,440000).status]
+    qp=ctx.request.post(ME+"/quality",headers=J0,data=json.dumps({"kind":"inspection","target":"product","refId":WO,"itemCode":"SPF","result":"pass","memo":"풍량 시험 합격"}))
+    fin=step(3,"finish"); finj=fin.json(); d85=ctx.request.get(WOE).json()
+    st85={r_["itemCode"]:r_ for r_ in ctx.request.get(ME+"/stock").json()["rows"]}
+    ok("S85c 공정 1 → 2 → 3 순서대로 · 완성품 검수 없이 마지막 완료 409 · 검수 합격 뒤 완료 → 작업지시 done · 재고 소모(SFN 1 × 2 · SMT 1 × 2) · 추가만 기록(착수 · 완료 · 누가 · 실제 시간)",
+       (seq85, nq85.status, nq85t[:30], rcv, qp.status, fin.status, finj.get("consumed"), d85.get("status"), [(s_["seq"],bool(s_["startedAt"]),bool(s_["finishedAt"]),s_["actualHours"]) for s_ in d85.get("steps",[])], (st85["SMT 1"]["onHand"], st85["SFN 1"]["onHand"])),
+       seq85==[200,200,200,200] and nq85.status==409 and "완성품 검수" in nq85t and rcv==[200,200] and qp.status==200 and fin.status==200 and d85.get("status")=="done"
+       and sorted((c_["itemCode"],c_["qty"]) for c_ in finj.get("consumed",[]))==[("SFN 1",2),("SMT 1",2)] and all(s_["startedAt"] and s_["finishedAt"] for s_ in d85["steps"]) and st85["SMT 1"]["onHand"]==1 and st85["SFN 1"]["onHand"]==0)
+    wp85=ctx.request.get(WOE+"/print"); wpt=wp85.text()
+    ok("S85d 작업지시서 A4 인쇄본 — 지시 번호 · 공정 사본 3줄 · 착수/완료 · QR(svg · /q/{토큰}) · 샘플 표지",
+       (wp85.status, wpt.count("<tr>")>=4, "wo-print-qr" in wpt and "<svg" in wpt, "샘플" in wpt), wp85.status==200 and "wo-print-steps" in wpt and "wo-print-qr" in wpt and "<svg" in wpt and "샘플" in wpt and d85["woNo"] in wpt)
+    # 창고 — 단가 4종 · Min Stack 경고 · 음수 출고 409(화면) · 추가만(405)
+    smt=st85["SMT 1"]
+    pg.goto(BASE+"/m/warehouse",wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=wh-stock] tbody tr",timeout=60000); nuke(pg)
+    pg.select_option("[data-testid=wh-form] [data-f=kind]","issue"); pg.fill("[data-testid=wh-form] [data-f=itemCode]","SMT 1"); pg.select_option("[data-testid=wh-form] [data-f=warehouseId]",WH1); pg.fill("[data-testid=wh-form] [data-f=qty]","999")
+    pg.click("[data-testid=wh-move]"); pg.wait_for_selector("[data-testid=mes-msg][data-ok='0']",timeout=30000); neg86=pg.inner_text("[data-testid=mes-msg]")
+    warn86=pg.get_attribute("[data-testid=wh-stock] tr[data-item='SMT 1']","data-warn")
+    ap86=(ctx.request.patch(ME+"/stock",headers=J0,data="{}").status, ctx.request.delete(ME+"/stock").status)
+    ok("S86 p44-4 창고 — SMT 1 입고 단가 4종(최고 440,000 · 최저 420,000 · 평균 433,333.33 · 최근 440,000) · 현재고 1 < Min Stack 2 경고 · 화면에서 999 출고 → 409(음수 재고 불가) · 입출고 고치기 · 지우기 405",
+       (smt["price"], smt["onHand"], warn86, neg86[:50], ap86),
+       smt["price"]=={"max":440000,"min":420000,"avg":433333.33,"latest":440000} and smt["onHand"]==1 and smt["warn"] and warn86=="1" and "409" in neg86 and "재고" in neg86 and ap86==(405,405))
+    # 품질 — 입고 검수 불합격 → 반품 이동 + 하자 건 열림 → 조치 → 닫힘(화면) · 거꾸로 409 · 설치완료 → A/S · 완료 작업지시 A/S
+    rcv87=ctx.request.post(ME+"/stock",headers=J0,data=json.dumps({"kind":"receipt","itemCode":"SFN 1","warehouseId":WH1,"qty":1,"unitPrice":1500000})).json()
+    fl87=ctx.request.post(ME+"/quality",headers=J0,data=json.dumps({"kind":"inspection","target":"material","refId":rcv87.get("id"),"itemCode":"SFN 1","result":"fail","memo":"임펠러 찍힘"})).json()
+    DF=fl87.get("defectId")
+    pg.goto(BASE+"/m/quality",wait_until="domcontentloaded"); pg.wait_for_selector(f"[data-testid=q-defects] tr[data-defect='{DF}']",timeout=60000); nuke(pg)
+    pg.click(f"[data-testid=q-action-{DF}]"); pg.wait_for_selector(f"[data-testid=q-defects] tr[data-defect='{DF}'][data-status=action]",timeout=30000)
+    pg.click(f"[data-testid=q-close-{DF}]"); pg.wait_for_selector(f"[data-testid=q-defects] tr[data-defect='{DF}'][data-status=closed]",timeout=30000)
+    back87=ctx.request.post(ME+f"/defects/{DF}",headers=J0,data=json.dumps({"to":"action"})).status
+    ret87=[m_ for m_ in ctx.request.get(ME+"/stock").json()["moves"] if m_["reason"]=="inspection_return"]
+    ins87=ctx.request.post(ME+"/quality",headers=J0,data=json.dumps({"kind":"inspection","target":"install","refId":PID,"result":"pass","memo":"현장 설치 완료"})).json()
+    as87=ctx.request.post(ME+"/quality",headers=J0,data=json.dumps({"kind":"as","refId":ins87.get("inspectionId"),"title":"진동 점검 요청"}))
+    as87w=ctx.request.post(WOE,headers=J0,data=json.dumps({"action":"as","title":"도장 보수"}))
+    qd=ctx.request.get(ME+"/quality").json()["defects"]; dfx=[d_ for d_ in qd if d_["id"]==DF][0]
+    ok("S87 p44-5 품질 — 입고 검수 불합격 → 그 입고 1개 반품 이동(검수 반품) + 하자 건 열림 → 화면에서 조치 → 닫힘(상태 로그 추가만) · 거꾸로 409 · 설치완료 검수 → A/S 건 · 완료된 작업지시 A/S 건(p69-5)",
+       ([(m_["itemCode"],m_["qty"]) for m_ in ret87], [l_["status"] for l_ in dfx["log"]], back87, as87.status, as87w.status, sorted(d_["kind"] for d_ in qd)),
+       [(m_["itemCode"],m_["qty"]) for m_ in ret87]==[("SFN 1",-1)] and [l_["status"] for l_ in dfx["log"]]==["open","action","closed"] and back87==409
+       and as87.status==200 and as87w.status==200 and sorted(d_["kind"] for d_ in qd)==["as","as","defect"])
+    # 권한 · 경계 — viewer 읽기만 · 다른 회사 404 / 0건
+    v88=(vw.request.get(ME+"/stock").status, vw.request.post(ME+"/stock",headers=J0,data=json.dumps({"kind":"receipt","itemCode":"SMT 1","warehouseId":WH1,"qty":1,"unitPrice":1})).status,
+         vw.request.post(ME+"/mrp",headers=J0,data=json.dumps({"project":PID,"action":"work-orders"})).status, vw.request.post(WOE,headers=J0,data=json.dumps({"action":"start","seq":1})).status,
+         vw.request.post(ME+"/quality",headers=J0,data=json.dumps({"kind":"inspection","target":"product","refId":WO,"result":"pass"})).status, vw.request.get(WOE).status)
+    g88=(gb.request.get(WOE).status, len(gb.request.get(ME+"/work-orders").json().get("rows",[])), gb.request.get(ME+f"/mrp?project={PID}").status, len(gb.request.get(ME+"/stock").json().get("moves",[])),
+         gb.request.post(ME+f"/defects/{DF}",headers=J0,data=json.dumps({"to":"action"})).status, gb.request.get(WOE+"/print").status)
+    ok("S88 viewer — 재고 · 작업지시 읽기 200 · 입출고 · MRP · 공정 · 검수 쓰기 403 / 다른 회사(Globex) — A 의 작업지시 404 · 목록 0 · MRP 404 · 이동 0 · 하자 404 · 작업지시서 404",
+       (v88, g88), v88==(200,403,403,403,403,200) and g88==(404,0,404,0,404,404))
+    # ── LA-3 · p69 모바일(390×844) — 승인 · 대화 · 입출고 · 검수 · 공지 ──
+    ap89=ctx.request.post(BASE+f"/api/projects/{PID}/approvals",headers=J0,data=json.dumps({"note":"모바일 승인 e2e","runId":RUN84})).json(); AP89=ap89.get("id")
+    mb=b.new_context(viewport={"width":390,"height":844},is_mobile=True,has_touch=True); mb.request.post(BASE+"/api/auth/login",data=LOGIN("owner@acme.test")); mp=mb.new_page()
+    mp.goto(BASE+"/mobile",wait_until="domcontentloaded"); mp.wait_for_selector("[data-testid=mobile][data-ready='1']",timeout=60000); mp.wait_for_selector(f"[data-testid=m-approve] [data-approval='{AP89}']",timeout=60000)
+    mp.screenshot(path=f"{OUT}/96_mobile_approve.png",full_page=True)
+    mp.click(f"[data-testid=m-approve-{AP89}]"); mp.wait_for_selector("[data-testid=mes-msg][data-ok='1']",timeout=30000); a89=mp.inner_text("[data-testid=mes-msg]")
+    mp.click("[data-tab=talk]"); mp.fill("[data-testid=m-talk-input]","현장 도착 · 반입 시작(e2e)"); mp.click("[data-testid=m-talk-send]")
+    mp.wait_for_function("()=>(document.querySelector('[data-testid=m-talk-list]')?.innerText||'').includes('현장 도착')",timeout=30000)
+    mp.click("[data-tab=stock]"); mp.fill("[data-testid=m-stock] [data-f=itemCode]","SMT 1"); mp.select_option("[data-testid=m-stock] [data-f=warehouseId]",WH1)
+    mp.fill("[data-testid=m-stock] [data-f=qty]","2"); mp.fill("[data-testid=m-stock] [data-f=unitPrice]","430000"); mp.click("[data-testid=m-stock-save]")
+    mp.wait_for_selector("[data-testid=mes-msg][data-ok='1']",timeout=30000); mp.screenshot(path=f"{OUT}/97_mobile_stock.png",full_page=True)
+    mp.click("[data-tab=inspect]"); mp.select_option("[data-testid=m-inspect] [data-f=target]","install"); mp.fill("[data-testid=m-inspect] [data-f=refId]",PID); mp.click("[data-testid=m-inspect-save]")
+    mp.wait_for_selector("[data-testid=mes-msg][data-ok='1']",timeout=30000)
+    mp.click("[data-tab=notice]"); mp.fill("[data-testid=m-notice-title]","안전 교육 10/15(샘플)"); mp.fill("[data-testid=m-notice-body]","전 직원 참석"); mp.click("[data-testid=m-notice-save]")
+    mp.wait_for_function("()=>(document.querySelector('[data-testid=m-notice-list]')?.innerText||'').includes('안전 교육')",timeout=30000)
+    mstk={r_["itemCode"]:r_["onHand"] for r_ in ctx.request.get(ME+"/stock").json()["rows"]}
+    wid=mp.evaluate("()=>document.documentElement.scrollWidth")
+    vn=(vw.request.post(ME+"/notices",headers=J0,data=json.dumps({"title":"x"})).status, vw.request.get(ME+"/notices").status)
+    ok("S89 p69 모바일(폭 390) — 승인 대기(기존 프로젝트 승인)를 모바일에서 승인 · 대화 한 줄(기존 활동 기록) · 입고(SMT 1 +2) · 설치완료 검수 · 공지(owner) · 가로 넘침 없음 · viewer 공지 쓰기 403 · 읽기 200",
+       (a89[:20], mstk.get("SMT 1"), wid, vn), "승인" in a89 and mstk.get("SMT 1")==3 and wid<=390 and vn==(403,200))
+    # ── QR — 토큰 · /q/{토큰} · 로그인 돌아옴 · 다른 회사 404 · 폐기 410 · 인쇄본 QR ──
+    qr=ctx.request.post(ME+"/qr",headers=J0,data=json.dumps({"kind":"work_order","id":WO})).json(); TOK=qr.get("token","")
+    qr2=ctx.request.post(ME+"/qr",headers=J0,data=json.dumps({"kind":"work_order","id":WO})).json()
+    pg.goto(BASE+f"/q/{TOK}",wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=qr-page]",timeout=60000)
+    q90={k_:pg.inner_text(f"[data-testid=qr-{k_}]") for k_ in ("project","drawings","docs","history","todo")}
+    q404=gb.request.get(BASE+f"/q/{TOK}"); qv=vw.request.get(BASE+f"/q/{TOK}")
+    lo=b.new_context(); lp=lo.new_page(); lp.goto(BASE+f"/q/{TOK}",wait_until="domcontentloaded"); lp.wait_for_selector("[data-testid=login][data-ready='1']",timeout=60000)
+    red90=lp.url.replace(BASE,""); lp.fill("[data-testid=login-email]","owner@acme.test"); lp.fill("[data-testid=login-password]",PW); lp.click("button[type=submit]")
+    lp.wait_for_selector("[data-testid=qr-page]",timeout=60000); back90=lp.url.replace(BASE,""); lo.close()
+    iss=ctx.request.get(BASE+f"/api/drawings/{dI.get('id')}/sheet").text()
+    qrp=ctx.request.post(ME+"/qr",headers=J0,data=json.dumps({"kind":"project","id":PID})).json()
+    rv=ctx.request.post(ME+"/qr",headers=J0,data=json.dumps({"revoke":TOK})).status; q410=ctx.request.get(BASE+f"/q/{TOK}")
+    fake=ctx.request.get(BASE+"/q/"+"A"*43).status; vq=vw.request.post(ME+"/qr",headers=J0,data=json.dumps({"kind":"project","id":PID})).status
+    ok("S90 QR — 추측 불가 토큰(43자 · 같은 대상은 같은 토큰) · /q/{토큰} = Project 정보 · 도면(발행본) · 각종 서류 · Project History · 처리해야 할 업무 · 로그인 없으면 로그인 → 돌아옴 · 다른 회사 404 · 폐기 410 · 없는 토큰 404 · viewer 열람 200 · 토큰 만들기 403 · 발행 도면 시트에 QR",
+       (len(TOK), qr2.get("token")==TOK, {k_:v_[:25] for k_,v_ in q90.items()}, q404.status, qv.status, red90[:40], back90[:12], "sheet-qr" in iss, rv, q410.status, fake, vq),
+       len(TOK)==43 and qr2.get("token")==TOK and "<svg" in qr.get("svg","") and "PS-61313-5" in pg.inner_text("[data-testid=qr-page]")
+       and "현장 도착" in q90["history"] and "A/S" in q90["todo"] and q404.status==404 and qv.status==200 and red90.startswith("/login?next=") and back90==f"/q/{TOK}"
+       and "sheet-qr" in iss and qrp.get("token")!=TOK and rv==200 and q410.status==410 and fake==404 and vq==403)
+    vw.close(); gb.close()
+    # ── S91 (ccmd L · LA-1 · LA6 · p42) — 설계 우선순위 · 기준점 · 오류 체크 → 기존 설계 검증으로 판정 · 바꿀 후보(우선순위 역순) · 상위설계 우선자료 ──
+    s91=run_spf().json(); p91=(s91.get("dims") or {}).get("priority") or {}
+    e91=run55("S91"); e91d=ctx.request.get(BASE+f"/api/bom-runs/{e91.get('runId')}").json().get("dims") or {}
+    pg.goto(BASE+"/setup/design-priority",wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=dp-table]",timeout=60000)
+    dp91=pg.eval_on_selector_all("[data-testid=dp-table] tbody tr","es=>es.map(e=>e.dataset.target)")
+    ok("S91a p42 화면 — SPF 샘플의 설계 우선순위 표(Dim · 설계 우선순위 · 상위설계 우선자료 · 설계 기준점 · 설계 오류 체크 · Remarks) · 샘플 표지 · 샘플 치수에서 위반 0 · Material management 3칸 링크 · 3D 2D CAD Mapping '아직 없음' · EU 스냅샷에는 priority 키 없음",
+       (dp91, p91, "priority" in e91d, pg.is_visible("[data-testid=dp-sample]"), pg.inner_text("[data-testid=dp-cad-none]")[:30], len(pg.query_selector_all("[data-testid=dp-material] a"))),
+       dp91==["W","H","detail.Fan.A","L"] and p91.get("rows")==4 and p91.get("violated")==0 and "priority" not in e91d and pg.is_visible("[data-testid=dp-sample]")
+       and "아직 없음" in pg.inner_text("[data-testid=dp-cad-none]") and len(pg.query_selector_all("[data-testid=dp-material] a"))==3)
+    _cat91=ctx.request.get(BASE+"/api/setup/catalog").json(); spf91=[p_ for p_ in _cat91.get("productCodes",[]) if p_.get("code")=="SPF"][0]
+    spf91o=json.loads(json.dumps(spf91)); spf91b=json.loads(json.dumps(spf91))
+    for r_ in spf91b["tables"]["pri"]["rows"]:
+        if r_["cells"]["A"] in ("W","H"): r_["cells"]["E"]="<= 2000"   # W(1 · 상위설계) · H(2) 위반
+        if r_["cells"]["A"]=="L": r_["cells"]["E"]="<= 3000"          # L(4) 위반(전장 3600)
+    up91=ctx.request.post(BASE+"/api/setup/product-codes",headers=J0,data=json.dumps(spf91b))
+    b91=run_spf().json(); bd=(b91.get("dims") or {}); pb=bd.get("priority") or {}
+    dw91=ctx.request.post(BASE+"/api/drawings",headers=J0,data=json.dumps({"runId":b91.get("runId"),"type":"assembly"}))
+    pg.goto(BASE+"/setup/design-priority",wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=dp-verdict]",timeout=60000)
+    ui91=(pg.get_attribute("[data-testid=dp-verdict]","data-candidates"), pg.get_attribute("[data-testid=dp-verdict]","data-keep"))
+    nuke(pg); pg.screenshot(path=f"{OUT}/89_design_priority.png",full_page=True)
+    rs91=ctx.request.post(BASE+"/api/setup/product-codes",headers=J0,data=json.dumps(spf91o)); a91=run_spf().json()
+    ok("S91b 오류 체크 식 위반 3개(W · H · L) → 기존 설계 검증 위반으로 스냅샷에(도면 422) · 바꿀 후보 = 우선순위 역순 L(4) → H(2) · W(1)은 상위설계 우선자료 '바꾸지 말 것' · 화면 같은 판정 · 되돌리면 위반 0",
+       (up91.status, [v_["name"] for v_ in bd.get("violations",[])], [c_["target"] for c_ in pb.get("candidates",[])], [c_["target"] for c_ in pb.get("keep",[])], dw91.status, ui91, rs91.status, ((a91.get("dims") or {}).get("priority") or {}).get("violated")),
+       up91.status==200 and len([v_ for v_ in bd.get("violations",[]) if v_["name"].startswith("설계 우선순위")])==3 and [c_["target"] for c_ in pb.get("candidates",[])]==["L","H"]
+       and [c_["target"] for c_ in pb.get("keep",[])]==["W"] and dw91.status==422 and ui91==("L,H","W") and rs91.status==200 and ((a91.get("dims") or {}).get("priority") or {}).get("violated")==0)
+    # 캡처(맨 뒤) — 90번대 · 다른 단계 캡처와 겹치지 않게
+    for path_,url_,sel_ in [("90_work_process","/setup/work-process","[data-testid=wp-process] tbody tr"),("91_warehouse","/m/warehouse","[data-testid=wh-stock] tbody tr"),("92_mrp","/m/mrp","[data-testid=mrp-table] tbody tr"),
+                           ("93_work_order",f"/m/work-orders?id={WO}","[data-testid=wo-detail]"),("94_capacity","/m/capacity","[data-testid=cap-table]"),("95_quality","/m/quality","[data-testid=q-defects] tr")]:
+        pg.goto(BASE+url_,wait_until="domcontentloaded"); pg.wait_for_selector(sel_,timeout=60000); nuke(pg); pg.screenshot(path=f"{OUT}/{path_}.png",full_page=True)
+    mp.goto(BASE+f"/q/{qrp.get('token')}",wait_until="domcontentloaded"); mp.wait_for_selector("[data-testid=qr-page]",timeout=60000); mp.screenshot(path=f"{OUT}/98_qr_page.png",full_page=True); mb.close()
+    pg.goto(WOE+"/print",wait_until="load"); pg.screenshot(path=f"{OUT}/99_work_order_qr.png",full_page=True)
     # S37 은 맨 끝에서 센다 — 중간(옛 자리)에서는 뒤에 찍히는 5장(40·41·42·52·53)이 아직 없어,
     # 빈 폴더에서는 25장이라 실패하고 이전 실행 잔재가 있을 때만 통과했다(2026-09-24 실측).
     _want=["00_login","05_project_mgmt","06_module_cpq_stub","10_project_bound","11_code_builder","11b_revisions","12_macro_tab",
            "13_macro_approved","14_edim_run","15_bom_cost","16_design_tab","20_setup_subcode","21_setup_product_table",
            "22_setup_relationship","23_codebuilder_from_subcode","30_toolbox_program","31_toolbox_ui_tool","40_company_admin",
            "41_platform_console","42_user_management","43_drawings","44_document_tab","45_purchasing","46_quotation_print",
-           "47_techdata_print","48_dxf_plan","49_dxf_assembly","51_accepted","52_register","53_schedule","54_toolbar","55_project_mgmt","56_print_setup","57_ui_design","58_material","59_arrangement_code","60_spec_input","61_drawing_purpose","62_company_db","63_input_data","64_viewer3d","65_price_to_cost","66_project_contacts","67_partner_edit","68_spec_import","69_code_approval","70_dwg_view","71_techdata_list","72_mfg_rate","73_erp_master","74_sub_drawing","75_output_template","76_coding_list","77_wizards","78_print_layout","79_draw_module","80_macro_verify","81_learning_job","82_formula_cards","83_projection","84_toolbox_suggestion","85_special_request","86_fan_result","87_special_meter","75_cpq_special_bom","75_cpq_special_drawing","76_detail_dim","77_symbol","78_part_info","79_consulting_internal","79_consulting_benchmark","88_pcr_detail","89_ui_ai_designer","90_node_ui_form","91_install_motor"]
+           "47_techdata_print","48_dxf_plan","49_dxf_assembly","51_accepted","52_register","53_schedule","54_toolbar","55_project_mgmt","56_print_setup","57_ui_design","58_material","59_arrangement_code","60_spec_input","61_drawing_purpose","62_company_db","89_design_priority","90_work_process","91_warehouse","92_mrp","93_work_order","94_capacity","95_quality","96_mobile_approve","97_mobile_stock","98_qr_page","99_work_order_qr","63_input_data","64_viewer3d","65_price_to_cost","66_project_contacts","67_partner_edit","68_spec_import","69_code_approval","70_dwg_view","71_techdata_list","72_mfg_rate","73_erp_master","74_sub_drawing","75_output_template","76_coding_list","77_wizards","78_print_layout","79_draw_module","80_macro_verify","81_learning_job","82_formula_cards","83_projection","84_toolbox_suggestion","85_special_request","86_fan_result","87_special_meter","75_cpq_special_bom","75_cpq_special_drawing","76_detail_dim","77_symbol","78_part_info","79_consulting_internal","79_consulting_benchmark","88_pcr_detail","89_ui_ai_designer","90_node_ui_form","91_install_motor"]
     _miss=[w for w in _want if not os.path.exists(f"{OUT}/{w}.png") or os.path.getmtime(f"{OUT}/{w}.png")<T0]
     ok(f"S37 캡처 {len(_want)}장이 이번 실행에서 전부 나온다 (잔재 파일은 세지 않음)", _miss or len(_want), not _miss)
     b.close()

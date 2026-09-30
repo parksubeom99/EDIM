@@ -5,7 +5,7 @@ import { runApprovedForSession } from "@/app/lib/macro/run";
 import { ruleMacroEvaluator } from "@/app/lib/macro/rule-macros";
 import type { SlotValues } from "@/app/lib/rccs";
 import { buildEbom, buildCost } from "@/app/lib/output/bom";
-import { runBomCode, toBomLine, catalogFingerprint, dimsFor, sectionDimsFor, designRulesOf, checkDesign, buyItemOf, specialCallOf, detailDimsOf, type SpecialValues } from "@edim/bom-code";
+import { runBomCode, toBomLine, catalogFingerprint, dimsFor, sectionDimsFor, designRulesOf, checkDesign, designFacts, priorityRowsOf, compilePriorityRules, priorityVerdict, buyItemOf, specialCallOf, detailDimsOf, type SpecialValues } from "@edim/bom-code";
 import { loadCadRules, type CadRulesSnap } from "@/app/lib/cad-rules";
 import { applyPriceHistory, type PriceRowLike } from "@/app/lib/price";
 import { businessToday, dateOnly } from "@/app/lib/today";
@@ -157,9 +157,15 @@ export async function POST(
       cadRules = cr.snap;
     }
     const details = detailRes && detailRes.ok ? detailRes.dims : undefined;
-    const violations = drSnap && drSnap.ok ? checkDesign(rules, drSnap.dims, secDims, await ruleMacroEvaluator(session.tenantId, rules), details) : [];
+    // ccmd L · LA6 · p42 — 설계 우선순위 표(role priority)의 오류 체크 식을 **기존 설계 검증 규칙으로 컴파일**해 같은 판정기(checkDesign)에 함께 넣는다.
+    // 위반이 여럿이면 우선순위가 낮은(숫자가 큰) 치수부터 "바꿀 후보" · 상위설계 우선자료는 "바꾸지 말 것" — 요약을 스냅샷 dims.priority 에. 표가 없는 제품은 키 없음.
+    const prRows = productForDims ? priorityRowsOf(productForDims) : [];
+    const prComp = prRows.length > 0 && drSnap && drSnap.ok ? compilePriorityRules(prRows, designFacts(drSnap.dims, secDims)) : null;
+    const allRules = prComp ? [...rules, ...prComp.rules] : rules;
+    const violations = drSnap && drSnap.ok ? checkDesign(allRules, drSnap.dims, secDims, await ruleMacroEvaluator(session.tenantId, allRules), details) : [];
+    const priority = prComp ? priorityVerdict(prRows, prComp, violations) : null;
     const dimsSnap = drSnap && drSnap.ok
-      ? { ...drSnap.dims, item: drSnap.item, tableName: drSnap.tableName, sections: secDims, rules: rules.length, violations, ...(call ? { special } : {}), ...(detailRes ? { detail: details, cadRules } : {}) }
+      ? { ...drSnap.dims, item: drSnap.item, tableName: drSnap.tableName, sections: secDims, rules: allRules.length, violations, ...(call ? { special } : {}), ...(detailRes ? { detail: details, cadRules } : {}), ...(priority ? { priority } : {}) }
       : null;
     const snap = await withTenant(session.tenantId, async (tx) => {
       const saved = await saveBomCodeRun(tx, {
@@ -182,7 +188,7 @@ export async function POST(
       return saved;
     });
     // 등록된 Key Dimension 을 함께 돌려준다 — 화면이 치수를 따로 계산하지 않도록.
-    const dims = dimsSnap ? { W: dimsSnap.W, H: dimsSnap.H, L: dimsSnap.L, item: dimsSnap.item, sections: result.sections?.length ?? 0, rules: rules.length, violations } : null;
+    const dims = dimsSnap ? { W: dimsSnap.W, H: dimsSnap.H, L: dimsSnap.L, item: dimsSnap.item, sections: result.sections?.length ?? 0, rules: allRules.length, violations, ...(priority ? { priority } : {}) } : null;
     const specialOut = call ? { program: call.program, required: call.required, result: special?.result ?? null, input: special?.input ?? null, inputSources: special?.inputSources ?? null, curveFingerprint: special?.curveFingerprint ?? null, price: special?.price ?? 0, currency: special?.currency ?? null, sample: special?.sample ?? null, notice: specialNotice } : null;
     const spMsg = special ? ` · Special 팬 선정 ${special.result.model} · ${special.result.rpm} rpm · 모터 ${special.result.motorKw} kW(샘플 성능표)` : specialNotice ? ` · ${specialNotice}` : "";
     return NextResponse.json({ ...base, lines, trace, mainCode: result.mainCode, catalogFp, runId: snap.id, macroValue, dims, special: specialOut, message: `BOM ${lines.length}행 · 코드 관계 ${result.parent} · 스냅샷 ${snap.id.slice(0, 8)}${spMsg}` });

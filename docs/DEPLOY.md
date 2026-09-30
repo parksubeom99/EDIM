@@ -12,6 +12,8 @@ docker compose -f docker-compose.prod.yml up -d --build
 - `db` (PostgreSQL 16) → `migrate` (1회성: 마이그레이션 + 샘플 시드) → `web` (Next.js `next start`, 운영 모드) 순서로 뜬다.
 - 브라우저: http://localhost:3000/login — 샘플 계정 `owner@acme.test` / 비밀번호 `edim-demo-2026` (**공개 데모용 샘플 값**).
 - 내리기: `docker compose -f docker-compose.prod.yml down` (데이터까지 지우려면 `down -v`).
+- **시연 · e2e 는 빈 볼륨에서** 띄운다 — `docker compose -f docker-compose.prod.yml down -v` 뒤 다시 `up`, 또는 프로젝트 이름을 새로 준다(`-p edim-prod-새이름`). 옛 볼륨 위에서는 이전 실행의 개정 · 데이터가 남아 e2e 가 중간부터 깨진다(S2d · 8절).
+- 킷을 대상으로 e2e 를 돌릴 때는 `EDIM_E2E_TARGET=kit python scripts/demo_e2e.py` — 호스트 자원(저장소 폴더 파일 · 호스트 DB)에 기대는 3단계(S76d · S79d · S80c)는 건너뛰되 출력 · 요약 · 결과 JSON 에 `SKIP(host-only)` 로 남는다(ccmd M-2).
 - 운영 모드에서는 비밀번호가 없는 계정이 들어오지 못한다(`EDIM_DEV_LOGIN=0`).
 
 개발 DB(`docker-compose.yml`, 포트 5433)와 포트가 겹치지 않게 운영 킷의 DB 는 **밖으로 열지 않는다**(web 만 3000).

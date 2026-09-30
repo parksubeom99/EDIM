@@ -114,7 +114,7 @@ export function WorkProcess({ canEdit }: { canEdit: boolean }) {
 
 /* ───────── p44-4 창고 · 재고 ───────── */
 type StockRow = { itemCode: string; warehouseId: string; warehouseCode: string; onHand: number; unit: string; minStack: number; warn: boolean; price: { max: number | null; min: number | null; avg: number | null; latest: number | null } };
-export function Warehouse({ canEdit }: { canEdit: boolean }) {
+export function Warehouse({ canEdit, item = null }: { canEdit: boolean; item?: string | null }) {
   const { data, load } = useLoad<{ rows: StockRow[]; moves: { id: string; itemCode: string; qty: number; unitPrice: number | null; reason: string; createdAt: string }[] }>("/api/mes/stock");
   const { data: m } = useLoad<Master>("/api/mes/master");
   const [f, setF] = useState({ itemCode: "", warehouseId: "", kind: "receipt", qty: "1", unitPrice: "", refId: "" });
@@ -128,7 +128,7 @@ export function Warehouse({ canEdit }: { canEdit: boolean }) {
     <>
       <table data-testid="wh-stock" style={{ borderCollapse: "collapse" }}>
         <thead><tr>{["품목", "창고", "현재고", "Min Stack", "경고", "단가 최고", "최저", "평균", "최근"].map((h) => <th key={h} style={cell}>{h}</th>)}</tr></thead>
-        <tbody>{(data?.rows ?? []).map((r) => <tr key={`${r.itemCode}|${r.warehouseId}`} data-item={r.itemCode} data-onhand={r.onHand} data-warn={r.warn ? "1" : "0"}>
+        <tbody>{(data?.rows ?? []).filter((r) => !item || r.itemCode === item).map((r) => <tr key={`${r.itemCode}|${r.warehouseId}`} data-item={r.itemCode} data-onhand={r.onHand} data-warn={r.warn ? "1" : "0"}>
           <td style={cell}>{r.itemCode}</td><td style={cell}>{r.warehouseCode}</td><td style={num}>{r.onHand} {r.unit}</td><td style={num}>{r.minStack}</td>
           <td style={{ ...cell, color: r.warn ? "#b91c1c" : undefined }}>{r.warn ? "Min Stack 미만" : ""}</td>
           <td style={num}>{w(r.price.max)}</td><td style={num}>{w(r.price.min)}</td><td style={num}>{w(r.price.avg)}</td><td style={num}>{w(r.price.latest)}</td></tr>)}</tbody>
@@ -280,6 +280,9 @@ export function Mobile({ canEdit, canDecide, isOwner, projects, approvals, today
   projects: { id: string; projectNo: string; name: string }[]; approvals: { id: string; projectNo: string; code: string | null }[];
 }) {
   const [tab, setTab] = useState<"approve" | "talk" | "stock" | "inspect" | "notice">("approve");
+  // 서버가 그린 승인 목록은 하이드레이션 전에는 눌러도 반응이 없다 — 준비 표지(e2e 가 이것을 기다린다)
+  const [ready, setReady] = useState(false);
+  useEffect(() => setReady(true), []);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [apv, setApv] = useState(approvals);
   const [pid, setPid] = useState(projects[0]?.id ?? "");
@@ -293,7 +296,7 @@ export function Mobile({ canEdit, canDecide, isOwner, projects, approvals, today
   const big: CSSProperties = { ...btn, fontSize: 15, padding: "8px 12px" };
   const field: CSSProperties = { ...inp, fontSize: 15, padding: "6px 8px", width: "100%", boxSizing: "border-box", margin: "3px 0" };
   return (
-    <main data-testid="mobile" style={{ maxWidth: 430, margin: "0 auto", padding: 12, fontSize: 15 }}>
+    <main data-testid="mobile" data-ready={ready ? "1" : "0"} style={{ maxWidth: 430, margin: "0 auto", padding: 12, fontSize: 15 }}>
       <h1 style={{ fontSize: 18, margin: "4px 0 8px" }}>EDIM 모바일 업무</h1>
       <nav style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 4, marginBottom: 10 }}>{tabs.map(([k, l]) =>
         <button key={k} type="button" data-tab={k} aria-pressed={tab === k} onClick={() => { setTab(k); setMsg(null); }} style={{ ...big, padding: "8px 2px", background: tab === k ? "var(--accent)" : "transparent", color: tab === k ? "var(--accent-contrast, #fff)" : "var(--accent)" }}>{l}</button>)}</nav>

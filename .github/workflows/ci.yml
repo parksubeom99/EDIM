@@ -1,4 +1,4 @@
-# EDIM CI — 원본(ccmd I STEP 7 에서 docs/ci/ci.yml 에서 옮겨 배선). typecheck · 단위 · DB 검증 9종.
+# EDIM CI — 원본(ccmd I STEP 7 에서 docs/ci/ci.yml 에서 옮겨 배선). typecheck · 단위 · DB 검증 13종 · 청사진 판정 --check(ccmd L · LC · ccmd N).
 name: CI
 on:
   push:
@@ -26,6 +26,8 @@ jobs:
       - run: pnpm db:seed
       - run: pnpm db:seed:demo
       - run: pnpm typecheck
+      # 판정의 유일한 원천 = 생성기 PAGES — page-map.md 가 PAGES 출력과 한 글자라도 다르면 실패(ccmd M-1 · 엘 판정: LC 에서 배선)
+      - run: python3 docs/02-reports/build_blueprint_match.py --check
       - run: pnpm -r --workspace-concurrency=1 test
       # DB 가 직접 막는 규칙들 — 앱을 우회해도 거부되는지(RLS · append-only · 발행/발주 잠금 · 플랫폼 열람 차단)
       - run: pnpm --filter @edim/db rls:test
@@ -38,6 +40,7 @@ jobs:
       - run: pnpm --filter @edim/db learning:test   # 0033 · 학습 AI 역류 0(DB①↔DB② 권한) · 투영 함수
       - run: pnpm --filter @edim/db special:test    # 0034 · Special 팬 선정 — 원자료 보호 · 부여 · 사용 기록 불변
       - run: pnpm --filter @edim/db consulting:test # 0037 · 벤치마킹 — 집계 숫자만 · k-익명 3 · 플랫폼 EXECUTE 없음
+      - run: pnpm --filter @edim/db mes:test        # 0038 · 0039 · 생산 · 창고 · 품질 · QR — 추가만 · 음수 재고 · 경합 · 플랫폼 읽기 거부
       # 아래 둘은 시드를 다시 깔고(macro 는 매크로를 전부 지운다) 돌기 때문에 맨 끝에 둔다
       - run: pnpm --filter @edim/db hierarchy:test
       - run: pnpm --filter @edim/db macro:test
