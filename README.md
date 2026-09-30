@@ -40,7 +40,7 @@
 ### 🔗 스냅샷 한 장
 
 원가 · 도면 · 견적 · Tech Data · 구매 요청은 **다시 계산하지 않고** 같은 `runId` 를 읽는다.
-견적 합계 = 원가 카드 = Word · Excel 의 값 — e2e 가 파일을 열어 확인한다.
+견적 합계 = 원가 카드 × (1 + 마진율) = Word · Excel 의 값 — 원가는 스냅샷 그대로, 마진율은 요율표 파일에서 · e2e 가 파일을 열어 확인한다.
 
 </td>
 <td width="33%" valign="top">
@@ -186,7 +186,7 @@ LLM 은 자연어 → 매크로 DSL 번역기 자리에만. 실행은 검증 · 
 
 **문제:** 원가 화면 · 견적서 · 구매 요청이 각자 다시 계산하면, 그 사이 단가가 바뀌는 순간 숫자가 갈라진다.
 **선택:** 원가 · 도면 · 견적 · Tech Data · 구매 요청은 **재계산하지 않고 `runId` 스냅샷을 읽는다.** 승인 · 발행 · 발주는 스냅샷 한 장에 묶이고, 발행된 문서와 발주된 구매는 **DB 트리거가** 수정 · 삭제를 거부한다.
-**검증:** e2e 가 "견적 합계 = 원가 카드 = Word · Excel 파일의 값"을 파일을 직접 열어 단언. 단가를 바꾼 뒤 다시 Run 하지 않으면 옛 견적은 그대로임을 단언.
+**검증:** e2e 가 "견적 합계 = 원가 카드 × (1 + 요율표 마진율) = Word · Excel 파일의 값"을 파일을 직접 열어 단언(09-30 회장님 결정으로 마진율을 견적 단계에만 얹었다 — 원가 카드는 그대로). 단가를 바꾼 뒤 다시 Run 하지 않으면 옛 견적은 그대로임을 단언.
 → [ADR-003](docs/adr/ADR-003-immutable-snapshot.md)
 
 </details>
@@ -278,7 +278,7 @@ flowchart TB
 | ![매크로](docs/screens/13_macro_approved.webp) | ![Toolbox](docs/screens/30_toolbox_program.webp) | ![관계](docs/screens/22_setup_relationship.webp) |
 | **도면 — 등록 치수 표에서 나온다** | **견적 · Tech Data · 구매 요청** | **구매 요청 → 견적 요청 → 발주** |
 | ![도면](docs/screens/43_drawings.webp) | ![문서](docs/screens/44_document_tab.webp) | ![구매](docs/screens/45_purchasing.webp) |
-| **견적서 인쇄본 — 합계 = 스냅샷 원가** | **설계 검증 — 승인된 매크로가 규칙이 된다** | **플랫폼 콘솔 — 고객사 업무 데이터는 없다** |
+| **견적서 인쇄본 — 합계 = 스냅샷 원가 × (1 + 마진율)** | **설계 검증 — 승인된 매크로가 규칙이 된다** | **플랫폼 콘솔 — 고객사 업무 데이터는 없다** |
 | ![견적서](docs/screens/46_quotation_print.webp) | ![설계 검증](docs/screens/80_macro_verify.webp) | ![플랫폼](docs/screens/41_platform_console.webp) |
 | **PCR 세부 — Business Type 열 (샘플 요율표)** | **UI 개발 AI(결정론) · Object Inspector · Signal/Slot** | **구동 방식 → 조립도 모터 자리 (샘플 규칙서)** |
 | ![PCR](docs/screens/88_pcr_detail.webp) | ![UI Design](docs/screens/89_ui_ai_designer.webp) | ![구동 방식](docs/screens/91_install_motor.webp) |
@@ -316,6 +316,7 @@ docker compose -f docker-compose.prod.yml ps
 1. **설치** — 저장소만 받는다(이미지 빌드가 의존성을 담는다).
 2. **실행** — `db`(healthy) → `migrate`(Exited 0 · 마이그레이션 + 샘플 시드) → `web`(Up) 순서. 운영 모드(`next start`)다.
 3. **시연** — http://localhost:3000/login → 아래 샘플 계정 → `/workbench` 에서 코드 조립 → BOM Run → Cost → Document · Design. 장면 순서는 [`docs/DEMO.md`](docs/DEMO.md).
+   **시연은 운영 모드로** — 이 docker 킷 또는 로컬 `pnpm build` → `pnpm --filter @edim/web start`([`DEMO.md` 0-A](docs/DEMO.md)). 개발 모드(`pnpm dev`)는 예비 경로이고, 쓸 때는 시연 직전에 재시작한다.
 
 AI 키가 없어도 모든 화면이 돈다(결정론 폴백 · [`DEPLOY.md` 7절](docs/DEPLOY.md)). 회사 실자료(카탈로그 · CAD 규칙서 · PCR 요율표)는 **파일만 바꿔** 넣는다 → [`DEPLOY.md` 9절](docs/DEPLOY.md).
 

@@ -1,13 +1,14 @@
 /**
  * ccmd M · p66 PCR 세부(Table) — Procurement · Sub-manufacturing · Other direct · Sales & Adm. · EBIT 를 Business Type 열마다.
  * **순수 함수**(파일·DB 모름). 입력 = 스냅샷 원가(재료비 · 인건비) + 견적 금액 + 요율표(샘플 파일 · pcr-rules.ts 가 읽는다).
- * 견적 금액은 바꾸지 않는다 — 견적 합계 = 스냅샷 원가 그대로(S22). 여기서 나오는 것은 그 금액을 요율표로 나눠 본 참고 표다.
+ * ccmd M-1(회장님 결정 09-30) — 요율표의 marginPct 로 **견적 단가 = 스냅샷 원가 × (1 + 마진율)**. 원가(스냅샷)는 그대로다.
+ * 이 표의 Contract Amount = 그 견적 금액 → EBIT = 견적 − Full costs.
  */
 export type PcrKind = "bom" | "mfg" | "rate";
 export type PcrBase = "exwork" | "contract";
 export interface PcrRowRule { label: string; kind: PcrKind; base?: PcrBase; pct?: number[] }
 export interface PcrSectionRule { name: string; group: "direct" | "sna"; rows: PcrRowRule[] }
-export interface PcrRules { version: string; sample: string; businessTypes: string[]; sections: PcrSectionRule[] }
+export interface PcrRules { version: string; sample: string; businessTypes: string[]; sections: PcrSectionRule[]; /** 견적 마진율(%) — 없으면 0 */ marginPct: number }
 
 export function parsePcrRules(v: unknown): { ok: true; rules: PcrRules } | { ok: false; error: string } {
   const o = v as Record<string, unknown> | null;
@@ -41,16 +42,25 @@ export function parsePcrRules(v: unknown): { ok: true; rules: PcrRules } | { ok:
     sections.push({ name: s.name, group: s.group, rows });
   }
   if (bom !== 1 || mfg !== 1) return { ok: false, error: "bom(Ex-Work) 줄과 mfg(Manufacturing) 줄이 한 번씩 있어야 합니다 — 스냅샷 원가가 빠지거나 두 번 들어가지 않게" };
-  return { ok: true, rules: { version: o.version, sample: typeof o.sample === "string" ? o.sample : "", businessTypes: types as string[], sections } };
+  const m = o.marginPct;
+  if (m !== undefined && !(typeof m === "number" && Number.isFinite(m) && m >= 0 && m <= 100)) return { ok: false, error: "marginPct 는 0~100 의 수(%)입니다" };
+  return { ok: true, rules: { version: o.version, sample: typeof o.sample === "string" ? o.sample : "", businessTypes: types as string[], sections, marginPct: typeof m === "number" ? m : 0 } };
 }
 
 export interface PcrDetailRow { label: string; basis: string; values: number[] }
 export interface PcrDetail {
   version: string; fingerprint: string; file: string; sample: string;
+  /** 이 견적 금액을 만든 마진율(%) */
+  marginPct: number;
   businessTypes: string[];
   contract: number;
   sections: { name: string; group: "direct" | "sna"; rows: PcrDetailRow[]; subtotal: number[] }[];
   directTotal: number[]; contribution: number[]; snaTotal: number[]; fullCost: number[]; ebit: number[];
+}
+
+/** ccmd M-1 · 견적 단가 = 스냅샷 원가 × (1 + 마진율/100) — 원 단위 반올림. 마진율 0 이면 원가 그대로(옛 견적과 같다). */
+export function salePrice(costTotal: number, marginPct: number): number {
+  return marginPct ? Math.round(costTotal * (1 + marginPct / 100)) : costTotal;
 }
 
 const sum = (xs: number[][], n: number) => Array.from({ length: n }, (_, i) => xs.reduce((a, r) => a + r[i]!, 0));
@@ -75,7 +85,7 @@ export function buildPcrDetail(
   const contract = Math.round(input.contract);
   const fullCost = directTotal.map((d, i) => d + snaTotal[i]!);
   return {
-    version: rules.version, fingerprint: meta.fingerprint, file: meta.file, sample: rules.sample,
+    version: rules.version, fingerprint: meta.fingerprint, file: meta.file, sample: rules.sample, marginPct: rules.marginPct,
     businessTypes: rules.businessTypes, contract, sections,
     directTotal, contribution: directTotal.map((d) => contract - d), snaTotal, fullCost, ebit: fullCost.map((f) => contract - f),
   };

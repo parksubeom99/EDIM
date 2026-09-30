@@ -97,6 +97,11 @@ with sync_playwright() as p:
     body=pg.inner_text("body"); ok("S6a BOM rows incl. macro-driven isolator + p14 spec", "Vibration isolator" in body and "칼라강판" in body, "Vibration isolator" in body and "칼라강판" in body)
     m=re.search(r"15,487,170",body); ok("S6b Cost total ₩15,487,170", bool(m), m); pg.screenshot(path=f"{OUT}/15_bom_cost.png",full_page=True)
     # S7 DXF — P4-a: 도면은 슬롯이 아니라 **BOM 스냅샷**에서 나온다
+    import math
+    def quote_expect(qid_, cost_):
+        # ccmd M-1(회장님 결정 09-30) — 견적 단가 = 스냅샷 원가 × (1 + 요율표 마진율). 마진율은 그 견적 body 에 박힌 값(요율표 파일에서 온 것)을 읽는다.
+        b_=ctx.request.get(BASE+f"/api/documents/{qid_}").json().get("body",{}); m_=(b_.get("margin") or {}).get("pct",0)
+        return (math.floor(cost_*(1+m_/100)+0.5) if m_ else cost_), m_
     J0={"content-type":"application/json"}; S55_0={"A":"EU","B":"55","C":"2123","D":"630","E":"SS","F":"1-21-13-15"}
     r0=ctx.request.post(BASE+"/api/run/bom",headers=J0,data=json.dumps({"slots":S55_0,"code":"EU-55-2123-630SS-1-21-13-15","node":"a0000000-0000-4000-8000-000000000004"}))
     RUN0=r0.json().get("runId")
@@ -277,9 +282,13 @@ with sync_playwright() as p:
     nr=ctx.request.post(BASE+"/api/documents",headers=J0,data=json.dumps({"type":"quotation"}))
     ok("S22a 스냅샷 없이는 견적을 못 뜬다 (400)", nr.status, nr.status==400)
     q1=ctx.request.post(BASE+"/api/documents",headers=J0,data=json.dumps({"runId":RUN1,"type":"quotation"})).json()
-    ok("S22b 견적 합계 = Cost API 값 (한 원도 다르지 않다) · 번호 QR-61313-nn Rev A", (q1.get("docNo"), q1.get("rev"), q1.get("total"), cr.get("value")), q1.get("total")==cr.get("value") and str(q1.get("docNo","")).startswith("QR-61313-") and q1.get("rev")=="A")
-    ph=ctx.request.get(BASE+f"/api/documents/{q1.get('id')}/print"); won=format(int(cr.get("value")),",")
-    ok("S22c 인쇄본(HTML)에 그 합계와 근거 스냅샷 id 가 찍힌다", (ph.status, won in ph.text(), RUN1 in ph.text()), ph.status==200 and "text/html" in ph.headers.get("content-type","") and won in ph.text() and RUN1 in ph.text() and "견 적 서" in ph.text())
+    exp22,m22=quote_expect(q1.get("id"), cr.get("value"))
+    ok("S22b 견적 합계 = Cost API 값 × (1 + 마진율 10% — 요율표 샘플 · ccmd M-1) · 원가는 다시 세지 않는다 · 번호 QR-61313-nn Rev A", (q1.get("docNo"), q1.get("rev"), q1.get("total"), cr.get("value"), m22),
+       q1.get("total")==exp22 and m22==10 and exp22>cr.get("value") and str(q1.get("docNo","")).startswith("QR-61313-") and q1.get("rev")=="A")
+    ph=ctx.request.get(BASE+f"/api/documents/{q1.get('id')}/print"); won=format(int(q1.get("total")),","); won_c=format(int(cr.get("value")),",")
+    ok("S22c 인쇄본(HTML)에 견적 합계 · 근거 스냅샷 id · '견적 단가 = 스냅샷 원가 × (1 + 마진율)' 줄(원가 값 · 샘플 마진율 표지)이 찍힌다", (ph.status, won in ph.text(), won_c in ph.text(), RUN1 in ph.text()),
+       ph.status==200 and "text/html" in ph.headers.get("content-type","") and won in ph.text() and won_c in ph.text() and RUN1 in ph.text() and "견 적 서" in ph.text()
+       and 'data-testid="quote-margin"' in ph.text() and 'data-testid="margin-sample"' in ph.text())
     q2=ctx.request.post(BASE+"/api/documents",headers=J0,data=json.dumps({"runId":RUN1,"type":"quotation"})).json()
     ok("S22d 같은 코드로 다시 뜨면 같은 번호에 Rev B", (q2.get("docNo"), q2.get("rev")), q2.get("docNo")==q1.get("docNo") and q2.get("rev")=="B")
     for st in ("review","approved","issued"): pr_=ctx.request.patch(BASE+f"/api/documents/{q1.get('id')}",headers=J0,data=json.dumps({"status":st}))
@@ -1298,9 +1307,9 @@ with sync_playwright() as p:
     pr1=ctx.request.post(BASE+"/api/purchase-requests",headers=J0,data=json.dumps({"runId":r1["runId"]})).json()
     prs=[x for x in ctx.request.get(BASE+f"/api/purchase-requests?node={N4}").json()["rows"] if x["bomRunId"]==r1["runId"]]
     prl=[l for l in (prs[0]["lines"] if prs else []) if str(l.get("resolvedCode","")).startswith("PFP 1")]
-    ok("S52c 같은 스냅샷의 견적(합계 = 원가 합계 · 단가 기준 줄)과 구매 요청(PFP 1 단가 25,000)이 같은 단가를 쓴다",
+    ok("S52c 같은 스냅샷의 견적(합계 = 원가 합계 × (1 + 마진율) · 단가 기준 줄)과 구매 요청(PFP 1 단가 25,000)이 같은 단가를 쓴다",
        (q1.get("total"), c1["total"], 'data-testid="price-basis"' in qh, [float(l["unitPrice"]) for l in prl]),
-       q1.get("total")==c1["total"] and 'data-testid="price-basis"' in qh and prl and all(float(l["unitPrice"])==25000 for l in prl))
+       q1.get("total")==quote_expect(q1.get("id"), c1["total"])[0] and 'data-testid="price-basis"' in qh and prl and all(float(l["unitPrice"])==25000 for l in prl))
     p2=ctx.request.post(PRC,headers=J0,data=json.dumps({"code":"PFP 1","price":31000,"effectiveFrom":TODAY,"note":"E2E price-to-cost 2"})).json()
     c1b=ctx.request.post(BASE+"/api/run/cost",headers=J0,data=json.dumps({"runId":r1["runId"]})).json()["cost"]
     qh_b=ctx.request.get(BASE+f"/api/documents/{q1.get('id')}/print").text()
@@ -1632,9 +1641,9 @@ with sync_playwright() as p:
        and lb1.get("kind")=="mfg-table" and [(x["process"],x["equipment"],x["amount"]) for x in lb1.get("rows",[])]==[("조립",None,540000),("도장","도장 부스",228000)])
     q1=ctx.request.post(DOCS,headers=J0,data=json.dumps({"runId":r1["runId"],"type":"quotation"})).json(); qh=ctx.request.get(DOCS+f"/{q1.get('id')}/print").text()
     qb=ctx.request.get(DOCS+f"/{q1.get('id')}").json().get("body",{}); ap=qb.get("applied") or []
-    ok("S62c 견적 적용 — 견적 합계 = 스냅샷 원가 · PCR Manufacturing = 768,000 · 인쇄본에 인건비 기준 줄 · 견적 적용 Table 금액 합 = Material Cost",
+    ok("S62c 견적 적용 — 견적 합계 = 스냅샷 원가 × (1 + 마진율) · PCR Manufacturing = 768,000 · 인쇄본에 인건비 기준 줄 · 견적 적용 Table 금액 합 = Material Cost",
        (qb.get("total"), c1["total"], qb.get("pcr",{}).get("manufacturing"), len(ap), sum(a["amount"] for a in ap), c1["material"], "labor-basis" in qh, "applied-table" in qh),
-       qb.get("total")==c1["total"] and qb.get("pcr",{}).get("manufacturing")==768000 and len(ap)>0 and sum(a["amount"] for a in ap)==c1["material"]
+       qb.get("total")==quote_expect(q1.get("id"), c1["total"])[0] and qb.get("pcr",{}).get("fullCost")==c1["total"] and qb.get("pcr",{}).get("manufacturing")==768000 and len(ap)>0 and sum(a["amount"] for a in ap)==c1["material"]
        and all(a["table"] in ("견적","구매") for a in ap) and 'data-testid="labor-basis"' in qh and "제조 정보 표(EU)" in qh and 'data-testid="applied-table"' in qh and 'data-testid="price-basis"' in qh)
     pg.click("[data-testid='mfg-del-도장']"); wait_sel(pg,"[data-testid=mfg-msg][data-ok='1']"); wait_text(pg,"[data-testid=mfg-total]","540,000")
     c1b=ctx.request.post(BASE+"/api/run/cost",headers=J0,data=json.dumps({"runId":r1["runId"]})).json()["cost"]
@@ -2232,9 +2241,9 @@ with sync_playwright() as p:
     dxf_png(asm75, f"{OUT}/75_cpq_special_drawing.png", "EDIM - ASSEMBLY · SPF 샘플 (ezdxf re-render) — Item 표에 Special 선정 팬 · 모터")
     tx75=dxf_stats(asm75)["texts"]
     runs75=ctx.request.get(BASE+f"/api/bom-runs/{rid75}").json().get("specialRuns",[])
-    ok("S75b 같은 스냅샷으로 EBOM · Cost · 견적 · 조립도를 뽑아도 사용 기록(과금)은 BOM Run 1회 = 1건 · 5,000(샘플) · 견적 합계 = 스냅샷 원가 · 조립도 Item 표에 팬 모델 · 모터 kW(ezdxf)",
+    ok("S75b 같은 스냅샷으로 EBOM · Cost · 견적 · 조립도를 뽑아도 사용 기록(과금)은 BOM Run 1회 = 1건 · 5,000(샘플) · 견적 합계 = 스냅샷 원가 × (1 + 마진율) · 조립도 Item 표에 팬 모델 · 모터 kW(ezdxf)",
        (e75.status, q75.get("total"), c75.get("total"), [(r["price"]) for r in runs75], [t for t in tx75 if "EDIM-PF" in t or "kW" in t][:3]),
-       e75.status==200 and q75.get("total")==c75.get("total") and len(runs75)==1 and runs75[0]["price"]==5000
+       e75.status==200 and q75.get("total")==quote_expect(q75.get("id"), c75.get("total"))[0] and len(runs75)==1 and runs75[0]["price"]==5000
        and any(t.startswith("EDIM-PF-560 (샘플) · 2600 rpm") for t in tx75) and any(t.startswith("3.7 kW") for t in tx75))
     # (d) 플랫폼이 성능표 점 하나를 고친다 → 새 BOM Run 은 다른 결과 · 앞 스냅샷의 선정 결과는 그대로
     pf=b.new_context(); pf.request.post(BASE+"/api/auth/login",data=LOGIN("platform@edim.test"))
@@ -2457,10 +2466,10 @@ with sync_playwright() as p:
     sec80={s_["name"]:s_ for s_ in d80.get("sections",[])}
     exw=[r_ for s_ in d80.get("sections",[]) for r_ in s_["rows"] if r_["label"]=="Ex-Work"]
     mfg80=[r_ for s_ in d80.get("sections",[]) for r_ in s_["rows"] if r_["label"].startswith("Manufacturing")]
-    ok("S80a 견적 body 에 PCR 세부 — Business Type 3열 · Procurement · Sub-manufacturing · Other direct · Sales & Adm. · Ex-Work = 스냅샷 재료비 · Manufacturing = 스냅샷 인건비 · Contract = 견적 합계(그대로) · Full + EBIT = Contract · 요율표 판 · 지문",
+    ok("S80a 견적 body 에 PCR 세부 — Business Type 3열 · Procurement · Sub-manufacturing · Other direct · Sales & Adm. · Ex-Work = 스냅샷 재료비 · Manufacturing = 스냅샷 인건비 · Contract = 견적 합계 = 스냅샷 원가 × (1 + 마진율 10%) · Full + EBIT = Contract · **EBIT 전부 양수**(ccmd M-1) · 요율표 판 · 지문",
        (d80.get("businessTypes"), sorted(sec80), d80.get("contract"), q80.get("total"), d80.get("file"), d80.get("fingerprint"), d80.get("ebit")),
        len(d80.get("businessTypes",[]))==3 and sorted(sec80)==["Other direct cost","Procurement cost","Sales & Adm. cost","Sub-manufacturing cost"]
-       and d80.get("contract")==q80.get("total")==b80["pcr"]["fullCost"] and exw and exw[0]["values"]==[round(b80["pcr"]["material"])]*3 and mfg80 and mfg80[0]["values"]==[round(b80["pcr"]["manufacturing"])]*3
+       and d80.get("contract")==q80.get("total")==math.floor(b80["pcr"]["fullCost"]*1.1+0.5) and d80.get("marginPct")==10 and all(e_>0 for e_ in d80.get("ebit",[])) and exw and exw[0]["values"]==[round(b80["pcr"]["material"])]*3 and mfg80 and mfg80[0]["values"]==[round(b80["pcr"]["manufacturing"])]*3
        and all(f_+e_==d80["contract"] for f_,e_ in zip(d80.get("fullCost",[]),d80.get("ebit",[]))) and d80.get("file")=="pcr-rules.sample.json" and len(d80.get("fingerprint",""))==12)
     pg.goto(DOCS+f"/{q80.get('id')}/print",wait_until="load"); pg.wait_for_selector("[data-testid=pcr-detail]",timeout=30000)
     vis80=(pg.is_visible("[data-testid=pcr-detail]"), pg.is_visible("[data-testid=pcr-sample]"), pg.inner_text("[data-testid=pcr-sample]"), pg.get_attribute("[data-testid=pcr-detail]","data-types"))
@@ -2471,23 +2480,24 @@ with sync_playwright() as p:
     # 요율표 교체 — 회사 파일 자리(pcr-rules.local.json · .gitignore)에 Air/Sea freight 수출 요율 3.5 → 7.0 을 두면 다음 견적만 바뀐다. 틀린 파일은 422. 끝나면 지운다.
     _root=os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)),".."))
     _smp=os.path.join(_root,"packages","bom-code","cost-rules","pcr-rules.sample.json"); _loc=os.path.join(_root,"packages","bom-code","cost-rules","pcr-rules.local.json")
-    _rules=json.load(open(_smp,encoding="utf-8")); _rules["version"]="e2e-local-1"
+    _rules=json.load(open(_smp,encoding="utf-8")); _rules["version"]="e2e-local-1"; _rules["marginPct"]=20   # ccmd M-1 — 마진율도 파일에서만 바꾼다
     for r_ in _rules["sections"][0]["rows"]:
         if r_["label"]=="Air/Sea freight": r_["pct"]=[0,7.0,0]
     try:
         with open(_loc,"w",encoding="utf-8",newline="\n") as f_: json.dump(_rules,f_,ensure_ascii=False)
         q80b=ctx.request.post(DOCS,headers=J0,data=json.dumps({"runId":RUN1,"type":"quotation"})).json()
-        d80b=ctx.request.get(DOCS+f"/{q80b.get('id')}").json().get("body",{}).get("pcrDetail") or {}
+        b80b=ctx.request.get(DOCS+f"/{q80b.get('id')}").json().get("body",{}); d80b=b80b.get("pcrDetail") or {}
         with open(_loc,"w",encoding="utf-8",newline="\n") as f_: f_.write("{ not json")
         bad80=ctx.request.post(DOCS,headers=J0,data=json.dumps({"runId":RUN1,"type":"quotation"}))
     finally:
         if os.path.exists(_loc): os.remove(_loc)
-    d80a=ctx.request.get(DOCS+f"/{q80.get('id')}").json().get("body",{}).get("pcrDetail") or {}
+    b80a=ctx.request.get(DOCS+f"/{q80.get('id')}").json().get("body",{}); d80a=b80a.get("pcrDetail") or {}
     fr=lambda d_: [r_["values"] for r_ in d_.get("sections",[{}])[0].get("rows",[]) if r_["label"]=="Air/Sea freight"]
-    ok("S80c 요율표 파일만 바꾸면(pcr-rules.local.json) 다음 견적의 수출 운송비가 2배(원 단위 반올림 ±1) · 판 · 지문이 바뀐다 · 앞 견적은 그대로 · 틀린 파일은 422(숨기지 않는다) · 파일을 지우면 샘플로 돌아간다",
-       (fr(d80), fr(d80b), d80b.get("version"), d80b.get("file"), d80b.get("fingerprint")!=d80.get("fingerprint"), fr(d80a)==fr(d80), bad80.status),
+    ok("S80c 요율표 파일만 바꾸면(pcr-rules.local.json) 다음 견적의 수출 운송비가 2배(원 단위 반올림 ±1) · 마진율 10 → 20% 로 견적 합계 = 원가 × 1.2 · 원가(PCR Full cost)는 그대로 · 판 · 지문이 바뀐다 · 앞 견적은 합계까지 그대로 · 틀린 파일은 422(숨기지 않는다) · 파일을 지우면 샘플로 돌아간다",
+       (fr(d80), fr(d80b), d80b.get("version"), d80b.get("file"), d80b.get("fingerprint")!=d80.get("fingerprint"), fr(d80a)==fr(d80), bad80.status, q80b.get("total"), b80b.get("pcr",{}).get("fullCost"), b80a.get("total")),
        fr(d80b) and fr(d80) and abs(fr(d80b)[0][1]-2*fr(d80)[0][1])<=1 and fr(d80b)[0][0]==0 and d80b.get("version")=="e2e-local-1" and d80b.get("file")=="pcr-rules.local.json"
-       and d80b.get("fingerprint")!=d80.get("fingerprint") and fr(d80a)==fr(d80) and bad80.status==422 and "PCR 요율표" in bad80.text() and not os.path.exists(_loc))
+       and d80b.get("fingerprint")!=d80.get("fingerprint") and fr(d80a)==fr(d80) and bad80.status==422
+       and d80b.get("marginPct")==20 and q80b.get("total")==math.floor(b80["pcr"]["fullCost"]*1.2+0.5) and b80b.get("pcr",{}).get("fullCost")==b80["pcr"]["fullCost"] and b80a.get("total")==q80.get("total") and "PCR 요율표" in bad80.text() and not os.path.exists(_loc))
     # ── S81 (ccmd M · p25 · p26 · p21) — UI 개발 AI(결정론) · Canvas · 저장·삭제·등록 · 실행 설정(Call) · Object Inspector · Signal/Slot · Work Hierarchy 노드별 UI ──
     UF=BASE+"/api/ui-forms"; NODE81="a0000000-0000-4000-8000-000000000004"; FN81="E2E AI 폼"
     # 쓰기 시험용 샘플 표(E2E-UIF · reset:demo 가 지운다) — Item = Sub Code B(10 · 12 · 25 · 55)

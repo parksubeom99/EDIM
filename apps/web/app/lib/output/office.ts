@@ -39,7 +39,7 @@ function partsOf(doc: ExportDoc): { title: Section; fields: Section; tables: Sec
     const cur = b.pcr.currency;
     const fields: [string, Cell][] = [...head,
       ["공사명", p?.name ?? "—"], ["고객", p?.clientName ?? "—"], ["Project No.", p?.projectNo ?? "—"], ["Product Code", b.code],
-      ["통화", cur], ["VAT", b.vat], ["납품조건", b.terms.delivery || "—"], ["지급조건", b.terms.payment || "—"], ["유효기간", b.terms.validity || "—"], ["보증기간", b.terms.warranty || "—"]];
+      ["통화", cur], ...(b.margin ? [["견적 단가 = 원가 × (1 + 마진율)", `${b.margin.costUnit.toLocaleString("ko-KR")} × (1 + ${b.margin.pct}%)${b.margin.sample ? " · 샘플 마진율" : ""}`] as [string, Cell]] : []), ["VAT", b.vat], ["납품조건", b.terms.delivery || "—"], ["지급조건", b.terms.payment || "—"], ["유효기간", b.terms.validity || "—"], ["보증기간", b.terms.warranty || "—"]];
     const tables: Section[] = [
       { kind: "table", id: "pcr", name: "PCR · Pre-Calculation Report", head: ["항목", `금액 (${cur})`], fmt: [null, "won"],
         rows: [["Material Cost", b.pcr.material], ["Manufacturing Cost", b.pcr.manufacturing], ["Direct Cost", b.pcr.directCost], ["Overhead", b.pcr.overhead], ["Full cost", b.pcr.fullCost]] },

@@ -1,6 +1,8 @@
 {
   "version": "sample-1",
-  "sample": "샘플 PCR 요율표 — 회사 실 요율 아님 · 회사 파일(pcr-rules.local.json 또는 EDIM_PCR_RULES)로 바꾸면 다음 견적부터 반영",
+  "sample": "샘플 PCR 요율표 · 샘플 마진율 — 회사 실 요율 · 마진 정책 아님 · 회사 파일(pcr-rules.local.json 또는 EDIM_PCR_RULES)로 바꾸면 다음 견적부터 반영",
+  "marginPct": 10,
+  "_marginNote": "ccmd M-1 · 회장님 결정(09-30) — 견적 단가 = 스냅샷 원가 × (1 + marginPct/100). 원가(스냅샷)는 바꾸지 않는다. 없으면 0(옛 견적과 같다)",
   "businessTypes": ["Own acc.", "Biz Type 1 · 수출", "Biz Type 2 · 현장 설치"],
   "_note": "p66 PCR(Table). kind: bom = 스냅샷 재료비(Ex-Work) · mfg = 스냅샷 인건비(F10) · rate = base 금액 × % (businessTypes 순서대로). base: exwork = Ex-Work · contract = 견적 금액",
   "sections": [

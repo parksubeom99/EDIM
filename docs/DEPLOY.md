@@ -104,7 +104,7 @@ openssl rand -base64 32
 |---|---|---|---|
 | 카탈로그 — Sub Code · Product Code · 표(치수 · 기술 · 규칙 · 세부 치수) · 코드 관계 · 관계 단가 | `packages/bom-code/catalog/ahu-demo.json` | `packages/bom-code/catalog/catalog.local.json` · `EDIM_CATALOG` | `pnpm db:reset:demo`(개발) · 운영 킷은 `up -d --build`(migrate 가 시드) |
 | CAD 규칙서 — 3×3 칸 → mm · 기준점 · 구동 방식 · 방향 결합 · KAD 대응표 | `packages/bom-code/cad-rules/cad-rules.sample.json` | `cad-rules.local.json` · `EDIM_CAD_RULES` | 다음 BOM Run 부터(앞 스냅샷 도면은 그대로) |
-| PCR 요율표 — Business Type 열 · 요율 | `packages/bom-code/cost-rules/pcr-rules.sample.json` | `pcr-rules.local.json` · `EDIM_PCR_RULES` | 다음 견적부터(앞 견적은 그대로) |
+| PCR 요율표 — Business Type 열 · 요율 · **견적 마진율**(`marginPct` · 견적 단가 = 원가 × (1 + 마진율) · 원가는 그대로) | `packages/bom-code/cost-rules/pcr-rules.sample.json` | `pcr-rules.local.json` · `EDIM_PCR_RULES` | 다음 견적부터(앞 견적은 그대로) |
 
 - 운영 킷(docker)에서는 이미지 빌드 때 저장소의 파일이 들어간다 — 회사 파일을 같은 자리에 두고 `up -d --build`, 또는 파일을 볼륨으로 붙이고 환경변수(`EDIM_CAD_RULES` · `EDIM_PCR_RULES`)로 가리킨다.
 - 틀린 파일은 조용히 무시하지 않는다: CAD 규칙서 · PCR 요율표가 틀리면 BOM Run · 견적이 422 로 이유를 돌려준다.

@@ -8,7 +8,7 @@
 import type { LaborBasis } from "./bom";
 import { graphSvg, type OutputDataValue, type GraphSnap } from "../output-template";
 import { renderLayoutPage, LAYOUT_CSS, SIGNATURE_HTML, type LayoutElement } from "../print-layout";
-import { buildPcrDetail, type PcrDetail, type PcrRules } from "../pcr";
+import { buildPcrDetail, salePrice, type PcrDetail, type PcrRules } from "../pcr";
 
 export interface SnapshotLike {
   id: string;
@@ -102,8 +102,10 @@ export interface QuotationBody {
   laborBasis?: LaborBasis;
   /** F10 · p67 [견적 적용 Table] — Code No · Price · Supplier · Price table(견적/구매). 스냅샷 줄 그대로, Σ 금액 = PCR Material Cost. */
   applied?: AppliedRow[];
-  /** ccmd M · p66 PCR 세부(Business Type 열) — 만들 때의 요율표로 편 표(판 · 지문). 견적 금액은 바꾸지 않는다. 옛 견적엔 없다. */
+  /** ccmd M · p66 PCR 세부(Business Type 열) — 만들 때의 요율표로 편 표(판 · 지문). 옛 견적엔 없다. */
   pcrDetail?: PcrDetail;
+  /** ccmd M-1 · 견적 단가 = 스냅샷 원가(costUnit) × (1 + pct/100). 요율표가 있을 때만(없으면 단가 = 원가 · 옛 견적). */
+  margin?: { pct: number; costUnit: number; unitPrice: number; file: string; fingerprint: string; sample: string };
 }
 
 export interface AppliedRow { no: number; code: string; part: string; qty: number; unitPrice: number; amount: number; supplier: string; table: "견적" | "구매"; note: string }
@@ -147,8 +149,11 @@ export function buildQuotationBody(
   const qty = opts.qty ?? 1;
   if (!Number.isInteger(qty) || qty < 1 || qty > 9999)
     return { ok: false, status: 400, error: "수량은 1~9999 의 정수여야 합니다." };
-  // 단가 = 스냅샷에 저장된 cost.total **그대로**. 여기서 원가를 다시 세지 않는다.
-  const amount = cost.total * qty;
+  // 원가 = 스냅샷에 저장된 cost.total **그대로**(여기서 다시 세지 않는다).
+  // ccmd M-1(회장님 결정) — 견적 단가 = 그 원가 × (1 + 요율표 마진율). 요율표가 없으면 마진 0 = 원가 그대로.
+  const marginPct = opts.pcrRules?.rules.marginPct ?? 0;
+  const unitPrice = salePrice(cost.total, marginPct);
+  const amount = unitPrice * qty;
   return {
     ok: true,
     body: {
@@ -157,7 +162,7 @@ export function buildQuotationBody(
         material: cost.material, manufacturing: cost.labor, directCost: cost.material + cost.labor,
         overhead: cost.overhead, fullCost: cost.total, currency: cost.currency ?? "KRW",
       },
-      items: [{ no: 1, equipment: run.code, qty, unitPrice: cost.total, amount }],
+      items: [{ no: 1, equipment: run.code, qty, unitPrice, amount }],
       totalQty: qty, total: amount, vat: "별도",
       terms: {
         delivery: opts.deliveryTerms ?? "", payment: opts.paymentTerms ?? "",
@@ -168,6 +173,7 @@ export function buildQuotationBody(
       ...(cost.laborBasis ? { laborBasis: cost.laborBasis } : {}),
       ...(appliedOf(run) ? { applied: appliedOf(run)! } : {}),
       ...(opts.pcrRules ? { pcrDetail: buildPcrDetail({ material: cost.material * qty, labor: cost.labor * qty, contract: amount }, opts.pcrRules.rules, opts.pcrRules) } : {}),
+      ...(opts.pcrRules ? { margin: { pct: marginPct, costUnit: cost.total, unitPrice, file: opts.pcrRules.file, fingerprint: opts.pcrRules.fingerprint, sample: opts.pcrRules.rules.sample } } : {}),
     },
   };
 }
@@ -354,6 +360,7 @@ function quotationHtml(b: QuotationBody): string {
 ${b.items.map((i) => `<tr><td>${i.no}</td><td class="mono">${esc(i.equipment)}</td><td class="n">${i.qty}</td><td class="n">${won(i.unitPrice)}</td><td class="n">${won(i.amount)}</td><td></td></tr>`).join("")}
 <tr><th colspan="2">합계</th><td class="n">${b.totalQty}</td><td></td><td class="n"><b>${won(b.total)}</b></td><td></td></tr>
 </table>
+${b.margin ? `<p data-testid="quote-margin" style="font-size:11px;color:#555">견적 단가 = 스냅샷 원가 ${won(b.margin.costUnit)} × (1 + 마진율 ${b.margin.pct}%) = ${won(b.margin.unitPrice)} · 마진율 출처 ${esc(b.margin.file)} #${esc(b.margin.fingerprint)}${b.margin.sample ? ' <span data-testid="margin-sample" style="font-weight:700;color:#b45309">샘플 마진율</span>' : ""}</p>` : ""}
 ${b.priceBasis ? `<p data-testid="price-basis" style="font-size:11px;color:#555">단가 기준: 스냅샷 시점 유효 단가 — 단가 이력 ${b.priceBasis.history}줄${b.priceBasis.dates.length ? `(유효일 ${esc(b.priceBasis.dates.join(", "))})` : ""} · 코드 관계값 ${b.priceBasis.relationship}줄${b.priceBasis.mismatch ? ` · 통화 불일치로 관계값 ${b.priceBasis.mismatch}줄` : ""}</p>` : ""}
 ${b.laborBasis ? `<p data-testid="labor-basis" style="font-size:11px;color:#555">${laborBasisText(b.laborBasis)}</p>` : ""}
 ${b.applied ? `<h2>견적 적용 Table</h2>
@@ -381,7 +388,7 @@ ${d.sections.filter((s) => s.group === "sna").map((s) => `<tr><th colspan="${d.b
 ${row("Full costs", d.fullCost, "Direct + Sales & Adm.", true)}
 <tr style="font-weight:700" data-testid="pcr-ebit"><td>EBIT</td>${cells(d.ebit)}<td style="font-size:10px;color:#666">견적 금액 − Full costs</td></tr>
 </table>
-<p data-testid="pcr-rules-stamp" style="font-size:11px;color:#555">요율표 ${esc(d.file)} · 판 ${esc(d.version)} · 지문 <span class="mono">${esc(d.fingerprint)}</span> · 통화 ${esc(cur)}${d.sample ? ` — ${esc(d.sample)}` : ""}</p>`;
+<p data-testid="pcr-rules-stamp" style="font-size:11px;color:#555">요율표 ${esc(d.file)} · 판 ${esc(d.version)} · 지문 <span class="mono">${esc(d.fingerprint)}</span> · 마진율 ${d.marginPct ?? 0}% · 통화 ${esc(cur)}${d.sample ? ` — ${esc(d.sample)}` : ""}</p>`;
 }
 
 /** 인쇄본의 인건비 기준 한 줄(HTML 이스케이프됨) — 스냅샷에 박힌 laborBasis 를 글로 옮긴다. */
