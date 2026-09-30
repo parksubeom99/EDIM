@@ -231,11 +231,16 @@ ccmd K(main `a3b1853` KA · `da10672` KC · KB 는 이 절과 같은 브랜치)�
 |---|---|---|
 | Work Hierarchy 노드 → 사용자 UI Form → 매크로 Run (p21 · p26) | UI Design 작업장에서 폼의 `spec.nodes` 에 노드를 붙인다 → 작업대에서 그 노드를 고르면 Inspector · Toolbox UI Tool 탭에 그 폼 → 실행 설정 Call = **그 노드의** 승인 매크로를 Combo 값(= 코드 슬롯)으로 실행(`POST /api/run/edim` — 기존 경로 그대로) | e2e S81b · S81e |
 | 사용자 UI Form → Set-Up 제품 표 → BOM (p25) | 버튼 저장 · 삭제 · 등록이 대상 표 한 행을 서버가 쓴다(`POST /api/ui-forms/[id]/run` — 저장된 폼으로 판정 · `parseTables` · 감사) → 같은 표를 BOM · 매크로가 읽는다. 사람이 Set-Up 화면에 다시 치지 않는다 | e2e S81c · S81d |
-| BOM 스냅샷 → 견적 PCR 세부 (p66) | 스냅샷 재료비 · 인건비 = Ex-Work · Manufacturing 줄 · 견적 금액 = 스냅샷 원가 그대로 → 요율표(파일)로 Business Type 열 · 요율표 판 · 지문이 견적 body 에 박힌다(앞 견적 불변) | e2e S80a~c |
+| BOM 스냅샷 → 견적 PCR 세부 (p66) | 스냅샷 재료비 · 인건비 = Ex-Work · Manufacturing 줄 · 견적 금액 = 스냅샷 원가 그대로(M-1 부터 × (1 + 마진율) — 아래 M-1 절) → 요율표(파일)로 Business Type 열 · 요율표 판 · 지문이 견적 body 에 박힌다(앞 견적 불변) | e2e S80a~c |
 | Arrangement(구동 방식 · 방향) → 스냅샷 → 조립도 모터 자리 (p36) | 구획의 `install` · `dir` → `dims.sections` → CAD 규칙서(`installation` · `direction`)로 모터 mm 자리 → 앞 스냅샷 도면 불변 | e2e S82a~d |
 
 - 합계(CC 주장 · 엘 확정판 4 그대로): **이어짐 14 · 약함 0 · 없음 0 (총 14).**
 
 ### 2026-09-30 ccmd M-1 — 견적 마진율(회장님 결정)
 - 'BOM → 견적 · Export' 칸은 **이어짐 그대로**다. 바뀐 것은 견적 단가의 규칙뿐: 견적 단가 = 스냅샷 `cost.total` × (1 + 요율표 `marginPct`). 원가는 여전히 스냅샷을 읽기만 하고(재계산 0), 마진율은 견적을 만들 때 요율표 파일에서 읽어 견적 body 에 박는다(판 · 지문) — 요율표를 바꿔도 이미 만든 견적은 그대로(e2e S80c). 원가 카드 · PCR Full cost · 견적 적용 Table 합계는 불변(S6b · S62c).
+- 합계: **이어짐 14 · 약함 0 · 없음 0** 그대로.
+
+### 2026-10-01 ccmd M-2 — PCR 세부 원가 기준 · 킷 e2e
+- 'BOM 스냅샷 → 견적 PCR 세부' 곁가지는 **이어짐 그대로**. 밝힌 것: 이 표는 스냅샷 재료비 + 인건비를 읽고 간접비는 요율표 줄로 다시 센다(스냅샷 Overhead 는 표 밖) — 표 밑 기준 한 줄 · e2e S80d 타이(세로 합 = 견적 · EBIT ≤ 견적 − 재료비·인건비 · 재료비·인건비 + Overhead = 스냅샷 원가).
+- 운영 킷(docker) 대상 e2e 1회로 D-5 를 묶었다 — host-only 3단계(S76d · S79d · S80c)는 킷에서 건너뛰되 출력에 남는다.
 - 합계: **이어짐 14 · 약함 0 · 없음 0** 그대로.

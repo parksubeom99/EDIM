@@ -1,0 +1,7 @@
+# 개발 e2e (host · 머지된 main ce73119 + 이 브랜치) — 2026-10-01
+PASS S80a 견적 body 에 PCR 세부 — Business Type 3열 · Procurement · Sub-manufacturing · Other direct · Sales & Adm. · Ex-Work = 스냅샷 재료비 · Manufacturing = 스냅샷 인건비 · Contract = 견적 합계 = 스냅샷 원가 × (1 + 마진율 10%) · Full + EBIT = Contract · **EBIT 전부 양수**(ccmd M-1) · 요율표 판 · 지문 → (['Own acc.', 'Biz Type 1 · 수출',
+PASS S80b 인쇄본 화면에 PCR 세부 표 + '샘플' 표지가 실제로 보인다 · Excel 내보내기 200 → ((True, True, '샘플', '3'), 200)
+PASS S80c 요율표 파일만 바꾸면(pcr-rules.local.json) 다음 견적의 수출 운송비가 2배(원 단위 반올림 ±1) · 마진율 10 → 20% 로 견적 합계 = 원가 × 1.2 · 원가(PCR Full cost)는 그대로 · 판 · 지문이 바뀐다 · 앞 견적은 합계까지 그대로 · 틀린 파일은 422(숨기지 않는다) · 파일을 지우면 샘플로 돌아간다 → ([[0, 410
+PASS S80d EBIT 타이 — 세로 합 = 견적(열마다) · EBIT ≤ 견적 − 표의 원가 기준(스냅샷 재료비 + 인건비) · 원가 기준 + 스냅샷 Overhead = 스냅샷 원가 ₩15,487,170 · 견적 ₩17,035,887 불변 · 기준 한 줄이 인쇄본에 보인다 → ([2193185, 1265459, 1247237], [17035887, 17035887, 17035887], 13827830, 1659340, 15487170, 17035887, '원가 기준:
+[demo_e2e] target=host · 384/384 steps passed
+e2e EXIT 0

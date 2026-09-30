@@ -1,0 +1,9 @@
+# 킷 e2e (EDIM_E2E_TARGET=kit · http://localhost:3000 = edim-prod-m2 web · next start 컨테이너) — 2026-10-01
+SKIP(host-only) S76d — 저장소 폴더 packages/bom-code/cad-rules 에 cad-rules.local.json 을 둔다 — 킷 컨테이너는 호스트 폴더를 못 본다
+SKIP(host-only) S79d — 호스트 DB 에 bench:seed 를 돌린다 — 킷 DB 가 아니라 호스트 .env 의 DB 에 닿는다
+PASS S80a 견적 body 에 PCR 세부 — Business Type 3열 · Procurement · Sub-manufacturing · Other direct · Sales & Adm. · Ex-Work = 스냅샷 재료비 · Manufacturing = 스냅샷 인건비 · Contract = 견적 합계 = 스냅샷 원가 × (1 + 마진율 10%) · Full + EBIT = Contract · **EBIT 전부 양수**(ccmd M-1) · 요율표 판 · 지문 → (['Own acc.', 'Biz Type 1 · 수출',
+PASS S80b 인쇄본 화면에 PCR 세부 표 + '샘플' 표지가 실제로 보인다 · Excel 내보내기 200 → ((True, True, '샘플', '3'), 200)
+SKIP(host-only) S80c — 저장소 폴더 packages/bom-code/cost-rules 에 pcr-rules.local.json 을 둔다 — 킷 컨테이너는 호스트 폴더를 못 본다
+PASS S80d EBIT 타이 — 세로 합 = 견적(열마다) · EBIT ≤ 견적 − 표의 원가 기준(스냅샷 재료비 + 인건비) · 원가 기준 + 스냅샷 Overhead = 스냅샷 원가 ₩15,487,170 · 견적 ₩17,035,887 불변 · 기준 한 줄이 인쇄본에 보인다 → ([2193185, 1265459, 1247237], [17035887, 17035887, 17035887], 13827830, 1659340, 15487170, 17035887, '원가 기준:
+[demo_e2e] target=kit · 381/381 steps passed · host-only 건너뜀 3: S76d, S79d, S80c
+e2e EXIT 0
