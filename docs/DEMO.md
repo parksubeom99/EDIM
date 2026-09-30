@@ -4,6 +4,11 @@
 > 질문에 방어하는 전 과정. 이 문서 하나로 준비 → 리허설 → 발표가 끝나야 한다.
 > 방향 기준: EDIM.pdf 70장(NOVA 청사진). 시연은 그 중 **등뼈 한 줄**(코드 → Run → BOM·원가·도면)이다.
 
+> ### ⚠️ 시연은 운영 모드로 한다 (ccmd M-1 · 2026-09-30)
+> **기본 = 운영 모드**(아래 0-A 절 — `next start` 또는 docker 킷). 개발 모드(`pnpm dev`)는 **예비 경로**다.
+> 이유: 09-30 실측에서 개발 서버(node) 가 한 세션 동안 **16 GB** 까지 불었고, 그 순간 화면 응답이 1.5초를 넘겨 e2e 가 흔들렸다. 시연 중 같은 일이 나면 화면이 멎는다.
+> 개발 모드로 시연할 수밖에 없으면 **시연 직전에 개발 서버를 껐다 켠다**(1절 끝).
+
 ---
 
 ## 0. 발표 한 문장
@@ -12,7 +17,42 @@
 
 ---
 
-## 1. 로컬 준비 (Windows · 최초 1회 · 약 20분)
+## 0-A. 시연 경로 — 운영 모드 (기본)
+
+둘 중 하나. 리허설 뒤 초기화가 쉬운 **(가)** 를 권한다.
+
+**(가) 로컬 운영 모드 — `next build` → `next start`** (개발 DB 5433 · `db:reset:demo` 가 된다)
+
+```powershell
+cd C:\dev\EDIM
+pnpm install --frozen-lockfile
+pnpm db:up
+pnpm db:generate
+pnpm db:migrate
+pnpm db:reset:demo
+pnpm build
+pnpm --filter @edim/web start
+```
+
+- 브라우저 http://localhost:3000/login — `owner@acme.test` / `edim-demo-2026`(공개 데모용 샘플 값). 운영 모드라 비밀번호 로그인만 된다.
+- 리허설 뒤 초기화: 서버를 끄지 않아도 된다 — 다른 터미널에서 `pnpm db:reset:demo`.
+- 코드를 바꿨으면 `pnpm build` 부터 다시(운영 모드는 빌드된 것만 돈다).
+
+**(나) docker 운영 킷 — 한 줄** ([`DEPLOY.md`](DEPLOY.md) 1 · 6절)
+
+```bash
+AUTH_SECRET=$(openssl rand -base64 32) docker compose -f docker-compose.prod.yml up -d --build
+```
+
+- 초기화는 `db:reset:demo` 가 아니라 `docker compose -f docker-compose.prod.yml down -v` 뒤 다시 `up -d --build`(샘플 데이터를 새로 넣는다 — 볼륨의 데이터는 지워진다).
+
+아래 1절(개발 모드)은 **예비 경로**다.
+
+---
+
+## 1. 예비 경로 — 개발 모드 로컬 준비 (Windows · 최초 1회 · 약 20분)
+
+> **예비 경로다.** 시연은 0-A(운영 모드)로 한다. 개발 모드로 시연해야 하면 **시연 직전 개발 서버를 재시작**한다(`Ctrl+C` → `pnpm dev` → 첫 화면이 뜰 때까지 한 바퀴 눌러 둔다).
 
 전제: Docker Desktop 실행 중, 포터블 Node(`%LOCALAPPDATA%\edim-node`) PATH 반영, pnpm 9.15.
 
@@ -28,7 +68,7 @@ pnpm db:generate
 pnpm db:migrate
 pnpm db:seed               # 테넌트·사용자·계층·프로젝트 PS-61313-5
 pnpm db:seed:demo          # ★ 승인된 매크로 사전 탑재 (fresh DB에서도 첫 Run이 455.4)
-pnpm dev                   # http://localhost:3000  (pnpm start 아님)
+pnpm dev                   # http://localhost:3000  — 예비 경로(시연 직전 재시작)
 ```
 
 확인(다른 터미널):
