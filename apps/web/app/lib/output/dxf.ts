@@ -1,4 +1,4 @@
-import { componentMm, datumMm, kadValues, type Dims, type CadRules, type DetailDim, type At, type Level } from "@edim/bom-code";
+import { componentMm, datumMm, kadValues, motorMm, isInstall, type Dims, type CadRules, type DetailDim, type At, type Level } from "@edim/bom-code";
 
 /**
  * M3/P4-a — DXF R12(ASCII) 작성기. 순수 함수: 같은 입력 → 같은 바이트.
@@ -66,7 +66,7 @@ export interface DxfInput {
   dimItem: string;
   sections: string[];
   /** Arrangement: 구획별 길이(mm) + 방향(p36 L0~R270). 없으면 sections.length × L 로 균등 분할. */
-  secDims?: { name: string; len: number; dir?: string; components?: { code: string; at: string; level: string }[] }[];
+  secDims?: { name: string; len: number; dir?: string; install?: string; components?: { code: string; at: string; level: string }[] }[];
   items?: DrawingItem[];
   /**
    * B · 학습 샘플(정면도만) — 케이싱 위·아래의 프레임(베이스 프레임 · 상부 프레임, 같은 높이).
@@ -93,11 +93,11 @@ export interface DxfCad {
  *   DIM    : 세부 치수선 — 대상 구획의 anchor 기준점(또는 대상 부품의 mm 중심)에서 값만큼, 외형 위 띠에 한 줄씩
  *   KAD    : KAD-□ 슬롯 줄(샘플 대응표 · RCCS 문법 미확정) + 규칙서 판 · 지문
  */
-function cadEntities(cad: DxfCad, secs: { name: string; len: number; components?: { code: string; at: string; level: string }[] }[], offs: number[], W: number): { s: string; n: number } {
+function cadEntities(cad: DxfCad, secs: { name: string; len: number; dir?: string; components?: { code: string; at: string; level: string }[] }[], offs: number[], W: number): { s: string; n: number } {
   let s = ""; let n = 0;
   const compAt = new Map<string, { x: number; y: number }>();
   secs.forEach((sec, i) => {
-    for (const d of datumMm(cad.rules, offs[i]!, sec.len, W)) {
+    for (const d of datumMm(cad.rules, offs[i]!, sec.len, W, sec.dir)) {
       s += line(d.x - 60, d.y, d.x + 60, d.y, "CADRULE") + line(d.x, d.y - 60, d.x, d.y + 60, "CADRULE"); n += 2;
       s += text(d.x + 70, d.y + 20, 40, `${d.name.toUpperCase()} ${d.x},${d.y}`, "CADRULE"); n++;
     }
@@ -110,7 +110,7 @@ function cadEntities(cad: DxfCad, secs: { name: string; len: number; components?
   });
   const anchorX = (target: string): number => {
     const i = secs.findIndex((x) => x.name === target);
-    if (i >= 0) return datumMm(cad.rules, offs[i]!, secs[i]!.len, W).find((d) => d.name === cad.rules.detail.anchor)?.x ?? offs[i]!;
+    if (i >= 0) return datumMm(cad.rules, offs[i]!, secs[i]!.len, W, secs[i]!.dir).find((d) => d.name === cad.rules.detail.anchor)?.x ?? offs[i]!;
     return compAt.get(target)?.x ?? 0;   // 배치 안 된 부품 대상이면 원점에서(자리를 지어내지 않는다)
   };
   cad.details.forEach((d, k) => {
@@ -130,6 +130,24 @@ function cadEntities(cad: DxfCad, secs: { name: string; len: number; components?
   return { s, n };
 }
 
+/**
+ * ccmd M · p36 Installation Code — 구획에 고른 구동 방식(DD · BI · BA)의 모터 자리를 규칙서에서 얻어 CADRULE 층에 그린다
+ * (사각 + "MOTOR <코드> <이름> @x,y"). 규칙서에 그 구동 방식이 없으면 그리지 않고 "규칙서에 없음" 글자만(자리를 지어내지 않는다).
+ */
+function installEntities(cad: DxfCad, secs: { name: string; len: number; dir?: string; install?: string }[], offs: number[], W: number): { s: string; n: number; motors: NonNullable<DxfMeta["motors"]> } {
+  let s = ""; let n = 0;
+  const motors: NonNullable<DxfMeta["motors"]> = [];
+  secs.forEach((sec, i) => {
+    if (!isInstall(sec.install)) return;
+    const m = motorMm(cad.rules, offs[i]!, sec.len, W, sec.dir, sec.install);
+    if (!m) { s += text(offs[i]! + 120, 120, 45, `INSTALL ${sec.install} - NOT IN CAD RULES`, "CADRULE"); n++; motors.push({ section: sec.name, install: sec.install, dir: sec.dir ?? null, x: null, y: null }); return; }
+    s += rect(m.x - 90, m.y - 60, 180, 120, "CADRULE"); n += 4;
+    s += text(m.x - 90, m.y + 80, 45, `MOTOR ${m.code} ${m.name.toUpperCase()} @${m.x},${m.y}`, "CADRULE"); n++;
+    motors.push({ section: sec.name, install: m.code, dir: sec.dir ?? null, x: m.x, y: m.y });
+  });
+  return { s, n, motors };
+}
+
 /** 3각법 뷰 — plan=Top(L×W) · front=Front(L×H) · right=Right(W×H) · assembly=조립도 */
 export type DrawingView = "plan" | "assembly" | "front" | "right" | "iso" | "exploded";
 
@@ -138,6 +156,8 @@ export interface DxfMeta {
   sections: string[];
   /** 구획별 방향(없으면 null) — 평면도에만 적는다 */
   dirs?: (string | null)[];
+  /** ccmd M · p36 — 조립도: 구동 방식을 고른 구획의 모터 자리(규칙서에 없으면 x · y null). CAD 규칙서가 박힌 스냅샷만 */
+  motors?: { section: string; install: string; dir: string | null; x: number | null; y: number | null }[];
   /** 구획 안 부품 배치(p36) — 평면도에 상자로 그린다 */
   components?: { section: string; code: string; at: string; level: string }[];
   widthMm: number;
@@ -196,7 +216,7 @@ export function buildPlanDxf(input: DxfInput): { dxf: string; meta: DxfMeta } {
  */
 export function buildAssemblyDxf(input: DxfInput): { dxf: string; meta: DxfMeta } {
   const { W, H, L } = input.dims;
-  const secs: { name: string; len: number; dir?: string; components?: { code: string; at: string; level: string }[] }[] = (input.secDims && input.secDims.length > 0)
+  const secs: { name: string; len: number; dir?: string; install?: string; components?: { code: string; at: string; level: string }[] }[] = (input.secDims && input.secDims.length > 0)
     ? input.secDims
     : (input.sections.length > 0 ? input.sections : ["Unit"]).map((name) => ({ name, len: L }));
   const offs: number[] = []; let acc = 0;
@@ -239,10 +259,12 @@ export function buildAssemblyDxf(input: DxfInput): { dxf: string; meta: DxfMeta 
 
   ents += text(0, W + 300, 90, `EDIM ${input.code} - ASSEMBLY - DIM ${input.dimItem} (W${W} H${H} L${L})`); n++;
   if (input.cad) { const c = cadEntities(input.cad, secs, offs, W); ents += c.s; n += c.n; }
+  const inst = input.cad && secs.some((x) => isInstall(x.install)) ? installEntities(input.cad, secs, offs, W) : null;
+  if (inst) { ents += inst.s; n += inst.n; }
 
   return {
     dxf: wrap(ents, input.cad ? CAD_LAYERS : []),
-    meta: { type: "assembly", sections, widthMm: W, heightMm: H, lengthMm: length, dimItem: input.dimItem, entities: n, items: items.length },
+    meta: { type: "assembly", sections, widthMm: W, heightMm: H, lengthMm: length, dimItem: input.dimItem, entities: n, items: items.length, ...(inst ? { motors: inst.motors } : {}) },
   };
 }
 

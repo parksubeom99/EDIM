@@ -20,7 +20,7 @@ interface SnapLine {
   spec?: unknown; fromSpecial?: unknown;
 }
 
-function parseDims(v: unknown): { dims: Dims; item: string; secDims: { name: string; len: number; dir?: string; components?: { code: string; at: string; level: string }[] }[] } | null {
+function parseDims(v: unknown): { dims: Dims; item: string; secDims: { name: string; len: number; dir?: string; install?: string; components?: { code: string; at: string; level: string }[] }[] } | null {
   if (!v || typeof v !== "object") return null;
   const o = v as Record<string, unknown>;
   const n = (k: string) => (typeof o[k] === "number" && Number.isFinite(o[k]) ? (o[k] as number) : null);
@@ -40,7 +40,7 @@ function parseDims(v: unknown): { dims: Dims; item: string; secDims: { name: str
                 ? [{ code: o2.code, at: o2.at, level: o2.level }] : [];
             })
           : [];
-        return [{ name: r.name, len: r.len, ...(typeof r.dir === "string" ? { dir: r.dir } : {}), ...(comps.length > 0 ? { components: comps } : {}) }];
+        return [{ name: r.name, len: r.len, ...(typeof r.dir === "string" ? { dir: r.dir } : {}), ...(typeof r.install === "string" ? { install: r.install } : {}), ...(comps.length > 0 ? { components: comps } : {}) }];
       })
     : [];
   return { dims: { W, H, L }, item: o.item, secDims };

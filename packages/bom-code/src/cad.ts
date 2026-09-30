@@ -1,4 +1,7 @@
-import type { ProductCode, SlotValues, TechTable, At, Level } from "./index";
+import type { ProductCode, SlotValues, TechTable, At, Level, Install } from "./index";
+
+// index.ts 가 이 파일을 다시 내보내므로(순환) 값 import 대신 같은 목록을 여기서 본다 — INSTALLS 와 같아야 한다(cad.test 가 대조)
+const isInstall = (v: unknown): v is Install => v === "DD" || v === "BI" || v === "BA";
 
 /* ── ccmd K · KC-1 — Detail Dimension (p36 · p38 · p60) ──────────────────────────
  * 제품 코드의 role="detail" 표. 한 행 = 세부 치수 하나. 열 이름으로 읽는다 — target · label · value · from.
@@ -80,6 +83,8 @@ export function detailFacts(details: DetailDim[] | null | undefined): Record<str
  */
 export interface CadDatum { name: string; xRatio: number; yRatio: number; xMm: number; yMm: number }
 export interface CadKadSlot { slot: number; key: string }
+/** ccmd M · p36 Installation Code — 구동 방식마다 모터 자리 = 기준점(from) + (dxMm, dyMm). 방향이 돌면 이 벡터가 같이 돈다. */
+export interface CadInstall { code: Install; name: string; from: string; dxMm: number; dyMm: number }
 export interface CadRules {
   version: string;
   sample: string;
@@ -87,6 +92,10 @@ export interface CadRules {
   datum: CadDatum[];
   kad: { note: string; prefix: string; slots: CadKadSlot[] };
   detail: { anchor: string; startMm: number; gapMm: number };
+  /** ccmd M · p36 — 없으면 구동 방식 규칙 없음(모터 자리를 그리지 않는다 · 옛 규칙서 그대로 통과) */
+  installation?: { note: string; types: CadInstall[] };
+  /** ccmd M · p36 방향 L0~R270 ↔ 기준점 결합 — mirrorR: R 방향이면 구획 안 기준점을 길이 방향으로 뒤집는다. 없으면 방향과 무관(옛 규칙서) */
+  direction?: { note: string; mirrorR: boolean };
 }
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
@@ -119,6 +128,26 @@ export function parseCadRules(v: unknown): { ok: true; rules: CadRules } | { ok:
   const dt = v.detail;
   if (!isObj(dt) || typeof dt.anchor !== "string" || !fin(dt.startMm) || !fin(dt.gapMm)) return { ok: false, error: "detail.anchor · startMm · gapMm 이 필요합니다" };
   if (!datum.some((d) => d.name === dt.anchor)) return { ok: false, error: `detail.anchor '${dt.anchor}' 가 datum 에 없습니다` };
+  let installation: CadRules["installation"];
+  if (v.installation !== undefined) {
+    const ins = v.installation;
+    if (!isObj(ins) || typeof ins.note !== "string" || !Array.isArray(ins.types) || ins.types.length === 0) return { ok: false, error: "installation.note · installation.types 가 필요합니다" };
+    const types: CadInstall[] = [];
+    for (const t of ins.types) {
+      if (!isObj(t) || !isInstall(t.code) || typeof t.name !== "string" || typeof t.from !== "string" || !fin(t.dxMm) || !fin(t.dyMm))
+        return { ok: false, error: "installation.types 행은 code(DD · BI · BA) · name · from(기준점) · dxMm · dyMm 입니다" };
+      if (!datum.some((d) => d.name === t.from)) return { ok: false, error: `installation ${t.code}: from '${t.from}' 가 datum 에 없습니다` };
+      if (types.some((x) => x.code === t.code)) return { ok: false, error: `installation ${t.code} 가 두 번 있습니다` };
+      types.push({ code: t.code, name: t.name, from: t.from, dxMm: t.dxMm, dyMm: t.dyMm });
+    }
+    installation = { note: ins.note, types };
+  }
+  let direction: CadRules["direction"];
+  if (v.direction !== undefined) {
+    const d = v.direction;
+    if (!isObj(d) || typeof d.note !== "string" || typeof d.mirrorR !== "boolean") return { ok: false, error: "direction.note · direction.mirrorR(참/거짓) 이 필요합니다" };
+    direction = { note: d.note, mirrorR: d.mirrorR };
+  }
   return {
     ok: true,
     rules: {
@@ -126,6 +155,7 @@ export function parseCadRules(v: unknown): { ok: true; rules: CadRules } | { ok:
       grid: { at: { front: at.front as number, center: at.center as number, rear: at.rear as number }, level: { top: lv.top as number, mid: lv.mid as number, bottom: lv.bottom as number }, offsetMm: { x: off.x as number, y: off.y as number } },
       datum, kad: { note: k.note, prefix: k.prefix, slots: slots.sort((a, b) => a.slot - b.slot) },
       detail: { anchor: dt.anchor, startMm: dt.startMm, gapMm: dt.gapMm },
+      ...(installation ? { installation } : {}), ...(direction ? { direction } : {}),
     },
   };
 }
@@ -137,9 +167,29 @@ export function componentMm(rules: CadRules, secStart: number, secLen: number, W
   return { x: r1(secStart + rules.grid.at[at] * secLen + rules.grid.offsetMm.x), y: r1(rules.grid.level[level] * W + rules.grid.offsetMm.y) };
 }
 
-/** 구획의 기준점(p36 Point: Shaft · Foot) mm 좌표. */
-export function datumMm(rules: CadRules, secStart: number, secLen: number, W: number): { name: string; x: number; y: number }[] {
-  return rules.datum.map((d) => ({ name: d.name, x: r1(secStart + d.xRatio * secLen + d.xMm), y: r1(d.yRatio * W + d.yMm) }));
+/** R 방향이고 규칙서가 mirrorR 이면 참 — 방향이 없거나 규칙서에 direction 이 없으면 거짓(옛 도면 그대로). */
+const mirrored = (rules: CadRules, dir?: string | null) => !!dir && dir.startsWith("R") && !!rules.direction?.mirrorR;
+
+/** 구획의 기준점(p36 Point: Shaft · Foot) mm 좌표. ccmd M — 방향(dir)이 R 이고 규칙서 mirrorR 이면 구획 안에서 길이 방향으로 뒤집는다. */
+export function datumMm(rules: CadRules, secStart: number, secLen: number, W: number, dir?: string | null): { name: string; x: number; y: number }[] {
+  const m = mirrored(rules, dir);
+  return rules.datum.map((d) => ({ name: d.name, x: r1(m ? secStart + (1 - d.xRatio) * secLen - d.xMm : secStart + d.xRatio * secLen + d.xMm), y: r1(d.yRatio * W + d.yMm) }));
+}
+
+/**
+ * ccmd M · p36 모터 자리(구동 방식) = 규칙서 installation 의 기준점(from) + (dx, dy).
+ * 방향 결합: R 이고 mirrorR 이면 dx 를 뒤집고, 방향 각도(0 · 90 · 180 · 270)만큼 (dx, dy) 를 돌린다.
+ * 규칙서에 그 구동 방식이 없으면 null — 자리를 지어내지 않는다.
+ */
+export function motorMm(rules: CadRules, secStart: number, secLen: number, W: number, dir: string | null | undefined, install: Install): { code: Install; name: string; from: string; x: number; y: number } | null {
+  const t = rules.installation?.types.find((x) => x.code === install);
+  if (!t) return null;
+  const base = datumMm(rules, secStart, secLen, W, dir).find((d) => d.name === t.from);
+  if (!base) return null;
+  const dx0 = mirrored(rules, dir) ? -t.dxMm : t.dxMm, dy0 = t.dyMm;
+  const deg = dir && rules.direction ? Number(dir.slice(1)) || 0 : 0;
+  const rad = (deg * Math.PI) / 180, c = Math.round(Math.cos(rad)), s = Math.round(Math.sin(rad));
+  return { code: t.code, name: t.name, from: t.from, x: r1(base.x + dx0 * c - dy0 * s), y: r1(base.y + dx0 * s + dy0 * c) };
 }
 
 /** KAD-□ 슬롯 값 — 대응표의 치수 키를 스냅샷 사실에서 읽는다. 없는 키는 "?" (지어내지 않는다). */

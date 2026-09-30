@@ -15,8 +15,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const row = await withTenant(g.session.tenantId, (tx) => tx.arrangementCode.findFirst({ where: { id } }));
   if (!row) return NextResponse.json({ error: "not found" }, { status: 404 });
   if (row.status !== "approved") return NextResponse.json({ error: `승인된 코드만 적용할 수 있습니다 (지금: ${row.status})` }, { status: 409 });
-  const sections = (row.sections as { name: string; len?: number; dir?: string; components?: unknown[] }[]).map((s) => ({
-    name: s.name, ...(s.len != null ? { len: s.len } : {}), ...(s.dir ? { dir: s.dir } : {}), components: s.components ?? [],
+  // ccmd M · p36 — 구동 방식(install)도 등록된 배치 그대로 옮긴다
+  const sections = (row.sections as { name: string; len?: number; dir?: string; install?: string; components?: unknown[] }[]).map((s) => ({
+    name: s.name, ...(s.len != null ? { len: s.len } : {}), ...(s.dir ? { dir: s.dir } : {}), ...(s.install ? { install: s.install } : {}), components: s.components ?? [],
   }));
   const inner = new NextRequest(new URL("/api/setup/arrangement", req.url), {
     method: "POST", headers: { "content-type": "application/json", cookie: req.headers.get("cookie") ?? "" },

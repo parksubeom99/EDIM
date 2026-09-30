@@ -22,6 +22,18 @@
       { "slot": 5, "key": "detail.Fan.B" }
     ]
   },
+  "installation": {
+    "note": "p36 Installation Code 샘플 — 모터 자리 = 기준점(from) + (dxMm, dyMm) · 회사 실 CAD 규칙 아님",
+    "types": [
+      { "code": "DD", "name": "Direct Driven", "from": "Shaft", "dxMm": 450, "dyMm": 0 },
+      { "code": "BI", "name": "Belt In-Line", "from": "Foot", "dxMm": 300, "dyMm": 250 },
+      { "code": "BA", "name": "Belt Along", "from": "Foot", "dxMm": 0, "dyMm": 650 }
+    ]
+  },
+  "direction": {
+    "note": "p36 방향 L0~R270 ↔ 기준점 결합 샘플 — R 방향이면 구획 안 기준점을 길이 방향으로 뒤집고, 각도만큼 모터 벡터를 돌린다",
+    "mirrorR": true
+  },
   "detail": {
     "_note": "세부 치수선은 대상 구획의 anchor 기준점에서 시작해 외형 위쪽 띠에 그린다(startMm = 외형 위 간격 · gapMm = 줄 간격)",
     "anchor": "Foot",

@@ -109,3 +109,47 @@ describe("KC-2 CAD 규칙서(샘플) 파일", () => {
     expect(parseCadRules({ ...sample, kad: { ...sample.kad, slots: [{ slot: 1, key: "rm -rf" }] } })).toMatchObject({ ok: false });
   });
 });
+
+/* ── ccmd M · p36 Installation Code(구동 방식) · 방향 L0~R270 ↔ 기준점 결합 ── */
+import { motorMm, sectionDimsFor, INSTALLS } from "../src/index";
+
+describe("ccmd M · p36 구동 방식 · 방향 결합", () => {
+  const sample = JSON.parse(readFileSync(resolve(__dirname, "../cad-rules/cad-rules.sample.json"), "utf-8"));
+  const p = parseCadRules(sample);
+  if (!p.ok) throw new Error(p.error);
+  const R = p.rules;
+  it("샘플 규칙서의 installation 은 DD · BI · BA 세 가지(INSTALLS 와 같다) · direction.mirrorR", () => {
+    expect(R.installation?.types.map((t) => t.code)).toEqual([...INSTALLS]);
+    expect(R.direction?.mirrorR).toBe(true);
+  });
+  it("모터 자리 = 기준점 + (dx, dy) — 방향 없음 · L0 은 같다", () => {
+    const shaft = datumMm(R, 1000, 2000, 2400).find((d) => d.name === "Shaft")!;
+    expect(motorMm(R, 1000, 2000, 2400, null, "DD")).toMatchObject({ x: shaft.x + 450, y: shaft.y });
+    expect(motorMm(R, 1000, 2000, 2400, "L0", "DD")).toMatchObject({ x: shaft.x + 450, y: shaft.y });
+  });
+  it("R 방향이면 기준점이 구획 안에서 뒤집히고 모터 dx 도 뒤집힌다 · 90° 면 벡터가 돈다", () => {
+    const footL = datumMm(R, 1000, 2000, 2400, "L0").find((d) => d.name === "Foot")!;
+    const footR = datumMm(R, 1000, 2000, 2400, "R0").find((d) => d.name === "Foot")!;
+    expect(footL.x).toBe(1050);          // 1000 + 0 × 2000 + 50
+    expect(footR.x).toBe(2950);          // 1000 + (1 − 0) × 2000 − 50
+    expect(motorMm(R, 1000, 2000, 2400, "R0", "BI")).toMatchObject({ x: 2950 - 300, y: footR.y + 250 });
+    expect(motorMm(R, 1000, 2000, 2400, "L90", "BI")).toMatchObject({ x: 1050 - 250, y: footL.y + 300 });
+  });
+  it("규칙서에 direction 이 없으면 방향과 무관(옛 규칙서 · 옛 도면 그대로) · 그 구동 방식이 없으면 null", () => {
+    const old = structuredClone(sample); delete old.direction; delete old.installation;
+    const q = parseCadRules(old); if (!q.ok) throw new Error(q.error);
+    expect(datumMm(q.rules, 1000, 2000, 2400, "R90")).toEqual(datumMm(q.rules, 1000, 2000, 2400));
+    expect(motorMm(q.rules, 1000, 2000, 2400, null, "DD")).toBeNull();
+  });
+  it("installation 검사 — 없는 기준점 · 모르는 코드 · 중복은 거부", () => {
+    const bad = (f: (x: typeof sample) => void) => { const c = structuredClone(sample); f(c); return parseCadRules(c).ok; };
+    expect(bad((c) => { c.installation.types[0].from = "Nope"; })).toBe(false);
+    expect(bad((c) => { c.installation.types[0].code = "XX"; })).toBe(false);
+    expect(bad((c) => { c.installation.types[1].code = "DD"; })).toBe(false);
+    expect(bad((c) => { c.direction.mirrorR = "yes"; })).toBe(false);
+  });
+  it("sectionDimsFor 가 구동 방식을 스냅샷 구획에 옮긴다(없으면 키 없음)", () => {
+    const pr = { ...prod({}), sections: [{ name: "Fan", len: 1800, dir: "R90" as const, install: "BI" as const }, { name: "Coil" }] };
+    expect(sectionDimsFor(pr, {}, 1000)).toEqual([{ name: "Fan", len: 1800, dir: "R90", install: "BI" }, { name: "Coil", len: 1000 }]);
+  });
+});

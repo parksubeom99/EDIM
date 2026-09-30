@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { withTenant, upsertProductCode } from "@edim/db";
-import { sectionDimsFor, isDirection, isAt, isLevel, type ProductCode, type SectionDef, type ComponentPos, type SlotValues } from "@edim/bom-code";
+import { sectionDimsFor, isDirection, isAt, isLevel, isInstall, type ProductCode, type SectionDef, type ComponentPos, type SlotValues } from "@edim/bom-code";
 
 import { loadCatalog } from "@/app/lib/catalog";
 import { guard, str, dbError } from "../_guard";
@@ -55,6 +55,7 @@ export async function GET(req: NextRequest) {
     name: s.name,
     len: typeof s.len === "number" ? s.len : null,
     dir: isDirection(s.dir) ? s.dir : null,
+    install: isInstall(s.install) ? s.install : null,
     components: s.components ?? [],
     children: childrenBySection.get(s.name) ?? [],
     when: Boolean(s.when),
@@ -81,7 +82,7 @@ export async function POST(req: NextRequest) {
 
   if (Array.isArray(b.sections)) {
     // ── 2차: 배열 전체 교체(순서·추가·삭제·길이·방향) ──
-    const rows = b.sections as { name?: unknown; len?: unknown; dir?: unknown; components?: unknown }[];
+    const rows = b.sections as { name?: unknown; len?: unknown; dir?: unknown; install?: unknown; components?: unknown }[];
     if (rows.length === 0) return NextResponse.json({ error: "구획이 하나도 없을 수는 없습니다" }, { status: 400 });
     const seen = new Set<string>();
     nextSections = [];
@@ -94,6 +95,8 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "길이는 양수여야 합니다" }, { status: 400 });
       if (r.dir != null && !isDirection(r.dir))
         return NextResponse.json({ error: `방향 값이 아닙니다: ${String(r.dir)}` }, { status: 400 });
+      if (r.install != null && !isInstall(r.install))
+        return NextResponse.json({ error: `구동 방식 값이 아닙니다(DD · BI · BA): ${String(r.install)}` }, { status: 400 });
       // Component 배치(p36): 그 구획의 BOM 자식만 놓을 수 있다 — 없는 부품을 도면에 그리지 않는다.
       let comps: ComponentPos[] | undefined;
       if (r.components !== undefined) {
@@ -118,6 +121,7 @@ export async function POST(req: NextRequest) {
         ...(old?.when ? { when: old.when } : {}),            // 조건은 이름으로 물려받는다(화면에서 만들지 않는다)
         ...(typeof r.len === "number" ? { len: r.len } : {}),
         ...(isDirection(r.dir) ? { dir: r.dir } : {}),
+        ...(isInstall(r.install) ? { install: r.install } : {}),
         ...(comps !== undefined ? (comps.length > 0 ? { components: comps } : {}) : (old?.components ? { components: old.components } : {})),
       });
     }
@@ -137,7 +141,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "길이는 양수여야 합니다" }, { status: 400 });
     nextSections = prev.map((s) => {
       if (!(s.name in lengths)) return s;
-      return { name: s.name, ...(s.when ? { when: s.when } : {}), ...(isDirection(s.dir) ? { dir: s.dir } : {}), len: lengths[s.name] as number };
+      return { name: s.name, ...(s.when ? { when: s.when } : {}), ...(isDirection(s.dir) ? { dir: s.dir } : {}), ...(isInstall(s.install) ? { install: s.install } : {}), len: lengths[s.name] as number };
     });
   }
 

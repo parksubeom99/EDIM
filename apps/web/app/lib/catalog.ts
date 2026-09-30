@@ -1,7 +1,7 @@
 import type { Role } from "@edim/core-ontology";
 import { withTenant, loadCatalogRows, type CatalogRows } from "@edim/db";
 import { slotDefsFromSubCodes, type SlotDef } from "./rccs";
-import { macroTablesOf, isDirection, isAt, isLevel, dimsFor, sectionDimsFor, designFacts } from "@edim/bom-code";
+import { macroTablesOf, isDirection, isAt, isLevel, isInstall, dimsFor, sectionDimsFor, designFacts } from "@edim/bom-code";
 import type { Catalog, Cond, CostBind, QtyBind, SectionDef, ComponentPos, SlotKey, TechTable, Cell } from "@edim/bom-code";
 
 /**
@@ -111,6 +111,9 @@ export function parseSections(v: unknown): SectionDef[] | undefined | "invalid" 
     // Arrangement 2차: 방향(p36 L0~R270). 값이 목록 밖이면 그 코드 전체를 무효로 본다(조용한 무시 금지).
     if (s.dir !== undefined && s.dir !== null && !isDirection(s.dir)) return "invalid";
     const dir = isDirection(s.dir) ? s.dir : undefined;
+    // ccmd M · p36 Installation Code — 목록 밖이면 그 코드 전체를 무효로(방향과 같은 원칙)
+    if (s.install !== undefined && s.install !== null && !isInstall(s.install)) return "invalid";
+    const install = isInstall(s.install) ? s.install : undefined;
     // Component 배치(p36) — 형식이 틀리면 조용히 버리지 않고 그 코드를 무효로 본다.
     let comps: ComponentPos[] | undefined;
     if (s.components !== undefined && s.components !== null) {
@@ -124,7 +127,7 @@ export function parseSections(v: unknown): SectionDef[] | undefined | "invalid" 
       }
       comps = acc;
     }
-    out.push({ name: s.name, ...(c ? { when: c } : {}), ...(len !== undefined ? { len } : {}), ...(dir ? { dir } : {}), ...(comps && comps.length > 0 ? { components: comps } : {}) });
+    out.push({ name: s.name, ...(c ? { when: c } : {}), ...(len !== undefined ? { len } : {}), ...(dir ? { dir } : {}), ...(comps && comps.length > 0 ? { components: comps } : {}), ...(install ? { install } : {}) });
   }
   return out;
 }

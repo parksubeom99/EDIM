@@ -279,7 +279,9 @@ function nextRevLabel(count: number): string {
 /** 청사진 p36 Fan Direction — 좌/우 × 0·90·180·270 */
 const DIRS = ["L0", "L90", "L180", "L270", "R0", "R90", "R180", "R270"] as const;
 interface ArrComp { code: string; at: string; level: string }
-interface ArrSection { name: string; len: number | null; dir: string | null; when: boolean; active: boolean; locked: boolean; components?: ArrComp[]; children?: string[] }
+/** ccmd M · p36 Installation Code(구동 방식) — 모터 자리는 CAD 규칙서가 정한다 */
+const INSTS: [string, string][] = [["DD", "Direct Driven"], ["BI", "Belt In-Line"], ["BA", "Belt Along"]];
+interface ArrSection { name: string; len: number | null; dir: string | null; install?: string | null; when: boolean; active: boolean; locked: boolean; components?: ArrComp[]; children?: string[] }
 /** p36 Component 배치 — 구획 안 3×3 칸 */
 const ATS: [string, string][] = [["front", "앞"], ["center", "중"], ["rear", "뒤"]];
 const LVS: [string, string][] = [["top", "상"], ["mid", "중"], ["bottom", "하"]];
@@ -361,7 +363,7 @@ function DesignCanvas({ code, slots, runs, nodeStable, canEdit, link }: { code: 
     if (!canEdit) return;
     setArrBusy(true); setArrMsg(null);
     // Arrangement 2차: 배열 순서가 곧 구획 순서(Move) · 빠진 이름은 삭제(Delete) · 새 이름은 추가(Add)
-    const body = { code: slots.A ?? "", sections: next.map((s) => ({ name: s.name, ...(s.len != null ? { len: s.len } : {}), ...(s.dir ? { dir: s.dir } : {}), components: s.components ?? [] })) };
+    const body = { code: slots.A ?? "", sections: next.map((s) => ({ name: s.name, ...(s.len != null ? { len: s.len } : {}), ...(s.dir ? { dir: s.dir } : {}), ...(s.install ? { install: s.install } : {}), components: s.components ?? [] })) };
     const r = await fetch("/api/setup/arrangement", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
     const j = await r.json().catch(() => ({}));
     setArrBusy(false);
@@ -448,10 +450,10 @@ function DesignCanvas({ code, slots, runs, nodeStable, canEdit, link }: { code: 
       </div>
       {arrOpen && canEdit && (
         <div data-testid="arrangement-panel" style={{ ...card, margin: "0 0 10px", padding: 10, background: "var(--surface-1)" }}>
-          <p style={{ ...muted, margin: "0 0 6px" }}>구획 순서(↑↓) · 길이(mm) · 방향(p36 L0~R270) · 추가/삭제. 길이를 비우면 도면이 치수표의 L 로 균등 분할합니다. 저장은 다음 BOM Run 부터 반영됩니다.</p>
+          <p style={{ ...muted, margin: "0 0 6px" }}>구획 순서(↑↓) · 길이(mm) · 방향(p36 L0~R270) · 구동 방식(Direct Driven · Belt In-Line · Belt Along — 모터 자리는 CAD 규칙서 샘플) · 추가/삭제. 길이를 비우면 도면이 치수표의 L 로 균등 분할합니다. 저장은 다음 BOM Run 부터 반영됩니다.</p>
           <table data-testid="arr-table" style={{ borderCollapse: "collapse", fontSize: 11, color: "var(--ink)" }}>
             <thead><tr style={{ color: "var(--ink-muted)" }}>
-              <th style={arrTh}>순서</th><th style={arrTh}>구획</th><th style={arrTh}>길이(mm)</th><th style={arrTh}>방향</th><th style={arrTh}>Component 배치(앞·중·뒤 / 상·중·하)</th><th style={arrTh}></th>
+              <th style={arrTh}>순서</th><th style={arrTh}>구획</th><th style={arrTh}>길이(mm)</th><th style={arrTh}>방향</th><th style={arrTh}>구동 방식</th><th style={arrTh}>Component 배치(앞·중·뒤 / 상·중·하)</th><th style={arrTh}></th>
             </tr></thead>
             <tbody>
               {secs.map((s, i) => (
@@ -475,6 +477,14 @@ function DesignCanvas({ code, slots, runs, nodeStable, canEdit, link }: { code: 
                       style={{ fontFamily: "var(--font-mono)", fontSize: 12, padding: "3px 5px", border: "1px solid var(--line)", borderRadius: 4, background: "var(--surface-0)", color: "var(--ink)" }}>
                       <option value="">— 없음</option>
                       {DIRS.map((d) => <option key={d} value={d}>{d}</option>)}
+                    </select>
+                  </td>
+                  <td style={arrTd}>
+                    <select data-testid={`arr-inst-${s.name}`} value={s.install ?? ""} disabled={!canEdit} title="p36 Installation Code — 모터 자리는 CAD 규칙서(샘플)가 정한다"
+                      onChange={(e) => setSecs((xs) => xs.map((x, j) => (j === i ? { ...x, install: e.target.value === "" ? null : e.target.value } : x)))}
+                      style={{ fontFamily: "var(--font-mono)", fontSize: 12, padding: "3px 5px", border: "1px solid var(--line)", borderRadius: 4, background: "var(--surface-0)", color: "var(--ink)" }}>
+                      <option value="">— 없음</option>
+                      {INSTS.map(([v, l]) => <option key={v} value={v}>{v} · {l}</option>)}
                     </select>
                   </td>
                   <td style={arrTd}>

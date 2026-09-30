@@ -102,6 +102,14 @@ export const AT = ["front", "center", "rear"] as const;
 export const LEVEL = ["top", "mid", "bottom"] as const;
 export type At = (typeof AT)[number];
 export type Level = (typeof LEVEL)[number];
+/**
+ * ccmd M · p36 Installation Code(구동 방식) — "Call Arrangement Code · Installation Code: Direct Driven · Belt In-Line · Belt Along".
+ * 구획(보통 Fan)마다 고른다. 모터가 어디 놓이는지는 **CAD 규칙서(파일)의 installation** 이 정한다 — 코드에 좌표 없음.
+ */
+export const INSTALLS = ["DD", "BI", "BA"] as const;
+export type Install = (typeof INSTALLS)[number];
+export const INSTALL_LABEL: Record<Install, string> = { DD: "Direct Driven", BI: "Belt In-Line", BA: "Belt Along" };
+export const isInstall = (v: unknown): v is Install => typeof v === "string" && (INSTALLS as readonly string[]).includes(v);
 export const isAt = (v: unknown): v is At => typeof v === "string" && (AT as readonly string[]).includes(v);
 export const isLevel = (v: unknown): v is Level => typeof v === "string" && (LEVEL as readonly string[]).includes(v);
 
@@ -121,6 +129,8 @@ export interface SectionDef {
   dir?: Direction;
   /** Arrangement 2차: 구획 안 부품 배치(p36 Component). 없으면 배치 규칙 없음 — 도면은 그리지 않는다. */
   components?: ComponentPos[];
+  /** ccmd M · p36 Installation Code(구동 방식). 없으면 미지정 — 도면에 모터 자리를 그리지 않는다. */
+  install?: Install;
 }
 
 /** Arrangement: 한 구획의 이름 + 길이(mm) + 방향. len 이 없으면 fallbackL 을 쓴다. */
@@ -129,6 +139,7 @@ export interface SectionDim {
   len: number;
   dir?: Direction;
   components?: ComponentPos[];
+  install?: Install;
 }
 
 /** p33 — a registered code (product / part / purchased item). */
@@ -376,6 +387,7 @@ export function sectionDimsFor(
       len: typeof s.len === "number" && s.len > 0 ? s.len : fallbackL,
       ...(isDirection(s.dir) ? { dir: s.dir } : {}),
       ...(s.components && s.components.length > 0 ? { components: s.components } : {}),
+      ...(isInstall(s.install) ? { install: s.install } : {}),
     }));
 }
 
