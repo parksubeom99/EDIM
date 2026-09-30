@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { CodeChip } from "@edim/ui";
 import { TIER_PREFIX, type ApprovalTier } from "@/app/lib/approval-state";
 import type { WorkbenchProject } from "./mainform-shell";
+import { NodeForms } from "./node-forms";
 
 const sec: CSSProperties = { marginBottom: 14 };
 const title: CSSProperties = {
@@ -131,6 +132,12 @@ export function Inspector({
             <AttachmentPanel ownerKind="node" ownerKey={nodeStable} kinds={["data", "dwg2d", "dwg3d"]} canEdit={canEdit} title="이 노드의 자료 (p18)" testid="node-upload" />
           </Section>
         )}
+        {nodeStable && (
+          <Section name="UI Form">
+            {/* ccmd M · p26 — UI Design 작업장에서 이 노드에 붙인 사용자 UI Form */}
+            <NodeForms nodeStable={nodeStable} />
+          </Section>
+        )}
       </div>
     );
   }
@@ -165,6 +172,13 @@ export function Inspector({
           <span>{project.status}</span>
         </div>
       </Section>
+
+      {nodeStable && (
+        <Section name="UI Form">
+          {/* ccmd M · p26 — UI Design 작업장에서 이 노드에 붙인 사용자 UI Form */}
+          <NodeForms nodeStable={nodeStable} />
+        </Section>
+      )}
 
       <Section name="Data Up-Load">
         {/* F8 · p18 — 작업대 노드에 자료를 올린다(0025 공용 첨부 · 0014 저장소 재사용). 아래는 프로젝트 접수 자료(p12) */}

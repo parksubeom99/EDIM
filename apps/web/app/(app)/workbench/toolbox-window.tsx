@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent as RPointerEvent } from "react";
 import { SpecialPanel, type SpecialGrantView } from "./special-panel";
 import type { RunResult } from "./action-bar";
+import { NodeForms } from "./node-forms";
 
 /**
  * EDIM Toolbox — a SEPARATE floating window beside the MainForm (owner requirement
@@ -124,7 +125,7 @@ export function ToolboxWindow({
         {tab === "special" && fan
           ? <SpecialPanel grant={fan} canRun={canEdit} onUsage={() => void loadSpecials()} />
           : tab === "ui"
-          ? <UiTool commands={commands} onCommands={onCommands} onRun={onRun} busyKind={busyKind} runDisabled={runDisabled} canEdit={canEdit} />
+          ? <UiTool commands={commands} onCommands={onCommands} onRun={onRun} busyKind={busyKind} runDisabled={runDisabled} canEdit={canEdit} nodeStable={nodeStable} />
           : <ProgramTool nodeStable={nodeStable} canEdit={canEdit} canDecide={canDecide} onRun={onRun} runs={runs} busyKind={busyKind} runDisabled={runDisabled} />}
       </div>
       {!geo.docked && (
@@ -136,7 +137,7 @@ export function ToolboxWindow({
 }
 
 /* ───────────── UI Tool — p25 "Commend button set-up" ───────────── */
-function UiTool({ commands, onCommands, onRun, busyKind, runDisabled, canEdit }: { commands: CommandDef[]; onCommands: (c: CommandDef[]) => void; onRun: (k: string) => void; busyKind: string | null; runDisabled: boolean; canEdit: boolean }) {
+function UiTool({ commands, onCommands, onRun, busyKind, runDisabled, canEdit, nodeStable }: { commands: CommandDef[]; onCommands: (c: CommandDef[]) => void; onRun: (k: string) => void; busyKind: string | null; runDisabled: boolean; canEdit: boolean; nodeStable: string | null }) {
   const set = (i: number, patch: Partial<CommandDef>) => onCommands(commands.map((c, j) => (j === i ? { ...c, ...patch } : c)));
   const move = (i: number, d: -1 | 1) => { const j = i + d; if (j < 0 || j >= commands.length) return; const next = [...commands]; [next[i], next[j]] = [next[j]!, next[i]!]; onCommands(next); };
   return (
@@ -161,8 +162,12 @@ function UiTool({ commands, onCommands, onRun, busyKind, runDisabled, canEdit }:
         <div style={paneHead}>Combo box · Templet · Canvas<span style={muted}>p25 · p26</span></div>
         <div style={{ padding: 8 }}>
           <a data-testid="toolbox-ui-design" href="/setup/ui" style={{ ...btn(true), display: "inline-block", textDecoration: "none" }}>UI Design 작업장 열기 →</a>
-          <p style={{ ...muted, margin: "6px 0 0" }}>위젯(Button · Combo box · Table · Label)을 캔버스에 끌어다 놓고 동작·대상 Data 를 정한 폼을 회사 공용으로 저장합니다. Templet 로 표시하면 다른 폼이 호출해 고쳐 씁니다.</p>
+          <p style={{ ...muted, margin: "6px 0 0" }}>위젯(Button · Combo box · Table · Label · Number · Canvas)을 캔버스에 끌어다 놓고 동작(찾기 · 저장 · 삭제 · 등록 · 실행 설정)·대상 Data 를 정한 폼을 회사 공용으로 저장합니다. Templet 로 표시하면 다른 폼이 호출해 고쳐 씁니다. UI 개발 AI(결정론)가 설명으로 초안을 설계합니다.</p>
         </div>
+      </div>
+      <div style={pane}>
+        <div style={paneHead}>이 노드의 UI Form<span style={muted}>p26 · Work Hierarchy 노드별 UI</span></div>
+        <div style={{ padding: 8 }}><NodeForms nodeStable={nodeStable} testid="toolbox-node-forms" /></div>
       </div>
       <p style={{ ...muted, margin: 0 }}>위 Command button 설정은 이 브라우저에만 저장됩니다(Action Bar 는 개인 화면이라).</p>
     </>
