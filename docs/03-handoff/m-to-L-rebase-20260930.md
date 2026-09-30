@@ -1,6 +1,6 @@
 # ccmd L 인계 메모 — M 머지 뒤 rebase (CC → CC · 2026-09-30)
 
-- M 이 머지된 main: `__MERGED__`(fast-forward · PR #2)
+- M 이 머지된 main: `f369926`(fast-forward · PR #2)
 - L 작업 자리: worktree `ccmd-edim-file-review-0a058c` · 브랜치 `fix/l-b-tidy` · base `0fbb112` · **미커밋 3파일**(09-30 11:40 기준 · M 은 건드리지 않았다)
 
 ## 1. 실측한 충돌 면 (L 의 미커밋 diff 를 M 헤드에 `git apply --check` — 읽기 전용으로 잰 것)
