@@ -1,8 +1,8 @@
 # lmd N — 밤샘 청크 회수서: ccmd L 완주 + 통합 + CP4 자료 (CC → 엘 · 2026-10-01)
 
 - 인계: ccmd N(`ccmd-N-L-finish-20261001.md`) · 작업 지시 원본 = ccmd L(`ccmd-L-E청크-20260930.md`)
-- 작업 브랜치: `feat/n-l-finish` = main `733015e` 위 + 커밋 12개
-- 이번 청크 PR: **머지 대기(회장님 승인 대상)** — 번호는 5절
+- 작업 브랜치: `feat/n-l-finish` = main `733015e` 위 + 커밋 12개(이 정정 커밋 포함)
+- 이번 청크 PR: **[parksubeom99/EDIM#5](https://github.com/parksubeom99/EDIM/pull/5) · 머지 대기(회장님 승인 대상)**
 - 증빙: `docs/03-handoff/n-evidence/` · CP4 사실 묶음: `docs/03-handoff/cp4-facts-20261001.md`(N 판으로 갱신)
 
 ## 1. 한 일
@@ -193,7 +193,7 @@ before 36 → mid 38(+ edim-prod-n_edim-prod-pgdata · edim-prod-n2_edim-prod-pg
 - **충돌 0건** — 예상한 두 면이 모두 git 자동 병합으로 풀렸다. 예상 밖 충돌도 없다.
   - `dxf.ts cadEntities`: M 의 `datumMm(…, sec.dir)` 두 줄이 그대로 남았다(rebase 뒤 실측 — 메모의 풀이 "방향 인자 유지"와 결과가 같다).
   - `demo_e2e.py`: 깨끗하다.
-- PR: 아래 5절 끝에 번호. **머지하지 않았다.**
+- PR: **[parksubeom99/EDIM#5](https://github.com/parksubeom99/EDIM/pull/5)** · **머지하지 않았다.**
 
 ## 6. 설계와 다르게 한 곳(이유)
 
