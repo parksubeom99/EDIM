@@ -1,0 +1,9 @@
+# pg_stat_activity 최대(1초 간격 · datname=edim · edim_app · edim_platform · edim) — 킷 e2e 2회
+09:19:37 max=1
+09:19:41 max=3
+09:19:43 max=6
+09:20:31 max=9
+09:20:43 max=10
+09:21:09 max=12
+09:21:14 max=14
+final max=14

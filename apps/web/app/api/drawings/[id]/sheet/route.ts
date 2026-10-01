@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { withTenant, getDrawing, qrTokenFor } from "@edim/db";
-import { qrSvg, canEditMes } from "@/app/lib/mes-run";
+import { qrSvg, canEditMes, publicOrigin } from "@/app/lib/mes-run";
 import { getServerSession } from "@/app/lib/session";
 import { dxfToSvg } from "@/app/lib/output/dxf-svg";
 import type { SubDrawingRow } from "@/app/lib/drawing-template";
@@ -26,7 +26,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const qrTok = row.status === "issued"
     ? await withTenant(session.tenantId, (tx) => canEditMes(session.role) ? qrTokenFor(tx, "drawing", id, session.userId) : tx.qrToken.findFirst({ where: { targetKind: "drawing", targetId: id, revokedAt: null } }))
     : null;
-  const qrHtml = qrTok ? `<div data-testid="sheet-qr" style="float:right;text-align:center;font-size:9px">${qrSvg(`${req.nextUrl.origin}/q/${qrTok.token}`, 3)}<div>QR — 도면 · 서류 · 이력 · 할 일</div></div>` : "";
+  const qrHtml = qrTok ? `<div data-testid="sheet-qr" style="float:right;text-align:center;font-size:9px">${qrSvg(`${publicOrigin(req)}/q/${qrTok.token}`, 3)}<div>QR — 도면 · 서류 · 이력 · 할 일</div></div>` : "";
   const subHtml = subs === null
     ? `<p class="muted" data-testid="sheet-subs-none">이 도면은 도면 템플릿(0028) 이전에 떠서 하부 도면 목록이 없습니다.</p>`
     : subs.length === 0

@@ -28,6 +28,7 @@ docker compose -f docker-compose.prod.yml up -d --build
 | `AUTH_SECRET` | ✓ | 세션 쿠키 서명 키. **없으면 로그인이 500** | compose 가 `${AUTH_SECRET:?}` 로 요구 |
 | `EDIM_DEV_LOGIN` | | `1` 이면 비밀번호 없는 계정이 이메일로 들어온다(개발 편의). 설정이 없으면 `next dev` 는 1, 운영은 0 | `0` |
 | `EDIM_SEED_DEMO` | | `1` 이면 migrate 단계에서 샘플 데이터(데모 회사 · 샘플 계정)를 넣는다 | `1` |
+| `EDIM_PUBLIC_URL` | | QR(작업지시서 · 발행 도면 · /api/mes/qr)에 넣을 바깥 주소. 비우면 요청의 Host 헤더(프록시 뒤면 `x-forwarded-host` · `-proto`)를 쓴다 — 컨테이너 안 주소(0.0.0.0)는 쓰지 않는다(ccmd N) | `https://edim.example.com` |
 | `EDIM_OIDC_ISSUER` | | 설정되면 로그인 화면에 SSO 버튼 **자리**가 보인다(아래 5절 — 아직 연결 없음) | 비움 |
 
 `.env` 는 이미지에 굽지 않는다(`.dockerignore`). 값은 compose 의 `environment` 나 실행 환경에서 넣는다.
@@ -48,7 +49,7 @@ openssl rand -base64 32
 
 - [ ] **DB 백업** — 관리형 PostgreSQL 16 의 자동 백업·시점 복구를 켠다. 옮기기 전 `pg_dump -Fc` 한 벌.
 - [ ] **도메인 · HTTPS** — 앞단(로드밸런서·리버스 프록시)에서 TLS 를 끝낸다. 운영 모드 쿠키는 `secure` 라 HTTPS 에서만 붙는다.
-- [ ] **연결 풀 한도** — web 한 대가 여는 연결은 운영 모드 e2e 중 최대 14~16(`pg_stat_activity` 실측, README). 인스턴스 수 × 이 값이 DB `max_connections` 를 넘지 않게 하거나 PgBouncer 를 둔다.
+- [ ] **연결 풀 한도** — web 한 대가 여는 연결은 운영 모드 e2e 중 최대 **14**(ccmd N 운영 킷 e2e 399단계 중 `pg_stat_activity` 1초 간격 실측 · 2회 같음) · 엘 09-30 기록 **17** — 여유를 두고 17 로 계산한다. 인스턴스 수 × 이 값이 DB `max_connections` 를 넘지 않게 하거나 PgBouncer 를 둔다.
 - [ ] **로그인 잠금 카운터** — 틀린 비밀번호 5회/10분 잠금은 **서버 메모리**에 있다. web 을 여러 대로 늘리면 공유 저장소(예: Redis)로 옮긴다.
 - [ ] **DB 역할 비밀번호** 교체(3절) · `AUTH_SECRET` 은 비밀 저장소에.
 - [ ] **마이그레이션은 1회성 작업**으로 — web 과 따로(킷의 `migrate` 서비스와 같은 방식). 마이그레이션은 추가만 한다(저장소 규칙).

@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { withTenant, workOrderDetail, qrTokenFor } from "@edim/db";
 import { sessionOr401 } from "../../../_util";
-import { UUID_RE, workOrderHtml, canEditMes } from "@/app/lib/mes-run";
+import { UUID_RE, workOrderHtml, canEditMes, publicOrigin } from "@/app/lib/mes-run";
 
 /** ccmd L · LA3 · LA7 — 작업지시서 A4 인쇄본(기존 인쇄본 방식 = HTML → 브라우저 인쇄/PDF) · QR 칸(/q/{토큰}). 다른 회사 404. */
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -17,6 +17,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     return { d, projectNo: p?.projectNo ?? "—", token: t?.token ?? null };
   });
   if (!out) return NextResponse.json({ error: "not found" }, { status: 404 });
-  const url = out.token ? `${req.nextUrl.origin}/q/${out.token}` : null;
+  const url = out.token ? `${publicOrigin(req)}/q/${out.token}` : null;
   return new NextResponse(workOrderHtml(out.d, out.projectNo, url), { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
 }

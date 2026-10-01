@@ -2820,9 +2820,9 @@ with sync_playwright() as p:
     qrp=ctx.request.post(ME+"/qr",headers=J0,data=json.dumps({"kind":"project","id":PID})).json()
     rv=ctx.request.post(ME+"/qr",headers=J0,data=json.dumps({"revoke":TOK})).status; q410=ctx.request.get(BASE+f"/q/{TOK}")
     fake=ctx.request.get(BASE+"/q/"+"A"*43).status; vq=vw.request.post(ME+"/qr",headers=J0,data=json.dumps({"kind":"project","id":PID})).status
-    ok("S90 QR — 추측 불가 토큰(43자 · 같은 대상은 같은 토큰) · /q/{토큰} = Project 정보 · 도면(발행본) · 각종 서류 · Project History · 처리해야 할 업무 · 로그인 없으면 로그인 → 돌아옴 · 다른 회사 404 · 폐기 410 · 없는 토큰 404 · viewer 열람 200 · 토큰 만들기 403 · 발행 도면 시트에 QR",
+    ok("S90 QR — 추측 불가 토큰(43자 · 같은 대상은 같은 토큰) · QR 주소 = 사용자가 연 주소(운영 킷 0.0.0.0 아님) · /q/{토큰} = Project 정보 · 도면(발행본) · 각종 서류 · Project History · 처리해야 할 업무 · 로그인 없으면 로그인 → 돌아옴 · 다른 회사 404 · 폐기 410 · 없는 토큰 404 · viewer 열람 200 · 토큰 만들기 403 · 발행 도면 시트에 QR",
        (len(TOK), qr2.get("token")==TOK, {k_:v_[:25] for k_,v_ in q90.items()}, q404.status, qv.status, red90[:40], back90[:12], "sheet-qr" in iss, rv, q410.status, fake, vq),
-       len(TOK)==43 and qr2.get("token")==TOK and "<svg" in qr.get("svg","") and "PS-61313-5" in pg.inner_text("[data-testid=qr-page]")
+       len(TOK)==43 and qr2.get("token")==TOK and "<svg" in qr.get("svg","") and qr.get("url","")==f"{BASE}/q/{TOK}" and "PS-61313-5" in pg.inner_text("[data-testid=qr-page]")
        and "현장 도착" in q90["history"] and "A/S" in q90["todo"] and q404.status==404 and qv.status==200 and red90.startswith("/login?next=") and back90==f"/q/{TOK}"
        and "sheet-qr" in iss and qrp.get("token")!=TOK and rv==200 and q410.status==410 and fake==404 and vq==403)
     vw.close(); gb.close()

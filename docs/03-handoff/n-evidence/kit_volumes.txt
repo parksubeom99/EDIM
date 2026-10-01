@@ -1,0 +1,8 @@
+# docker volume ls — before 36 / mid 38 / after 36
+## diff before mid
+20a21,22
+> local     edim-prod-n2_edim-prod-pgdata
+> local     edim-prod-n_edim-prod-pgdata
+## docker volume rm edim-prod-n_edim-prod-pgdata edim-prod-n2_edim-prod-pgdata
+## diff before after
+(차이 없음)

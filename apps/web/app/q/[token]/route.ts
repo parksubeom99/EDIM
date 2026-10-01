@@ -15,7 +15,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
   const { token } = await params;
   if (!/^[A-Za-z0-9_-]{32,64}$/.test(token)) return page(404, "없음", `<h1 data-testid="qr-404">404 — 이 QR 은 없습니다</h1>`);
   const s = await getServerSession();
-  if (!s) return NextResponse.redirect(new URL(`/login?next=${encodeURIComponent(`/q/${token}`)}`, req.nextUrl.origin), 307);
+  // 상대 Location — 운영 킷(HOSTNAME=0.0.0.0)에서 절대 주소를 만들면 http://0.0.0.0:3000 으로 보내 버린다(ccmd N 킷 e2e 실측)
+  if (!s) return new NextResponse(null, { status: 307, headers: { location: `/login?next=${encodeURIComponent(`/q/${token}`)}` } });
   const d = await qrPage(s.tenantId, token);
   if (d.status === 404) return page(404, "없음", `<h1 data-testid="qr-404">404 — 이 QR 은 없거나 이 회사 것이 아닙니다</h1>`);
   if (d.status === 410) return page(410, "폐기됨", `<h1 data-testid="qr-410">410 — 폐기된 QR 입니다</h1><p class="muted">새로 인쇄한 QR 을 쓰십시오.</p>`);

@@ -2,7 +2,7 @@
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/hero-dark.svg">
-  <img alt="EDIM — 제품 코드 한 줄로 BOM · 도면 · 원가 · 견적 · 구매까지. e2e 383/383 · 단위 테스트 345 · DB 검증 12종 · 런타임 LLM 0" src="docs/assets/hero-light.svg" width="100%">
+  <img alt="EDIM — 제품 코드 한 줄로 BOM · 도면 · 원가 · 견적 · 구매까지. e2e 402/402 · 단위 테스트 355 · DB 검증 13종 · 런타임 LLM 0" src="docs/assets/hero-light.svg" width="100%">
 </picture>
 
 [![CI](https://github.com/parksubeom99/EDIM/actions/workflows/ci.yml/badge.svg)](https://github.com/parksubeom99/EDIM/actions/workflows/ci.yml)
@@ -12,9 +12,9 @@
 ![Prisma](https://img.shields.io/badge/Prisma-6-2D3748?logo=prisma&logoColor=white)
 ![pnpm](https://img.shields.io/badge/pnpm-monorepo%2011-F69220?logo=pnpm&logoColor=white)
 <br>
-![e2e](https://img.shields.io/badge/e2e-383%2F383-0e7c6b)
-![unit](https://img.shields.io/badge/unit%20tests-345-0e7c6b)
-![DB checks](https://img.shields.io/badge/DB%20checks-12%20suites-0e7c6b)
+![e2e](https://img.shields.io/badge/e2e-402%2F402-0e7c6b)
+![unit](https://img.shields.io/badge/unit%20tests-355-0e7c6b)
+![DB checks](https://img.shields.io/badge/DB%20checks-13%20suites-0e7c6b)
 ![runtime LLM](https://img.shields.io/badge/runtime%20LLM%20calls-0-0e7c6b)
 ![local AI](https://img.shields.io/badge/local%20AI-Ollama%20(optional)-555555?logo=ollama&logoColor=white)
 
@@ -48,7 +48,7 @@
 ### 🛡️ 막는 것은 DB 가
 
 회사 격리는 **RLS FORCE**, 개정 이력은 **append-only 권한**, 발행 · 발주 잠금은 **트리거**.
-앱에 버그가 있어도 Postgres 가 거부한다 — DB 검증 스위트 12종.
+앱에 버그가 있어도 Postgres 가 거부한다 — DB 검증 스위트 13종.
 
 </td>
 <td width="33%" valign="top">
@@ -269,7 +269,7 @@ flowchart TB
 
 ## 🖼️ 화면
 
-> 목업이 아니다 — `scripts/demo_e2e.py` 가 383단계를 걸으며 매번 새로 찍는다. 전체 68장: [`docs/screens/`](docs/screens)
+> 목업이 아니다 — `scripts/demo_e2e.py` 가 402단계를 걸으며 매번 새로 찍는다. 전체 68장: [`docs/screens/`](docs/screens)
 
 | 작업대 — 청사진의 다섯 구역 | 코드 조립 · 개정 Rev A→B | BOM Run → EBOM → Cost |
 |:---:|:---:|:---:|
@@ -296,7 +296,7 @@ flowchart TB
 | AI | 결정론 매크로 DSL · 번역 루프(provider 교체형) · 학습 AI 하네스 · 로컬 LLM(Ollama, 선택) | 런타임 LLM 0 · 자료가 서버 밖으로 나가지 않음 |
 | 도면 | DXF R12 생성 · 3각법 · 3D 등각(three.js) | 외부 CAD 없이 치수 표 → 도면 |
 | 문서 | 인쇄본 HTML · Word(docx) · Excel(exceljs) | 숫자를 표시 문자열이 아니라 **값**으로 (엑셀 합계가 되게) |
-| 테스트 | vitest(단위 295) · DB 검증 스크립트 11종 · Playwright(Python) e2e 348단계 | 화면 + API + DXF · Office 파일 파싱까지 한 시나리오 |
+| 테스트 | vitest(단위 355) · DB 검증 스크립트 13종 · Playwright(Python) e2e 402단계(운영 킷 대상 399 · 호스트 전용 3 건너뜀) | 화면 + API + DXF · Office 파일 파싱까지 한 시나리오 |
 | CI · 배포 | GitHub Actions · Dockerfile(다단계) · docker compose 운영 킷 | 로컬 한 줄로 운영 모드 재현 |
 
 <br>
@@ -360,13 +360,13 @@ pnpm dev                                  # http://localhost:3000
 | 단위 | `hierarchy-address` | 18 | Work Hierarchy 주소 해석 |
 | 단위 | `apps/web` | 168 | 학습 AI(숨긴 공식 복원 · 잡음 검출 · 도구 수명주기 · 유사도) · 팬 선정(손 계산 대조) · 단가 기준일 · Office 내보내기 · 인쇄 양식 · PCR 요율표 · UI Form(쓰기 · 결정론 설계) 등 |
 | 단위 | `auth` | 2 묶음 | scrypt 해시(잘린 해시 거부 포함) · 회사 결정 |
-| DB | `rls` · `platform` · `learning` · `special` · `consulting` | 12종 중 5 | 회사 격리 · 플랫폼 ↔ 회사 권한 교차 0 · 투영 · 부여는 함수로만 · 원자료 보호 · 사용 기록 불변 |
-| DB | `revision` · `macro` | 12종 중 2 | 코드 개정 append-only · 매크로 승인 · 개정 번호 규칙 |
-| DB | `drawing` · `document` · `project` · `backbone` · `hierarchy` | 12종 중 5 | 발행 · 발주 잠금이 **앱을 우회해도** 걸린다 · 스냅샷 참조 무결성 |
-| e2e | `scripts/demo_e2e.py` | **383** | 화면 + API + DXF(ezdxf) · Word/Excel(python-docx · openpyxl) 파싱 · 학습 → 투영 → 채택 · Special 과금 · 새 API 마다 열람자 403 · 타사 404 |
+| DB | `rls` · `platform` · `learning` · `special` · `consulting` · `mes` | 13종 중 6 | 회사 격리 · 플랫폼 ↔ 회사 권한 교차 0 · 투영 · 부여는 함수로만 · 원자료 보호 · 사용 기록 불변 · 입출고 · 공정 · 검수 추가만 · 음수 재고 거부(동시 출고 경합 포함) |
+| DB | `revision` · `macro` | 13종 중 2 | 코드 개정 append-only · 매크로 승인 · 개정 번호 규칙 |
+| DB | `drawing` · `document` · `project` · `backbone` · `hierarchy` | 13종 중 5 | 발행 · 발주 잠금이 **앱을 우회해도** 걸린다 · 스냅샷 참조 무결성 |
+| e2e | `scripts/demo_e2e.py` | **402** | 화면 + API + DXF(ezdxf) · Word/Excel(python-docx · openpyxl) 파싱 · 학습 → 투영 → 채택 · Special 과금 · 새 API 마다 열람자 403 · 타사 404 |
 
-> **머지 게이트**(모든 기능 브랜치): typecheck 11 패키지 → 단위 전부 → DB 초기화 후 DB 검증 12종 → e2e **개발 모드 1회 + 운영 모드 1회**(운영 중 `pg_stat_activity` 기록) → fast-forward 머지 → 머지된 main 에서 한 번 더.
-> **CI**: GitHub Actions — typecheck · 단위 · DB 검증 12종 (위 배지).
+> **머지 게이트**(모든 기능 브랜치): typecheck 11 패키지 → 단위 전부 → DB 초기화 후 DB 검증 13종 → e2e **개발 모드 1회 + 운영 모드 1회**(운영 중 `pg_stat_activity` 기록) → fast-forward 머지 → 머지된 main 에서 한 번 더.
+> **CI**: GitHub Actions — typecheck · 청사진 판정 `--check` · 단위 · DB 검증 13종 (위 배지).
 
 <br>
 
@@ -428,7 +428,7 @@ pnpm dev                                  # http://localhost:3000
 | 마감 M | PCR 세부(Business Type · 샘플 요율표) · UI Form(저장·삭제·등록 · Canvas · Call · 노드별 UI · UI 개발 AI 결정론) · 구동 방식 · 방향 결합 · 파일 교체 경로 · 운영 킷 규칙 파일 | 09-30 | ✅ |
 | 다음 | MRP/작업지시 · 공정 · 품질 · 모바일 승인 · QR | — | ⏳ |
 
-청사진 70쪽 대조: 구현 대상 51쪽 중 **실동 38 · 부분 9 · 미착수 4**(엘 확정판 4 · 09-30) → ccmd M 초안 **실동 42(그중 실동(샘플) 3) · 부분 5 · 미착수 4**(엘 재측정 전). 쪽마다 "있는 것 / 없는 것"은 [`page-map.md`](docs/00-corpus/page-map.md).
+청사진 70쪽 대조: 구현 대상 51쪽 중 **실동 38 · 부분 9 · 미착수 4**(엘 확정판 4 · 09-30) → ccmd M 초안 **실동 42(그중 실동(샘플) 3) · 부분 5 · 미착수 4** → ccmd N(L 완주) 초안 **실동 46(그중 실동(샘플) 7) · 부분 5 · 미착수 0**(CC 초안 — 엘 재측정 전). 완료 정의 4항목: [`docs/04-decisions/2026-09-28-completion-definition.md`](docs/04-decisions/2026-09-28-completion-definition.md). 쪽마다 "있는 것 / 없는 것"은 [`page-map.md`](docs/00-corpus/page-map.md).
 
 <br>
 

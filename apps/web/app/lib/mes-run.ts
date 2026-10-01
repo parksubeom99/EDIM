@@ -17,6 +17,18 @@ export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f
 
 export const esc = (s: unknown) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 
+/**
+ * QR 에 넣을 바깥 주소. 운영 킷(next start · HOSTNAME=0.0.0.0)에서는 req.nextUrl.origin 이 http://0.0.0.0:3000 이 되어
+ * 휴대폰이 찍어도 못 간다(ccmd N 킷 e2e 실측). 우선 EDIM_PUBLIC_URL · 다음 프록시 헤더(x-forwarded-*) · 다음 Host 헤더 — 사용자가 실제로 연 주소.
+ */
+export function publicOrigin(req: { headers: Headers; nextUrl: { protocol: string; origin: string } }): string {
+  const env = process.env.EDIM_PUBLIC_URL?.trim();
+  if (env && /^https?:\/\/[^/\s]+$/.test(env.replace(/\/$/, ""))) return env.replace(/\/$/, "");
+  const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host");
+  const proto = (req.headers.get("x-forwarded-proto") ?? req.nextUrl.protocol.replace(":", "")).split(",")[0]!.trim();
+  return host && /^[A-Za-z0-9.\-]+(:\d+)?$/.test(host) ? `${proto}://${host}` : req.nextUrl.origin;
+}
+
 /** QR SVG(추측 불가 토큰 URL) — 새 의존성 qrcode-generator(MIT) 한 개 */
 export function qrSvg(text: string, cell = 3): string {
   const q = qrcode(0, "M");
