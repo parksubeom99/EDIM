@@ -2,7 +2,7 @@
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/hero-dark.svg">
-  <img alt="EDIM — 제품 코드 한 줄로 BOM · 도면 · 원가 · 견적 · 구매까지. e2e 402/402 · 단위 테스트 355 · DB 검증 13종 · 런타임 LLM 0" src="docs/assets/hero-light.svg" width="100%">
+  <img alt="EDIM — 제품 코드 한 줄로 BOM · 도면 · 원가 · 견적 · 구매까지. e2e 404/404 · 단위 테스트 357 · DB 검증 13종 · 런타임 LLM 0" src="docs/assets/hero-light.svg" width="100%">
 </picture>
 
 [![CI](https://github.com/parksubeom99/EDIM/actions/workflows/ci.yml/badge.svg)](https://github.com/parksubeom99/EDIM/actions/workflows/ci.yml)
@@ -12,8 +12,8 @@
 ![Prisma](https://img.shields.io/badge/Prisma-6-2D3748?logo=prisma&logoColor=white)
 ![pnpm](https://img.shields.io/badge/pnpm-monorepo%2011-F69220?logo=pnpm&logoColor=white)
 <br>
-![e2e](https://img.shields.io/badge/e2e-402%2F402-0e7c6b)
-![unit](https://img.shields.io/badge/unit%20tests-355-0e7c6b)
+![e2e](https://img.shields.io/badge/e2e-404%2F404-0e7c6b)
+![unit](https://img.shields.io/badge/unit%20tests-357-0e7c6b)
 ![DB checks](https://img.shields.io/badge/DB%20checks-13%20suites-0e7c6b)
 ![runtime LLM](https://img.shields.io/badge/runtime%20LLM%20calls-0-0e7c6b)
 ![local AI](https://img.shields.io/badge/local%20AI-Ollama%20(optional)-555555?logo=ollama&logoColor=white)
@@ -76,6 +76,204 @@ LLM 은 자연어 → 매크로 DSL 번역기 자리에만. 실행은 검증 · 
 
 <br>
 
+<a id="principles"></a>
+
+## 설계 원칙
+
+EDIM 은 제품 코드 한 줄에서 **부품표 · 도면 · 원가 · 견적 · 구매 요청**을 만들어 내는 시스템입니다.
+이 문서는 무엇을 만들었는지가 아니라 **왜 이렇게 설계했는지**를 적습니다.
+
+---
+
+### 1. 데이터는 샘플, 구조는 실물입니다
+
+이 저장소는 **공개 데이터와 직접 설계한 예시 데이터로 전 구간이 동작**합니다.
+회사 단가표나 실제 도면 같은 실자료는 공개할 수 없는 자산이므로 넣지 않았습니다.
+
+대신 **실자료가 들어오면 파일 교체만으로 반영되는 구조**로 만들었고, 그것을 숫자로 증명합니다.
+
+```
+catalog.local.json 의 단가 하나를 바꾸고 db:reset:demo
+  원가 합계  15,487,170원  →  17,866,050원
+파일을 지우고 다시 reset
+  원가 합계  17,866,050원  →  15,487,170원
+코드 수정 0 줄
+```
+
+파일을 찾는 순서는 `EDIM_CATALOG` 환경변수 → `catalog.local.json` → 샘플입니다.
+CAD 규칙서와 견적 요율표도 같은 방식이고, 이 성질 자체를 e2e 단언으로 못 박아 두었습니다.
+
+예시 데이터를 쓴다는 것은 **데이터 모델을 직접 설계했다**는 뜻입니다.
+제품 코드 구조, 카탈로그 JSON 형식, 단가표 칸 구성, CAD 규칙서 형식, 견적 요율표 형식 —
+**그릇을 먼저 정의하고 그 그릇에 맞는 예시 값을 채웠습니다.**
+
+---
+
+### 2. AI 를 어디에 두고, 어디를 무엇으로 대체했는가
+
+AI 는 잘하는 일과 못하는 일이 뚜렷합니다. 이 시스템은 그 경계를 먼저 긋고 설계했습니다.
+
+| | AI 가 강한 일 | AI 가 약한 일 |
+|---|---|---|
+| 내용 | 사람 말을 구조화된 형식으로 옮기기 · 도면과 문서에서 패턴 뽑기 · 화면 설계 초안 | 같은 입력에 **항상 같은 답** 보장 · 비용과 지연 예측 · 틀렸을 때 스스로 막기 |
+| EDIM 의 선택 | **적극적으로 씁니다** | **결정론 엔진으로 대체했습니다** |
+
+견적과 도면에서 같은 입력에 다른 답이 나오면 그건 기능이 아니라 사고입니다.
+그래서 **약점이 드러나는 자리만 골라내어 대체**했습니다. AI 를 줄인 것이 아니라 **배치를 바꾼 것**입니다.
+
+구현은 시간을 둘로 쪼개는 방식입니다.
+
+| | 준비 시간 (build-time) | 업무 시간 (runtime) |
+|---|---|---|
+| 속도 | 느려도 됩니다 | 빨라야 합니다 |
+| AI | **여기서 일합니다** | 결정론 실행기가 맡습니다 |
+| 하는 일 | 전문가의 문장 → 계산식 초안 → 검사 → **사람이 승인** | 승인된 계산식만 실행 |
+| 성질 | 반복과 재시도가 가능합니다 | 비용 0 · 지연 0 · 재현 100% |
+
+AI 가 만드는 것은 **답이 아니라 수식**입니다.
+수식은 사람이 승인해야 Registry 에 등재되고, 업무 시간에는 등재된 것만 실행됩니다.
+AI 의 출력이 곧바로 결과가 되는 경로가 없으므로, **AI 가 틀려도 검사와 승인에서 걸립니다.**
+
+```
+자연어 Prompt  →  Macro DSL(중간표현)  →  검사 · 시험 실행  →  사람 승인  →  Registry
+                        ▲                                                      │
+                   AI 가 여기서 일합니다                   업무 시간 ──────────┘
+                                                          (승인본만 실행)
+```
+
+**승인이 형식적으로 흐르지 않도록** 역번역을 두었습니다.
+수식을 순서도와 자연어로 되돌려 보여주면, 검토자는 수식을 읽을 줄 몰라도
+"내가 말한 의도와 맞는가"만 판단하면 됩니다.
+
+그리고 **승인된 수식은 다음 번역의 예제로 다시 들어갑니다.** 쓸수록 그 회사 도메인에 정확해집니다.
+여기서는 AI 를 줄이는 것이 아니라 **누적해서 성능을 올립니다.**
+자산은 AI 모델이 아니라 **승인 코퍼스**입니다.
+
+AI 가 실제로 일하는 자리는 네 곳입니다.
+
+| 자리 | 하는 일 |
+|---|---|
+| 번역기 | 전문가의 자연어 설명 → Macro DSL 수식 |
+| 학습 | 원천 자료(도면 · 기술문서) → 패턴 · 공식 추출 |
+| 화면 설계 | 용도 설명 → 입력 화면 구성 초안 |
+| 고급 계산 | 단순 매크로로 풀리지 않는 계산 |
+
+현재는 AI 키 없이 **규칙 기반 설계기로 동작**합니다.
+이것은 오류 처리가 아니라 **설계된 폴백**이며 화면에도 그대로 표시됩니다.
+키가 들어오면 위 네 자리에서만 켜지고, 업무 시간의 성질은 바뀌지 않습니다.
+
+---
+
+### 3. 세 갈래로 나눠서, 쓸 곳에만 씁니다
+
+"계산이 필요하면 AI" 가 아닙니다. 들어온 일을 먼저 셋으로 나눕니다.
+
+| 일의 종류 | 처리 | AI |
+|---|---|---|
+| 확정된 문법 · 공식 | Macro DSL + 실행기 | 쓰지 않습니다 |
+| "어느 표 어느 칸" 찾기 | Address Resolver | 쓰지 않습니다 |
+| 진짜 새로운 계산 | build-time 에 **1 회** 번역 → 승인 → 이후 결정론 | **씁니다** |
+
+앞의 둘은 답이 정해져 있는 일입니다. 정해진 답을 AI 에게 물으면 비용과 불확실성만 늘어납니다.
+세 번째만이 AI 가 실제로 가치를 만드는 자리이고,
+그 한 번의 번역이 승인을 거치면 **그 뒤로는 영원히 결정론**입니다.
+
+Address Resolver 는 **존재하는 표 · 변수 · 코드만 심볼로 노출**합니다.
+없는 표를 참조하는 수식은 실행 전에 파싱 단계에서 죽습니다.
+AI 가 없는 것을 지어내도 **문법 차원에서 막히도록** 설계했습니다.
+
+---
+
+### 4. 이중 프로젝션 — 권한 분리를 DB 가 강제합니다
+
+계층은 셋입니다.
+
+| 계층 | 누구 | 데이터 |
+|---|---|---|
+| 플랫폼 관리자 | 플랫폼 운영자 | **DB①** — 원본 · 고급 항목 · 학습 자료 |
+| 회사 관리자 | 고객사 관리자 | **DB②** 운영 · 하부 사용자 통제 |
+| 사용자 | 고객사 실무자 | **DB②** 사용 |
+
+**학습은 한 번만 하고, 출력을 둘로 나눕니다.**
+
+```
+원천 자료 ──▶ 통합 학습 ──┬── π_admin ──▶ DB①  (플랫폼 관리자 전용)
+                          └── π_user  ──▶ DB②  (회사 관리자 · 사용자)
+```
+
+DB② 는 DB① 의 사용자 프로젝션이므로 구조가 닮아 있고, 차이는 플랫폼 전용 항목입니다.
+학습을 두 번 하면 비용도 두 배지만 두 DB 가 서로 어긋나기 시작합니다.
+한 번 학습하고 출력만 나누면 **정합성이 구조적으로 유지**됩니다.
+
+**역류(DB② → DB①)는 운영 규칙이나 코드 리뷰로 막지 않습니다. DB 권한으로 막습니다.**
+
+```
+edim_app       →  platform 스키마 USAGE 권한 0
+edim_platform  →  업무 테이블 권한 0
+```
+
+애플리케이션을 우회해도, API 를 직접 호출해도 넘어가지 못합니다.
+데이터 주권과 멀티테넌트 신뢰가 **담당자의 주의가 아니라 권한 설정**에 걸려 있습니다.
+
+같은 원리를 발행 통제에도 씁니다.
+**승인되지 않은 BOM 스냅샷으로는 도면과 문서를 발행할 수 없고, 구매 발주도 나가지 않습니다.**
+이것도 애플리케이션 검사가 아니라 **DB 트리거**가 막습니다.
+
+---
+
+### 5. 도면은 만들고, 되읽어서 검증합니다
+
+도면을 **생성하는 것**과 **생성한 도면이 맞는지 아는 것**은 다른 문제입니다.
+
+EDIM 은 BOM 스냅샷의 치수를 읽어 DXF 를 직접 그립니다.
+평면 · 조립 · 정면 · 우측면 · 등각 · 분해 **6 종이 같은 스냅샷 하나에서** 나옵니다.
+
+그리고 **생성한 DXF 를 다시 파싱해서 검사합니다.**
+
+- 여섯 뷰 사이의 치수가 서로 일치하는가
+- 치수를 바꾸면 바뀌어야 할 것만 바뀌는가 — 2472 를 2600 으로 바꾸면 **폭만 128 변하고 전장은 불변**
+- 등각 투영의 기울어진 선이 실제로 그 각도인가
+
+설계 규칙을 위반한 치수로는 도면이 나오지 않습니다. DXF 생성과 등록 **양쪽에서 거부**합니다.
+스냅샷과 등록 표가 어긋난 상태에서도 도면을 만들 수 없습니다.
+
+DWG → DXF 변환은 범위에 넣지 않았습니다.
+이 프로젝트의 문제는 도면을 **받아 읽는 것**이 아니라 **코드에서 만들어 내는 것**이었습니다.
+
+---
+
+### 원자 컴포넌트 — 구현 상태 (저장소 실측)
+
+| 원자 | 판정 | 근거 |
+|---|---|---|
+| A1 Macro DSL 문법 | 구현됨 | `packages/macro-dsl` 파서 · 결정론 실행기 · 단위 54 · EDIM Run(e2e S10 계열) |
+| A2 Address Resolver | 구현됨 | `packages/hierarchy-address` 단위 18 · 웹의 매크로 주소 해석(`apps/web/app/lib/macro/address.ts`) |
+| A3 Context Assembler | **설계만** | 번역 프롬프트는 고정 문법 명세 + 예시 6개다. 회사의 표 · 변수 심볼이나 **승인 코퍼스를 다음 번역의 예제로 넣는 조립 경로는 아직 없다**(주소 트리는 검증에서만 쓴다) |
+| A4 LLM Translator | 폴백 동작 | 번역 클라이언트 · 재시도 루프 구현(`packages/macro-compile` 단위 13 — 대본 클라이언트 주입). API 키가 없으면 "번역 모델이 연결되지 않았습니다" 안내 · Macro 직접 입력으로 진행 |
+| A5 Round-trip 역번역 | 구현됨 | 식 → 순서도 · 설명(LLM 없음) · `packages/macro-dsl` describe 단위 6 · e2e S13c |
+| A6 Verifier + Dry-run | 구현됨 | `packages/macro-verify` 정적 검사 · 시험 실행 단위 19 · 저장 전 Verify |
+| A7 Approval Gate + Registry | 구현됨 | `packages/macro-registry` 단위 15 · DB 검증 `macro:test` · 승인된 매크로만 Run |
+
+---
+
+### 검증
+
+| 항목 | 값 |
+|---|---|
+| 타입 검사 | 전 패키지 통과 |
+| 단위 테스트 | 357 |
+| DB 검증 | 13 종 |
+| 전체 흐름 e2e (개발) | 404 단계 |
+| 전체 흐름 e2e (운영 컨테이너) | 401 단계 |
+
+운영 e2e 가 3 단계 적은 것은 **호스트 파일 교체를 확인하는 단계**라
+컨테이너 안에서는 구조상 돌 수 없기 때문입니다. 건너뛴 사실은 실행 출력에 그대로 남습니다.
+
+진행 상태를 사람이 손으로 올리지 못하도록
+**판정 데이터를 단일 기준으로 두고, 기록과 실제가 어긋나면 검사가 실패**하게 했습니다.
+
+<br>
+
 <a id="architecture"></a>
 
 ## 🏗️ 아키텍처
@@ -108,9 +306,9 @@ LLM 은 자연어 → 매크로 DSL 번역기 자리에만. 실행은 검증 · 
 
 <a id="ai"></a>
 
-## 🤖 AI 설계 — "LLM 은 컴파일러다"
+## 🤖 AI 구성 — 패키지 · 학습 AI · Special
 
-제조 견적에서 AI 환각은 **돈이 틀리는 사고**다. 그래서 EDIM 은 AI 를 **어디에 두고 어디서 빼는지**부터 설계했다.
+왜 이렇게 배치했는지는 위 [설계 원칙 §2 · §3](#principles). 여기는 무엇으로 만들었는지다.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/ai-design-dark.svg">
@@ -208,9 +406,7 @@ LLM 은 자연어 → 매크로 DSL 번역기 자리에만. 실행은 검증 · 
 
 <br>
 
-**문제:** 플랫폼(학습 AI)은 데이터가 많을수록 좋지만, 고객사 업무 데이터가 플랫폼으로 흘러가면 데이터 주권 · 신뢰가 깨진다.
-**선택:** `platform` 스키마 + `edim_platform` 역할. 플랫폼은 회사 업무 테이블에 **GRANT 가 없다.** 회사 → 플랫폼 통로는 요청서 테이블 하나, 플랫폼 → 회사 통로는 승인된 결과만 넣는 `SECURITY DEFINER` 함수(`project_formula` · `grant_special`).
-**검증:** `platform:test` · `learning:test` · `special:test` 가 "플랫폼 역할로 회사 테이블 SELECT → permission denied" 와 그 반대를 매 CI 에서 확인.
+설계 이유 · 구조는 [설계 원칙 §4 이중 프로젝션](#principles). **검증:** `platform:test` · `learning:test` · `special:test` · `mes:test` 가 "플랫폼 역할로 회사 테이블 SELECT → permission denied" 와 그 반대를 매 CI 에서 확인.
 → [ADR-005](docs/adr/ADR-005-admin-user-db-separation.md)
 
 </details>
@@ -220,9 +416,7 @@ LLM 은 자연어 → 매크로 DSL 번역기 자리에만. 실행은 검증 · 
 
 <br>
 
-**문제:** 도메인 전문가(비개발자)가 엑셀 매크로 수준의 계산을 직접 만들고 싶어 한다. LLM 이 돕기 좋지만, 런타임에 LLM 이 답을 만들면 같은 입력에 다른 견적이 나올 수 있다.
-**선택:** LLM 은 **자연어 → DSL 번역**에만(빌드 타임 · 1회). 실행은 검증 · 승인된 DSL 만, 결정론 실행기로. 역번역(DSL → 흐름도 · 설명)은 LLM 없이 해서, 사람이 AI 산출물을 **읽고 승인**할 수 있게 했다.
-**트레이드오프:** DSL 표현력 한계 ↔ 비용 0 · 지연 0 · 재현 100 %. DSL 로 안 되는 계산은 Special Tool Box 로.
+설계 이유 · 시간 분리(build-time / runtime)는 [설계 원칙 §2 · §3](#principles). **트레이드오프:** DSL 표현력 한계 ↔ 비용 0 · 지연 0 · 재현 100 %. DSL 로 안 되는 계산은 Special Tool Box 로.
 → [ADR-002](docs/adr/ADR-002-deterministic-runtime.md)
 
 </details>
@@ -269,7 +463,7 @@ flowchart TB
 
 ## 🖼️ 화면
 
-> 목업이 아니다 — `scripts/demo_e2e.py` 가 402단계를 걸으며 매번 새로 찍는다. 전체 68장: [`docs/screens/`](docs/screens)
+> 목업이 아니다 — `scripts/demo_e2e.py` 가 404단계를 걸으며 매번 새로 찍는다. 전체 68장: [`docs/screens/`](docs/screens)
 
 | 작업대 — 청사진의 다섯 구역 | 코드 조립 · 개정 Rev A→B | BOM Run → EBOM → Cost |
 |:---:|:---:|:---:|
@@ -296,7 +490,7 @@ flowchart TB
 | AI | 결정론 매크로 DSL · 번역 루프(provider 교체형) · 학습 AI 하네스 · 로컬 LLM(Ollama, 선택) | 런타임 LLM 0 · 자료가 서버 밖으로 나가지 않음 |
 | 도면 | DXF R12 생성 · 3각법 · 3D 등각(three.js) | 외부 CAD 없이 치수 표 → 도면 |
 | 문서 | 인쇄본 HTML · Word(docx) · Excel(exceljs) | 숫자를 표시 문자열이 아니라 **값**으로 (엑셀 합계가 되게) |
-| 테스트 | vitest(단위 355) · DB 검증 스크립트 13종 · Playwright(Python) e2e 402단계(운영 킷 대상 399 · 호스트 전용 3 건너뜀) | 화면 + API + DXF · Office 파일 파싱까지 한 시나리오 |
+| 테스트 | vitest(단위 357) · DB 검증 스크립트 13종 · Playwright(Python) e2e 404단계(운영 킷 대상 401 · 호스트 전용 3 건너뜀) | 화면 + API + DXF · Office 파일 파싱까지 한 시나리오 |
 | CI · 배포 | GitHub Actions · Dockerfile(다단계) · docker compose 운영 킷 | 로컬 한 줄로 운영 모드 재현 |
 
 <br>
@@ -327,7 +521,7 @@ AI 키가 없어도 모든 화면이 돈다(결정론 폴백 · [`DEPLOY.md` 7�
 | `owner@acme.test` | 🏢 데모 회사 A 관리자 | 모든 화면 · 매크로 승인 · 발행 |
 | `viewer@acme.test` | 👀 데모 회사 A 열람자 | 고치기 · 내보내기 → 403 |
 | `owner@globex.test` | 🏢 데모 회사 B | A 의 데이터가 **하나도** 안 보임 |
-| `platform@edim.test` | 🛠️ 플랫폼 관리자 | 학습 AI · Special · 고객사 업무 데이터 권한 없음 |
+| `platform@edim.test` | 🛠️ 플랫폼 관리자 | 학습 AI · Special · 회사 업무 데이터 권한 없음 |
 
 <details>
 <summary><b>개발 모드 (pnpm) · 로컬 AI 켜기</b></summary>
@@ -428,7 +622,7 @@ pnpm dev                                  # http://localhost:3000
 | 마감 M | PCR 세부(Business Type · 샘플 요율표) · UI Form(저장·삭제·등록 · Canvas · Call · 노드별 UI · UI 개발 AI 결정론) · 구동 방식 · 방향 결합 · 파일 교체 경로 · 운영 킷 규칙 파일 | 09-30 | ✅ |
 | 다음 | MRP/작업지시 · 공정 · 품질 · 모바일 승인 · QR | — | ⏳ |
 
-청사진 70쪽 대조: 구현 대상 51쪽 중 **실동 38 · 부분 9 · 미착수 4**(엘 확정판 4 · 09-30) → ccmd M 초안 **실동 42(그중 실동(샘플) 3) · 부분 5 · 미착수 4** → ccmd N(L 완주) 초안 **실동 46(그중 실동(샘플) 7) · 부분 5 · 미착수 0**(CC 초안 — 엘 재측정 전). 완료 정의 4항목: [`docs/04-decisions/2026-09-28-completion-definition.md`](docs/04-decisions/2026-09-28-completion-definition.md). 쪽마다 "있는 것 / 없는 것"은 [`page-map.md`](docs/00-corpus/page-map.md).
+청사진 70쪽 대조: 구현 대상 51쪽 중 **실동 38 · 부분 9 · 미착수 4**(엘 확정판 4 · 09-30) → ccmd M 초안 **실동 42(그중 실동(샘플) 3) · 부분 5 · 미착수 4** → ccmd N(L 완주) 초안 실동 46 · 부분 5 · 미착수 0 → **ccmd P 규칙 R 적용 — 실동 44(그중 실동(샘플) 5) · 부분 7 · 미착수 0 · 개념 19**(CC 초안 — 엘 재측정 전 · 항목 대조 [`rule-r-20261001.md`](docs/02-reports/rule-r-20261001.md)). 완료 정의 4항목: [`docs/04-decisions/2026-09-28-completion-definition.md`](docs/04-decisions/2026-09-28-completion-definition.md). 쪽마다 "있는 것 / 없는 것"은 [`page-map.md`](docs/00-corpus/page-map.md).
 
 <br>
 
@@ -454,7 +648,7 @@ pnpm dev                                  # http://localhost:3000
 | `packages/macro-*` | DSL(파서 · 실행기) · 검증기 · 역번역 · 등록부 |
 | `packages/db` | Prisma 스키마 · 마이그레이션 0001~0037 · RLS · 트리거 · DB 검증 스크립트 · 샘플 학습 도면 · 샘플 팬 성능표 |
 | `packages/auth` · `hierarchy-address` · `core-ontology` · `ui` | 세션 · 주소 · 도메인 타입 · 디자인 시스템 |
-| `scripts/demo_e2e.py` · `make_learning_samples.ts` · `file_swap_check.py` | 383단계 시나리오 e2e · 샘플 학습 도면 생성(시드 고정) · 파일 교체 전후 화면 확인 |
+| `scripts/demo_e2e.py` · `make_learning_samples.ts` · `file_swap_check.py` | 404단계 시나리오 e2e · 샘플 학습 도면 생성(시드 고정) · 파일 교체 전후 화면 확인 |
 | `docs/architecture` · `ai` · `adr` · `assets` | 구조 · AI 설계 · 설계 결정 · README 그림(`make_readme_art.py`) |
 | `docs/00-corpus` | 청사진 쪽 지도 · 설계 코퍼스 |
 | `docs/01-design` · `04-decisions` | 단계별 설계서 · 제품 결정 로그 |
