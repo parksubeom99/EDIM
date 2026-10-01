@@ -30,6 +30,8 @@ PAGE_MAP = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "00-co
 # 판정자 — 기본은 엘 확정판 4. ccmd M 에서 바뀐 쪽은 회장님 결정(09-30)으로 엘이 확정했다(엘 저장소 실측 아님 · lmd 교차검증).
 JUDGE_4 = "엘 확정판 4 (2026-09-30)"
 JUDGE_M1 = "엘 판정 확정 (2026-09-30 · 회장님 결정) — 엘 저장소 실측 아님 · lmd M 교차검증 기준"
+# ccmd N(10-01) — ccmd L 완주로 연 쪽 · 바꾼 쪽. 최종 판정은 엘이 한다(엘 재측정 전).
+JUDGE_N = "CC 초안 — 엘 재측정 전 (2026-10-01 · ccmd N · L 완주)"
 HERE = os.path.dirname(os.path.abspath(__file__))
 DECK = os.path.join(HERE, "..", "deck")
 
@@ -238,9 +240,30 @@ PAGES = {
          "**Call Sub Drawing**(H5) — 도면 시트에 하부 도면 표(Item · Description · Q'ty · Remarks · 코드에 첨부한 DWG) · **Detail Design 주의사항** 목록 · 템플릿을 고쳐도 뜬 도면은 그대로"],
         ["하부 도면을 조립도 안에 mm 로 배치(Detail Dimension A~K) — 필요한 입력: 회사 CAD 규칙(M4)"], "e2e S18f · S64a~e", "74_sub_drawing"),
  41: pg("C", "간지", "EDIM Drawing Management — Data Set-Up"),
- 42: pg("N", "Data Set-Up", "설계 우선순위 · 기준점 · 오류 체크 · Material management", [], ["없음 (CAD Mapping · Variant List · Inventory 포함)"], "", None, "CAD 담당 영역(역할 분담 확정)"),
- 43: pg("N", "S-4-1-2 · Work Process Management", "전 부서 Work Process — 창고·공정·인원·스킬·시간", [], ["없음"], "", None, "ERP 확장 — 80% 범위 밖"),
- 44: pg("N", "Table List · Manufacturing", "MRP · 작업지시 · 공정 · 자재흐름 · 품질 · 원가", [], ["Table List 중 tech·dim 표만 존재. 생산계획·작업지시·공정·품질 없음"], "", None, "ERP/MES 확장 — 80% 범위 밖"),
+ 42: pg("L", "Data Set-Up", "설계 우선순위 · 기준점 · 오류 체크 · Material management",
+       ["**/setup/design-priority**(ccmd L · LA6) — p42 표 모양: Dim · 설계 우선순위 · 상위설계 우선자료 · 설계 기준점 설정 · 설계 오류 체크 · Remarks(제품 코드의 priority 표)",
+        "오류 체크 식(`<= 3000` · `> 300` · `< W`)은 BOM Run 에서 **기존 설계 검증 규칙으로 컴파일**되어 같은 판정기가 판정 — 위반이면 도면 422",
+        "위반이 여럿이면 우선순위가 낮은(숫자가 큰) 치수부터 '바꿀 후보' · 상위설계 우선자료는 '바꾸지 말 것' — 스냅샷 dims.priority 에 박힌다",
+        "Material management 3칸 — Sub Material List(BOM 자식 · 자재 코드) · Variant List(제품 코드 슬롯) · Inventory Management(/m/warehouse?item=)"],
+       ["3D 2D CAD Mapping — 필요한 입력: 3D 모델 · CAD 규칙(M4)", "우선순위 표는 SPF 샘플 제품에만(EU 시연 제품 없음) — 회사 설계 기준이 들어오면 표 교체"],
+       "e2e S91a~b · priority.test", "89_design_priority", "회사 설계 우선순위 기준 · 3D 모델(M4)", sample=True, judge=JUDGE_N,
+       why="실동(샘플): 우선순위 표 · 오류 체크(기존 설계 검증으로 판정) · 바꿀 후보 · Material management 링크가 돌고, 3D 2D CAD Mapping 은 없다 — e2e S91"),
+ 43: pg("L", "S-4-1-2 · Work Process Management", "전 부서 Work Process — 창고·공정·인원·스킬·시간",
+       ["**/setup/work-process**(ccmd L · LA1 · 0038) — Material 표(Item · warehouse · Min Stack · 공급자 · 제조/구매 · Time) · Process 표(Assembling · Work shop · Person · Skill · W. Time · 앞 공정)",
+        "기준정보 — 작업장(가용 시간/일) · 기계 · 작업자(스킬 등급 · 실명 금지 '작업자 A~D') · 창고(지역/창고/구역) · 회사 경계(RLS) · 다른 회사 id 를 가리키면 404",
+        "원가 계산은 이 표를 읽지 않는다(제조비 = 제조 정보 표 F10 만 — 시연 원가 ₩15,487,170 불변)"],
+       ["기준정보는 샘플(작업장 3 · 기계 3 · 작업자 4 · 창고 2 · SPF 공정) — 필요한 입력: 회사 공정 · 인원 · 창고 기준정보"],
+       "e2e S83a~b · mes:test", "90_work_process", "회사 기준정보로 표 교체", sample=True, judge=JUDGE_N,
+       why="실동(샘플): Material · Process 표와 기준정보가 화면에서 등록 · 조회되고 MRP · 작업지시가 읽는다 — 자료는 샘플 · e2e S83"),
+ 44: pg("L", "Table List · Manufacturing", "MRP · 작업지시 · 공정 · 자재흐름 · 품질 · 원가",
+       ["**MRP**(/m/mrp) — 프로젝트(수량 · 납기)의 BOM 스냅샷 → 총소요 · 재고 · 입고 예정 · 순소요 · 시기(납기 − 리드타임 / 공정 시간 ÷ 8h) · 같은 입력 = 같은 답 → 구매 요청 초안(기존 흐름) · 작업지시 초안",
+        "**작업지시 · 공정**(/m/work-orders) — 공정 순서 사본 · 착수/완료 추가만 기록 · 앞 공정 미완료 409 · A4 작업지시서(QR) · **Capacity**(/m/capacity) 작업장별 부하 vs 가용 → 초과 칸",
+        "**창고 · 재고**(/m/warehouse) — 입출고 추가만 · 현재고 = 합 · 재고 단가 최고 · 최저 · 평균 · 최근 · Min Stack 경고 · 음수 재고 409(동시 출고 경합 포함 · DB 트리거)",
+        "**품질**(/m/quality) — 검수(자재 · 완성품 · 설치완료) · 불합격 → 하자 건(열림 → 조치 → 닫힘) · 자재 불합격 → 반품 이동 · 마지막 공정 완료에는 완성품 검수 합격"],
+       ["원가(p44-6 공정비용) — 새 표는 원가가 읽지 않는다(하드 가드 · 시연 원가 보호) · 원가의 제조비는 제조 정보 표(F10)",
+        "기준정보 · 재고 · 리드타임은 샘플 — 필요한 입력: 회사 MRP 기준 · 창고 · 품질 기준"],
+       "e2e S84a~S88 · mrp.test · mes:test 26", "92_mrp", "회사 기준정보 · 원가에 공정비용을 넣을지(회장님 결정)", sample=True, judge=JUDGE_N,
+       why="실동(샘플): MRP · 작업지시 · 공정 · Capacity · 창고 · 품질이 화면에서 끝까지 돌고 e2e · DB 검증이 못 박는다 — 공정비용 원가는 하드 가드로 제외 · e2e S84~S88"),
  45: pg("C", "간지", "Selection & Document Set-Up — Arrangement"),
  46: pg("L", "S-3-1 · Set-up / CPQ / Selection", "Selection Set-Up — Spec List input",
         ["**사양 입력표**(⑥) — 회사가 제품 코드마다 사양 항목(풍량 CMH · 가습량 kg/h · 재질 …)을 정의하고, 값을 넣으면 **등록된 Sub Code·제품 표에서만** 맞는 슬롯 값을 골라 Code Builder 에 채운다. 저장은 기존 개정(Rev) 한 곳",
@@ -294,10 +317,11 @@ PAGES = {
          "개념도에서 구획을 고르면 Move·Delete·Copy 가 풀리고, 편집은 Design 초안 → 기존 '저장' 한 곳으로만 반영된다",
          "**Delete 미리 잠금**(E8) — BOM 관계가 걸린 구획을 고르면 툴바 Delete 도 표의 Delete 처럼 눌리지 않고 이유를 적는다(서버 409 는 그대로)",
          "**그림 제작 Module 1단계**(H10) — 도면 위 주석(선 · 사각형 · 글자 · 치수선) 추가·이동·삭제 · 원 도면 불변 · DXF 내보내기에 ANNOT 레이어 · 발행 도면은 잠김",
-         "**설계 심볼**(ccmd K · 0036) — 편집기에서 샘플 심볼 5종 놓기 · 옮기기 · 90° · 지우기 · SYMBOL 레이어 · 발행 도면 409"],
-        ["작업대 툴바 '설계 심볼' 자리는 아직 잠김 — ccmd L(LB)에서 도면 고르기 → 편집기로 연결 중(이 ccmd 는 건드리지 않음)", "Free CAD — 필요한 결정: EDIM 안 CAD 편집기(M4 · M5)"],
-        "e2e S41a~l · S69a~f · S77a~c", "79_draw_module", "툴바 '설계 심볼' 연결은 ccmd L · Free CAD 는 편집기 결정 후", judge=JUDGE_M1,
-        why="부분: 툴바 명령 · 그림 제작 · 설계 심볼(편집기)은 돌지만 작업대 툴바 '설계 심볼' 자리 · Free CAD 가 없다"),
+         "**설계 심볼**(ccmd K · 0036) — 편집기에서 샘플 심볼 5종 놓기 · 옮기기 · 90° · 지우기 · SYMBOL 레이어 · 발행 도면 409",
+         "**작업대 툴바 '설계 심볼'**(ccmd L · LB-3) — 이 스냅샷의 도면 목록 → 고르면 그 도면 편집기의 심볼 패널 · 도면이 없으면 잠김 + '먼저 도면을 등록하세요'"],
+        ["Free CAD — 필요한 결정: EDIM 안 CAD 편집기(M4 · M5)"],
+        "e2e S41a~s · S69a~f · S77a~c", "79_draw_module", "Free CAD 는 편집기 결정 후", judge=JUDGE_N,
+        why="부분: 툴바 명령 · 그림 제작 · 설계 심볼(작업대 툴바 → 스냅샷 도면 → 편집기 심볼 패널 · ccmd L LB-3 · e2e S41s)은 돌지만 Free CAD 가 없다"),
  59: pg("L", "E-3 · Key Work Place", "Hierarchy 와 Run 심볼",
         ["Work Hierarchy 트리에서 노드를 고르면 작업 대상이 호출된다", "EDIM Run · BOM Run · EBOM Run · Cost · Approval Request ✓"], ["Hierarchy(Edit) · Data Up-Load · DWG 폴더 없음"],
         "hierarchy:test · e2e S1 · S3", "10_project_bound"),
@@ -337,7 +361,13 @@ PAGES = {
         ["재고 단가 Table — 필요한 입력: 재고 데이터 · 장비(설비) 사용료 — 필요한 입력: 회사 설비 데이터"],
         "e2e S6b · S45d · S49c · S52a~g · S62a~f", "72_mfg_rate", "회사 실 단가표가 들어올 때 함께"),
  68: pg("C", "간지", "Work Process"),
- 69: pg("N", "CTO Business Model", "파트너 · 모바일 ERP · QR", [], ["없음 — 파트너 연결 · 사무실 밖 업무(승인·입출고·검수) · QR 정보"], "", None, "EDIM 완료 후 확장 단계(회장님 확정)"),
+ 69: pg("L", "CTO Business Model", "파트너 · 모바일 ERP · QR",
+       ["**/mobile**(폭 390 · ccmd L · LA7) — 승인(기존 프로젝트 승인) · 대화(기존 활동 기록) · 입출고 · 검수 · 공지(0039 · 추가만) · 같은 로그인 · 같은 권한",
+        "**QR**(qr_token · 추측 불가 임의값) — 프로젝트 · 작업지시 · 발행 도면 인쇄본에 QR → /q/{토큰} = 도면(발행본) · 각종 서류 · Project History · Project 정보 · 처리해야 할 업무",
+        "로그인 없으면 로그인 → 돌아옴 · 다른 회사 404 · 폐기 410 · 유지보수(A/S) = 하자 종류 'as'(완료 작업지시 · 설치완료 검수)"],
+       ["증강 현실 · 파트너(공급사) 외부 로그인 포털 — 확장 단계(회장님 확정) · 아직 없음"],
+       "e2e S89 · S90 · mes:test", "96_mobile_approve", "확장 단계(AR · 파트너 포털)는 EDIM 완료 후", sample=True, judge=JUDGE_N,
+       why="실동(샘플): 모바일 다섯 업무 · QR(토큰 · 경계 · 폐기 · 인쇄본)이 돌고 — AR · 파트너 포털은 확장 단계로 제외 · e2e S89 · S90"),
  70: pg("C", "표지", "CTO, ETO Business Model Platform"),
 }
 assert sorted(PAGES) == list(range(1, 71))
