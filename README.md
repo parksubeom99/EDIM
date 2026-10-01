@@ -463,7 +463,7 @@ flowchart TB
 
 ## 🖼️ 화면
 
-> 목업이 아니다 — `scripts/demo_e2e.py` 가 404단계를 걸으며 매번 새로 찍는다. 전체 68장: [`docs/screens/`](docs/screens)
+> 목업이 아니다 — `scripts/demo_e2e.py` 가 404단계를 걸으며 매번 새로 찍는다. 전체 86장: [`docs/screens/`](docs/screens)
 
 | 작업대 — 청사진의 다섯 구역 | 코드 조립 · 개정 Rev A→B | BOM Run → EBOM → Cost |
 |:---:|:---:|:---:|
