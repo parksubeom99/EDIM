@@ -1,0 +1,8 @@
+{
+  "version": "sample-1",
+  "sample": "샘플 공정 요율 — 작업장별 시간당 요율(원/인·시) · 원가 미반영 참고값 · 회사 파일(process-rates.local.json 또는 EDIM_PROCESS_RATES)로 바꾸면 다음 조회부터 반영",
+  "_note": "ccmd P · p44-6 공정비용(참고). 작업지시 공정 단계마다 시간 × 인원 × 수량 × 요율. 원가 · 견적 · PCR 계산은 이 파일을 읽지 않는다.",
+  "currency": "KRW",
+  "ratePerHour": { "WC-ASM": 32000, "WC-PNT": 28000, "WC-QC": 30000 },
+  "default": 30000
+}

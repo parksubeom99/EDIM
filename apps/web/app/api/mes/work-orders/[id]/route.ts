@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { withTenant, workOrderDetail, releaseWorkOrder, stepEvent, openDefect, addStockMove } from "@edim/db";
 import { sessionOr401, editorOr403, mesError, num, str } from "../../_util";
 import { UUID_RE } from "@/app/lib/mes-run";
+import { processCostFor } from "@/app/lib/process-cost";
 
 /**
  * ccmd L · LA3 · p44-2 · 3 — 작업지시 한 건. GET 상세(공정 사본 · 착수/완료 · 검수).
@@ -13,9 +14,12 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   const a = await sessionOr401(); if ("res" in a) return a.res;
   const { id } = await params;
   if (!UUID_RE.test(id)) return NextResponse.json({ error: "not found" }, { status: 404 });
-  const d = await withTenant(a.s.tenantId, (tx) => workOrderDetail(tx, id));
-  if (!d) return NextResponse.json({ error: "not found" }, { status: 404 });
-  return NextResponse.json(d);
+  const out = await withTenant(a.s.tenantId, async (tx) => {
+    const d = await workOrderDetail(tx, id);
+    return d ? { ...d, processCost: await processCostFor(tx, d) } : null;
+  });
+  if (!out) return NextResponse.json({ error: "not found" }, { status: 404 });
+  return NextResponse.json(out);
 }
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {

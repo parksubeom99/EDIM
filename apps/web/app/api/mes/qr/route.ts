@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { withTenant, qrTokenFor, revokeQrToken, findQrToken } from "@edim/db";
 import { editorOr403 } from "../_util";
-import { UUID_RE, qrSvg, publicOrigin } from "@/app/lib/mes-run";
+import { UUID_RE, qrSvg, publicOriginOf } from "@/app/lib/mes-run";
 
 /**
  * ccmd L · LA7 · p69 — QR 토큰. POST {kind: project | work_order | drawing, id} → 대상마다 살아 있는 토큰 하나(추측 불가 임의값) · URL · SVG.
@@ -27,6 +27,7 @@ export async function POST(req: NextRequest) {
     return qrTokenFor(tx, kind, id, a.s.userId);
   });
   if (!t) return NextResponse.json({ error: "not found" }, { status: 404 });
-  const url = `${publicOrigin(req)}/q/${t.token}`;
-  return NextResponse.json({ ok: true, token: t.token, url, svg: qrSvg(url, 4) });
+  const o = publicOriginOf(req);
+  const url = `${o.origin}/q/${t.token}`;
+  return NextResponse.json({ ok: true, token: t.token, url, origin: o.source, svg: qrSvg(url, 4) });
 }

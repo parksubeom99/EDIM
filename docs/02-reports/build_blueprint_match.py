@@ -17,6 +17,13 @@ usage: python3 build_blueprint_match.py <corpus_dir> <shots_dir> <out_dir> [main
   P 부분   — 그 장의 일부만 돈다(무엇이 돌고 무엇이 없는지 둘 다 적는다)
   N 미착수 — 구현 대상인데 도는 것이 없다(자리만 있는 것은 미착수다)
   C 개념·표지 — 구현 대상이 아닌 장(표지·간지·개념 설명). 반영된 곳이 있으면 적는다
+규칙 R(엘 확정 · ccmd P · 2026-10-01) — 실동 · 부분 · 미착수를 가르는 단일 잣대:
+  R1. 청사진 쪽의 원문 항목을 전부 열거한다.
+  R2. 항목마다: 있음(화면 경로 + e2e 단계 ID) / 없음 / 확장(회장님 확정 확장 목록).
+      확장 목록 = AR · XR · 증강 현실 · Digital Twin · Smart Factory · 실시간 설비 데이터 · 파트너 외부 로그인 포털
+  R3. '없음'이 0 이면 실동(샘플 자료면 실동(샘플)) · '없음'이 1 이상이면 부분 · 화면 0 이면 미착수.
+  R4. 판정 칸 옆에 '없음' 항목과 "필요한 입력: …"을 적는다.
+  항목 대조표: docs/02-reports/rule-r-20261001.md (p42 · p43 · p44 · p69 — 그 밖의 쪽은 엘 확정판 판정 그대로)
 """
 import base64, html, io, os, sys
 
@@ -25,13 +32,16 @@ if not CHECK:
     from PIL import Image
     CORPUS, SHOTS, OUTDIR = sys.argv[1], sys.argv[2], sys.argv[3]
 MAIN = sys.argv[4] if len(sys.argv) > 4 and not CHECK else "—"
-DATE = "2026-09-30"
+DATE = "2026-10-01"
 PAGE_MAP = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "00-corpus", "page-map.md")
 # 판정자 — 기본은 엘 확정판 4. ccmd M 에서 바뀐 쪽은 회장님 결정(09-30)으로 엘이 확정했다(엘 저장소 실측 아님 · lmd 교차검증).
 JUDGE_4 = "엘 확정판 4 (2026-09-30)"
 JUDGE_M1 = "엘 판정 확정 (2026-09-30 · 회장님 결정) — 엘 저장소 실측 아님 · lmd M 교차검증 기준"
 # ccmd N(10-01) — ccmd L 완주로 연 쪽 · 바꾼 쪽. 최종 판정은 엘이 한다(엘 재측정 전).
 JUDGE_N = "CC 초안 — 엘 재측정 전 (2026-10-01 · ccmd N · L 완주)"
+JUDGE_P = "CC 초안 · 규칙 R 기계 적용 — 엘 재측정 전 (2026-10-01 · ccmd P)"
+RULE_R_MD = ("> **규칙 R**(엘 확정 · ccmd P): R1 원문 항목 전부 열거 → R2 항목마다 있음(화면 경로 + e2e ID) · 없음 · 확장(AR · XR · 증강 현실 · Digital Twin · Smart Factory · 실시간 설비 데이터 · 파트너 외부 로그인 포털) "
+             "→ R3 없음 0 = 실동(샘플 자료면 실동(샘플)) · 없음 1 이상 = 부분 · 화면 0 = 미착수 → R4 판정 옆에 없음 · 필요한 입력. 항목 대조표: `docs/02-reports/rule-r-20261001.md`.")
 HERE = os.path.dirname(os.path.abspath(__file__))
 DECK = os.path.join(HERE, "..", "deck")
 
@@ -240,30 +250,30 @@ PAGES = {
          "**Call Sub Drawing**(H5) — 도면 시트에 하부 도면 표(Item · Description · Q'ty · Remarks · 코드에 첨부한 DWG) · **Detail Design 주의사항** 목록 · 템플릿을 고쳐도 뜬 도면은 그대로"],
         ["하부 도면을 조립도 안에 mm 로 배치(Detail Dimension A~K) — 필요한 입력: 회사 CAD 규칙(M4)"], "e2e S18f · S64a~e", "74_sub_drawing"),
  41: pg("C", "간지", "EDIM Drawing Management — Data Set-Up"),
- 42: pg("L", "Data Set-Up", "설계 우선순위 · 기준점 · 오류 체크 · Material management",
+ 42: pg("P", "Data Set-Up", "설계 우선순위 · 기준점 · 오류 체크 · Material management",
        ["**/setup/design-priority**(ccmd L · LA6) — p42 표 모양: Dim · 설계 우선순위 · 상위설계 우선자료 · 설계 기준점 설정 · 설계 오류 체크 · Remarks(제품 코드의 priority 표)",
-        "오류 체크 식(`<= 3000` · `> 300` · `< W`)은 BOM Run 에서 **기존 설계 검증 규칙으로 컴파일**되어 같은 판정기가 판정 — 위반이면 도면 422",
-        "위반이 여럿이면 우선순위가 낮은(숫자가 큰) 치수부터 '바꿀 후보' · 상위설계 우선자료는 '바꾸지 말 것' — 스냅샷 dims.priority 에 박힌다",
-        "Material management 3칸 — Sub Material List(BOM 자식 · 자재 코드) · Variant List(제품 코드 슬롯) · Inventory Management(/m/warehouse?item=)"],
-       ["3D 2D CAD Mapping — 필요한 입력: 3D 모델 · CAD 규칙(M4)", "우선순위 표는 SPF 샘플 제품에만(EU 시연 제품 없음) — 회사 설계 기준이 들어오면 표 교체"],
-       "e2e S91a~b · priority.test", "89_design_priority", "회사 설계 우선순위 기준 · 3D 모델(M4)", sample=True, judge=JUDGE_N,
-       why="실동(샘플): 우선순위 표 · 오류 체크(기존 설계 검증으로 판정) · 바꿀 후보 · Material management 링크가 돌고, 3D 2D CAD Mapping 은 없다 — e2e S91"),
+        "오류 체크 식은 BOM Run 에서 **기존 설계 검증 규칙으로 컴파일**되어 같은 판정기가 판정 — 위반이면 도면 422 · 바꿀 후보(우선순위 역순) · 상위설계 우선자료 '바꾸지 말 것'",
+        "Material management — Sub Material List · Variant List · Inventory Management 링크 · Item List(Assembling = BOM 줄 · 조립도 Item 표) · Edit Table · Coding List · Sub Item list 는 기존 화면"],
+       ["3D 2D CAD Mapping — 필요한 입력: 3D 모델 · CAD 규칙(M4)", "Item List · Bolt & Nut — 필요한 입력: 회사 체결 부품 표준",
+        "애매(엘 판정): 설계 기준점 설정(이름만 · 좌표는 CAD 규칙서) · Data Up-Load(Table · Image 형식) · Schedule management"],
+       "e2e S91a~b · S86 · S58a · S66a · priority.test · 대조표 rule-r-20261001.md", "89_design_priority", "3D 모델 · 체결 부품 표준", sample=True, judge=JUDGE_P,
+       why="부분(규칙 R · 없음 2): 우선순위 표 · 오류 체크 · Material management 링크는 돌지만 3D 2D CAD Mapping · Bolt & Nut 목록이 없다"),
  43: pg("L", "S-4-1-2 · Work Process Management", "전 부서 Work Process — 창고·공정·인원·스킬·시간",
        ["**/setup/work-process**(ccmd L · LA1 · 0038) — Material 표(Item · warehouse · Min Stack · 공급자 · 제조/구매 · Time) · Process 표(Assembling · Work shop · Person · Skill · W. Time · 앞 공정)",
         "기준정보 — 작업장(가용 시간/일) · 기계 · 작업자(스킬 등급 · 실명 금지 '작업자 A~D') · 창고(지역/창고/구역) · 회사 경계(RLS) · 다른 회사 id 를 가리키면 404",
         "원가 계산은 이 표를 읽지 않는다(제조비 = 제조 정보 표 F10 만 — 시연 원가 ₩15,487,170 불변)"],
        ["기준정보는 샘플(작업장 3 · 기계 3 · 작업자 4 · 창고 2 · SPF 공정) — 필요한 입력: 회사 공정 · 인원 · 창고 기준정보"],
-       "e2e S83a~b · mes:test", "90_work_process", "회사 기준정보로 표 교체", sample=True, judge=JUDGE_N,
-       why="실동(샘플): Material · Process 표와 기준정보가 화면에서 등록 · 조회되고 MRP · 작업지시가 읽는다 — 자료는 샘플 · e2e S83"),
- 44: pg("L", "Table List · Manufacturing", "MRP · 작업지시 · 공정 · 자재흐름 · 품질 · 원가",
-       ["**MRP**(/m/mrp) — 프로젝트(수량 · 납기)의 BOM 스냅샷 → 총소요 · 재고 · 입고 예정 · 순소요 · 시기(납기 − 리드타임 / 공정 시간 ÷ 8h) · 같은 입력 = 같은 답 → 구매 요청 초안(기존 흐름) · 작업지시 초안",
-        "**작업지시 · 공정**(/m/work-orders) — 공정 순서 사본 · 착수/완료 추가만 기록 · 앞 공정 미완료 409 · A4 작업지시서(QR) · **Capacity**(/m/capacity) 작업장별 부하 vs 가용 → 초과 칸",
-        "**창고 · 재고**(/m/warehouse) — 입출고 추가만 · 현재고 = 합 · 재고 단가 최고 · 최저 · 평균 · 최근 · Min Stack 경고 · 음수 재고 409(동시 출고 경합 포함 · DB 트리거)",
-        "**품질**(/m/quality) — 검수(자재 · 완성품 · 설치완료) · 불합격 → 하자 건(열림 → 조치 → 닫힘) · 자재 불합격 → 반품 이동 · 마지막 공정 완료에는 완성품 검수 합격"],
-       ["원가(p44-6 공정비용) — 새 표는 원가가 읽지 않는다(하드 가드 · 시연 원가 보호) · 원가의 제조비는 제조 정보 표(F10)",
-        "기준정보 · 재고 · 리드타임은 샘플 — 필요한 입력: 회사 MRP 기준 · 창고 · 품질 기준"],
-       "e2e S84a~S88 · mrp.test · mes:test 26", "92_mrp", "회사 기준정보 · 원가에 공정비용을 넣을지(회장님 결정)", sample=True, judge=JUDGE_N,
-       why="실동(샘플): MRP · 작업지시 · 공정 · Capacity · 창고 · 품질이 화면에서 끝까지 돌고 e2e · DB 검증이 못 박는다 — 공정비용 원가는 하드 가드로 제외 · e2e S84~S88"),
+       "e2e S83a~b · mes:test · 대조표 rule-r-20261001.md", "90_work_process", "회사 기준정보로 표 교체", sample=True, judge=JUDGE_P,
+       why="실동(샘플 · 규칙 R 없음 0 · 애매 1 = Process 표 Work place): Material · Process 표와 기준정보가 화면에서 등록 · 조회되고 MRP · 작업지시가 읽는다 — e2e S83"),
+ 44: pg("P", "Table List · Manufacturing", "MRP · 작업지시 · 공정 · 자재흐름 · 품질 · 원가",
+       ["**MRP**(/m/mrp) — 프로젝트(수량 · 납기)의 BOM 스냅샷 → 총소요 · 재고 · 입고 예정 · 순소요 · 시기 → 구매 요청 초안(기존 흐름) · 작업지시 초안",
+        "**작업지시 · 공정**(/m/work-orders) — 공정 사본 · 착수/완료 추가만 · 앞 공정 409 · A4 작업지시서(QR) · **Capacity**(/m/capacity)",
+        "**창고 · 재고**(/m/warehouse) — 입출고 추가만 · 단가 4종 · Min Stack 경고 · 음수 재고 409 · **품질**(/m/quality) — 검수 · 하자 · 반품 이동",
+        "**공정비용(참고 · 원가 미반영)**(ccmd P) — 시간 × 인원 × 수량 × 작업장 요율(파일) · 작업지시 화면 · 작업지시서 — 원가 · 견적은 그대로"],
+       ["물류 방식 · 공급처 국가/본사 · 납품 조건(EXW/FOB/CIP) · 운송 · 사용자용/공급자용 제품코드 · 물품 형식 · 최소 구매수량 · 인증서 · 보관 품질 · 유통기한 · 폐품 처리 · 표준화 · 대체 자재 · 외주 — 필요한 입력: 회사 구매 · 물류 · 창고 기준(규칙 R 없음 12)",
+        "애매(엘 판정): 지불조건(견적에만) · 자재 생산 계획 · 자재 물성"],
+       "e2e S84a~S88 · S85e · mrp.test · process-rates.test · mes:test · 대조표 rule-r-20261001.md", "92_mrp", "회사 구매 · 물류 · 창고 기준", sample=True, judge=JUDGE_P,
+       why="부분(규칙 R · 없음 12): MRP · 작업지시 · 공정 · Capacity · 창고 · 품질 · 공정비용(참고)은 돌지만 구매 관리 · 물류 · 보관의 회사 기준 항목이 없다"),
  45: pg("C", "간지", "Selection & Document Set-Up — Arrangement"),
  46: pg("L", "S-3-1 · Set-up / CPQ / Selection", "Selection Set-Up — Spec List input",
         ["**사양 입력표**(⑥) — 회사가 제품 코드마다 사양 항목(풍량 CMH · 가습량 kg/h · 재질 …)을 정의하고, 값을 넣으면 **등록된 Sub Code·제품 표에서만** 맞는 슬롯 값을 골라 Code Builder 에 채운다. 저장은 기존 개정(Rev) 한 곳",
@@ -366,8 +376,8 @@ PAGES = {
         "**QR**(qr_token · 추측 불가 임의값) — 프로젝트 · 작업지시 · 발행 도면 인쇄본에 QR → /q/{토큰} = 도면(발행본) · 각종 서류 · Project History · Project 정보 · 처리해야 할 업무",
         "로그인 없으면 로그인 → 돌아옴 · 다른 회사 404 · 폐기 410 · 유지보수(A/S) = 하자 종류 'as'(완료 작업지시 · 설치완료 검수)"],
        ["증강 현실 · 파트너(공급사) 외부 로그인 포털 — 확장 단계(회장님 확정) · 아직 없음"],
-       "e2e S89 · S90 · mes:test", "96_mobile_approve", "확장 단계(AR · 파트너 포털)는 EDIM 완료 후", sample=True, judge=JUDGE_N,
-       why="실동(샘플): 모바일 다섯 업무 · QR(토큰 · 경계 · 폐기 · 인쇄본)이 돌고 — AR · 파트너 포털은 확장 단계로 제외 · e2e S89 · S90"),
+       "e2e S89 · S90 · S90b · mes:test · 대조표 rule-r-20261001.md", "96_mobile_approve", "확장 단계(AR · 파트너 포털)는 EDIM 완료 후", sample=True, judge=JUDGE_P,
+       why="실동(샘플 · 규칙 R 없음 0 · 확장 1 = 증강 현실): 모바일 다섯 업무 · QR(토큰 · 경계 · 폐기 · 인쇄본 · 공개 주소 고정)이 돈다 — e2e S89 · S90 · S90b"),
  70: pg("C", "표지", "CTO, ETO Business Model Platform"),
 }
 assert sorted(PAGES) == list(range(1, 71))
@@ -547,7 +557,8 @@ def page_map_md():
     c = counts()
     out = [f"# 청사진 페이지 색인 — 70장의 지금 (main `{MAIN}` · {DATE})", "",
            "> 이 파일은 `docs/02-reports/build_blueprint_match.py` 의 판정 데이터에서 **자동 생성**된다. 손으로 고치지 말 것.",
-           f"> 실동 {c['L']}(그중 실동(샘플) {c['LS']}) · 부분 {c['P']} · 미착수 {c['N']} · 개념·표지 {c['C']} (합 70). **엘 판정 확정 (2026-09-30)** — 근거: 엘 저장소 실측 아님 · lmd 교차검증 기준. 판정 원천은 생성기의 PAGES 한 곳(이 파일 · 보고서는 출력).", ""]
+           f"> 실동 {c['L']}(그중 실동(샘플) {c['LS']}) · 부분 {c['P']} · 미착수 {c['N']} · 개념·표지 {c['C']} (합 70). 쪽마다 **판정자** 칸을 볼 것 — 엘 확정 · CC 초안(엘 재측정 전)이 섞여 있다. 판정 원천은 생성기의 PAGES 한 곳(이 파일 · 보고서는 출력).",
+           RULE_R_MD, ""]
     for name, a, b in SECTIONS:
         out += [f"## {name} (p{a}–{b})", "", "| 쪽 | 판정 | 판정자 | 판정 근거 | 제목 | 도는 것 | 없는 것 | 근거 |", "|---|---|---|---|---|---|---|---|"]
         for p in range(a, b + 1):

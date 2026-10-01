@@ -19,14 +19,19 @@ export const esc = (s: unknown) => String(s ?? "").replace(/[&<>"']/g, (c) => ({
 
 /**
  * QR 에 넣을 바깥 주소. 운영 킷(next start · HOSTNAME=0.0.0.0)에서는 req.nextUrl.origin 이 http://0.0.0.0:3000 이 되어
- * 휴대폰이 찍어도 못 간다(ccmd N 킷 e2e 실측). 우선 EDIM_PUBLIC_URL · 다음 프록시 헤더(x-forwarded-*) · 다음 Host 헤더 — 사용자가 실제로 연 주소.
+ * 휴대폰이 찍어도 못 간다(ccmd N 킷 e2e 실측).
+ * ccmd P · 4-2 — **EDIM_PUBLIC_URL 이 있으면 그것만 쓴다**(Host · x-forwarded-* 무시 — 위조 Host 로 인쇄본 QR 이 바뀌지 않게).
+ * 없을 때만 프록시 헤더 → Host 헤더로 폴백한다(개발 · 로컬). 운영 모드에서 없으면 서버 시작 시 경고 1줄(instrumentation.ts) · DEPLOY.md.
  */
-export function publicOrigin(req: { headers: Headers; nextUrl: { protocol: string; origin: string } }): string {
-  const env = process.env.EDIM_PUBLIC_URL?.trim();
-  if (env && /^https?:\/\/[^/\s]+$/.test(env.replace(/\/$/, ""))) return env.replace(/\/$/, "");
+export function publicOriginOf(req: { headers: Headers; nextUrl: { protocol: string; origin: string } }): { origin: string; source: "env" | "header" } {
+  const env = process.env.EDIM_PUBLIC_URL?.trim().replace(/\/$/, "");
+  if (env && /^https?:\/\/[^/\s]+$/.test(env)) return { origin: env, source: "env" };
   const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host");
   const proto = (req.headers.get("x-forwarded-proto") ?? req.nextUrl.protocol.replace(":", "")).split(",")[0]!.trim();
-  return host && /^[A-Za-z0-9.\-]+(:\d+)?$/.test(host) ? `${proto}://${host}` : req.nextUrl.origin;
+  return { origin: host && /^[A-Za-z0-9.\-]+(:\d+)?$/.test(host) ? `${proto}://${host}` : req.nextUrl.origin, source: "header" };
+}
+export function publicOrigin(req: { headers: Headers; nextUrl: { protocol: string; origin: string } }): string {
+  return publicOriginOf(req).origin;
 }
 
 /** QR SVG(추측 불가 토큰 URL) — 새 의존성 qrcode-generator(MIT) 한 개 */
@@ -85,7 +90,14 @@ export async function capacityFor(tenantId: string) {
   });
 }
 
-export function workOrderHtml(d: NonNullable<Awaited<ReturnType<typeof workOrderDetail>>>, projectNo: string, qrUrl: string | null): string {
+export type ProcessCostView = { total: number; rows: { seq: number; center: string; amount: number | null }[]; missing: string[]; file: string; fingerprint: string; sample: string } | { error: string };
+export const PROCESS_COST_LABEL = "공정비용(참고 · 원가 미반영)";
+export function processCostLine(pc: ProcessCostView): string {
+  if ("error" in pc) return `${PROCESS_COST_LABEL}: 계산 안 함 — ${pc.error}`;
+  return `${PROCESS_COST_LABEL}: ₩${pc.total.toLocaleString("ko-KR")} — 단계마다 시간 × 인원 × 수량 × 작업장 요율 · 요율 ${pc.file} #${pc.fingerprint}${pc.missing.length ? ` · 요율 없는 작업장 ${pc.missing.join(", ")}(합에서 빠짐)` : ""}${pc.sample ? " · 샘플 요율" : ""}`;
+}
+
+export function workOrderHtml(d: NonNullable<Awaited<ReturnType<typeof workOrderDetail>>>, projectNo: string, qrUrl: string | null, pc?: ProcessCostView): string {
   const rows = d.steps.map((s) => `<tr><td>${s.seq}</td><td>${esc(s.name)}</td><td>${esc(s.workCenter)}</td><td class="n">${s.persons}</td><td>${esc(s.skill)}</td><td class="n">${s.hours}</td><td>${s.prevSeq ?? "—"}</td><td>${s.startedAt ? esc(s.startedAt.slice(0, 16).replace("T", " ")) : ""}</td><td>${s.finishedAt ? esc(s.finishedAt.slice(0, 16).replace("T", " ")) : ""}</td><td class="n">${s.actualHours ?? ""}</td></tr>`).join("");
   return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>${esc(d.woNo)} 작업지시서</title>
 <style>@page{size:A4;margin:14mm}body{font-family:"Noto Sans KR",sans-serif;font-size:12px;color:#111}h1{font-size:20px;letter-spacing:.3em;margin:0 0 8px}table{border-collapse:collapse;width:100%;margin:8px 0}th,td{border:1px solid #999;padding:4px 6px;text-align:left}td.n{text-align:right}.head{display:flex;justify-content:space-between;align-items:flex-start}.sample{color:#b45309;font-weight:700;border:1px solid #b45309;border-radius:3px;padding:0 4px;font-size:11px}footer{margin-top:10px;font-size:10px;color:#555;border-top:1px solid #999;padding-top:4px}</style></head>
@@ -93,8 +105,9 @@ export function workOrderHtml(d: NonNullable<Awaited<ReturnType<typeof workOrder
 <table data-testid="wo-print-head"><tr><th>지시 번호</th><td class="mono">${esc(d.woNo)}</td><th>상태</th><td>${esc(d.status)}</td></tr>
 <tr><th>프로젝트</th><td>${esc(projectNo)}</td><th>품목</th><td>${esc(d.itemCode)} × ${d.qty}</td></tr>
 <tr><th>납기</th><td>${esc(d.dueDate ?? "—")}</td><th>BOM 스냅샷</th><td class="mono">${esc(d.bomRunId.slice(0, 8))}</td></tr></table></div>
-<div data-testid="wo-print-qr" style="text-align:center">${qrUrl ? qrSvg(qrUrl, 3) + `<div style="font-size:9px">QR — 도면 · 서류 · 이력 · 할 일</div>` : "QR 없음"}</div></div>
+<div data-testid="wo-print-qr" data-url="${esc(qrUrl ?? "")}" style="text-align:center">${qrUrl ? qrSvg(qrUrl, 3) + `<div style="font-size:9px">QR — 도면 · 서류 · 이력 · 할 일</div>` : "QR 없음"}</div></div>
 <table data-testid="wo-print-steps"><tr><th>순번</th><th>공정</th><th>작업장</th><th>인원</th><th>스킬</th><th>시간(h)</th><th>앞 공정</th><th>착수</th><th>완료</th><th>실제(h)</th></tr>${rows}</table>
+${pc ? `<p data-testid="wo-print-process-cost" data-total="${"error" in pc ? "" : pc.total}">${esc(processCostLine(pc))}</p>` : ""}
 <p><span class="sample">샘플</span> ${esc(SAMPLE_NOTE)}</p>
 <footer>공정 순서는 지시 순간의 사본이다(나중에 공정 순서를 고쳐도 이 지시서는 그대로). 착수 · 완료는 추가만 되는 기록 · 앞 공정 미완료면 다음 공정 착수 불가 · 마지막 공정 완료에는 완성품 검수 합격 필요.</footer>
 </body></html>`;

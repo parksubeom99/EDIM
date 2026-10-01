@@ -44,6 +44,8 @@ services:
       <<: *db-urls
       AUTH_SECRET: ${AUTH_SECRET:?AUTH_SECRET 를 넣으십시오 — openssl rand -base64 32}
       EDIM_DEV_LOGIN: "0"
+      # ccmd P · 4-2 — 인쇄본 QR 에 넣을 바깥 주소(이 값이 있으면 요청 Host 를 믿지 않는다). 공개 배포에서는 실제 주소로.
+      EDIM_PUBLIC_URL: ${EDIM_PUBLIC_URL:-http://localhost:3000}
     ports:
       - "3000:3000"
     depends_on:

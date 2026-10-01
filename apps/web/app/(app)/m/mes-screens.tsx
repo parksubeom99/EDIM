@@ -192,6 +192,7 @@ export function Mrp({ canEdit, projects }: { canEdit: boolean; projects: { id: s
 
 /* ───────── p44-2 · 3 작업지시 · 공정 진행 ───────── */
 type WoD = { id: string; woNo: string; itemCode: string; qty: number; status: string; dueDate: string | null;
+  processCost?: { total: number; missing: string[]; file: string; fingerprint: string; sample: string } | { error: string };
   steps: { seq: number; name: string; workCenter: string; persons: number; skill: string; hours: number; prevSeq: number | null; startedAt: string | null; finishedAt: string | null; actualHours: number | null }[] };
 export function WorkOrders({ canEdit, initial }: { canEdit: boolean; initial: string | null }) {
   const { data: list, load: reload } = useLoad<{ rows: { id: string; woNo: string; itemCode: string; qty: number; status: string }[] }>("/api/mes/work-orders");
@@ -216,10 +217,13 @@ export function WorkOrders({ canEdit, initial }: { canEdit: boolean; initial: st
           <tbody>{d.steps.map((s) => <tr key={s.seq} data-seq={s.seq} data-started={s.startedAt ? "1" : "0"} data-finished={s.finishedAt ? "1" : "0"}>
             <td style={num}>{s.seq}</td><td style={cell}>{s.name}</td><td style={cell}>{s.workCenter}</td><td style={num}>{s.persons}</td><td style={cell}>{s.skill}</td><td style={num}>{s.hours}</td><td style={num}>{s.prevSeq ?? "—"}</td>
             <td style={cell}>{s.startedAt?.slice(11, 16) ?? ""}</td><td style={cell}>{s.finishedAt?.slice(11, 16) ?? ""}{s.actualHours !== null ? ` · ${s.actualHours}h` : ""}</td>
-            <td style={cell}>{canEdit && <>
-              <button type="button" data-testid={`wo-start-${s.seq}`} disabled={!!s.startedAt} onClick={() => void act({ action: "start", seq: s.seq, workerId: worker || undefined }, `공정 ${s.seq} 착수`)} style={btn}>착수</button>{" "}
-              <button type="button" data-testid={`wo-finish-${s.seq}`} disabled={!s.startedAt || !!s.finishedAt} onClick={() => void act({ action: "finish", seq: s.seq, workerId: worker || undefined, actualHours: Number(hrs) }, `공정 ${s.seq} 완료`)} style={btn}>완료</button></>}</td></tr>)}</tbody>
+            <td style={cell}>{canEdit && !s.finishedAt && <>{/* ccmd P · 4-1 — 완료된 공정에는 버튼을 두지 않는다(서버 409 는 그대로) */}
+              {!s.startedAt && <button type="button" data-testid={`wo-start-${s.seq}`} onClick={() => void act({ action: "start", seq: s.seq, workerId: worker || undefined }, `공정 ${s.seq} 착수`)} style={btn}>착수</button>}{" "}
+              {s.startedAt && <button type="button" data-testid={`wo-finish-${s.seq}`} onClick={() => void act({ action: "finish", seq: s.seq, workerId: worker || undefined, actualHours: Number(hrs) }, `공정 ${s.seq} 완료`)} style={btn}>완료</button>}</>}</td></tr>)}</tbody>
         </table>
+        {d.processCost && <p data-testid="wo-process-cost" data-total={"error" in d.processCost ? "" : d.processCost.total} style={{ fontSize: 12, color: "var(--ink-muted)" }}>
+          {"error" in d.processCost ? `공정비용(참고 · 원가 미반영): 계산 안 함 — ${d.processCost.error}`
+            : <>공정비용(참고 · 원가 미반영): <b>₩{d.processCost.total.toLocaleString("ko-KR")}</b> — 단계마다 시간 × 인원 × 수량 × 작업장 요율 · 요율 {d.processCost.file} #{d.processCost.fingerprint}{d.processCost.missing.length ? ` · 요율 없는 작업장 ${d.processCost.missing.join(", ")}` : ""} {d.processCost.sample && <Sample />}</>}</p>}
         <Msg m={msg} />
       </div>}</div>
     </div>

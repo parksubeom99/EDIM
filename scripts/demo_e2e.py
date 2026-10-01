@@ -2752,6 +2752,17 @@ with sync_playwright() as p:
     wp85=ctx.request.get(WOE+"/print"); wpt=wp85.text()
     ok("S85d 작업지시서 A4 인쇄본 — 지시 번호 · 공정 사본 3줄 · 착수/완료 · QR(svg · /q/{토큰}) · 샘플 표지",
        (wp85.status, wpt.count("<tr>")>=4, "wo-print-qr" in wpt and "<svg" in wpt, "샘플" in wpt), wp85.status==200 and "wo-print-steps" in wpt and "wo-print-qr" in wpt and "<svg" in wpt and "샘플" in wpt and d85["woNo"] in wpt)
+    # ccmd P · 2-1 · 4-1 — 공정비용(참고 · 원가 미반영) = Σ 시간 × 인원 × 수량 × 작업장 요율(샘플 파일) · 완료된 공정에는 버튼 0 · API 는 여전히 409 · 원가 · 견적 불변
+    pc85=(ctx.request.get(WOE).json().get("processCost") or {})
+    pg.goto(BASE+f"/m/work-orders?id={WO}",wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=wo-detail][data-status=done]",timeout=60000); pg.wait_for_selector("[data-testid=wo-process-cost]",timeout=30000)
+    ui85=(pg.get_attribute("[data-testid=wo-process-cost]","data-total"), pg.inner_text("[data-testid=wo-process-cost]")[:40], len(pg.query_selector_all("[data-testid=wo-steps] [data-testid^=wo-start-],[data-testid=wo-steps] [data-testid^=wo-finish-]")))
+    f85=ctx.request.post(WOE,headers=J0,data=json.dumps({"action":"start","seq":1})).status
+    pp85=re.search(r'data-testid="wo-print-process-cost" data-total="(\d+)"',ctx.request.get(WOE+"/print").text())
+    d85q=ctx.request.get(DOCS+f"/{q80.get('id')}").json().get("body",{})
+    ok("S85e 공정비용(참고 · 원가 미반영) = 조립 3h×2인×2대×32,000 + 도장 2×1×2×28,000 + 검사 1×1×2×30,000 = 556,000(샘플 요율 파일) · 화면 · 인쇄본 같은 값 · 완료된 공정의 착수/완료 버튼 0 · API 착수는 여전히 409 · 원가 ₩15,487,170 · 견적 ₩17,035,887 그대로",
+       (pc85.get("total"), pc85.get("file"), ui85, f85, pp85.group(1) if pp85 else None, d85q.get("total"), d85q.get("pcr",{}).get("fullCost")),
+       pc85.get("total")==556000 and pc85.get("file")=="process-rates.sample.json" and ui85[0]=="556000" and "참고" in ui85[1] and ui85[2]==0 and f85==409
+       and pp85 and pp85.group(1)=="556000" and d85q.get("total")==17035887 and d85q.get("pcr",{}).get("fullCost")==15487170)
     # 창고 — 단가 4종 · Min Stack 경고 · 음수 출고 409(화면) · 추가만(405)
     smt=st85["SMT 1"]
     pg.goto(BASE+"/m/warehouse",wait_until="domcontentloaded"); pg.wait_for_selector("[data-testid=wh-stock] tbody tr",timeout=60000); nuke(pg)
@@ -2825,6 +2836,16 @@ with sync_playwright() as p:
        len(TOK)==43 and qr2.get("token")==TOK and "<svg" in qr.get("svg","") and qr.get("url","")==f"{BASE}/q/{TOK}" and "PS-61313-5" in pg.inner_text("[data-testid=qr-page]")
        and "현장 도착" in q90["history"] and "A/S" in q90["todo"] and q404.status==404 and qv.status==200 and red90.startswith("/login?next=") and back90==f"/q/{TOK}"
        and "sheet-qr" in iss and qrp.get("token")!=TOK and rv==200 and q410.status==410 and fake==404 and vq==403)
+    # ccmd P · 4-2 — 위조 Host(x-forwarded-host)로 QR 을 만들거나 인쇄본을 요청해도, EDIM_PUBLIC_URL 이 있으면 QR 주소는 그 값이다.
+    # 공개 주소 설정이 없는 호스트 실행(origin=header)에서는 위조값을 따라간다는 사실을 단언 값에 남긴다(DEPLOY: 공개 배포는 필수). 킷은 반드시 env.
+    FH={**J0,"x-forwarded-host":"evil.example","x-forwarded-proto":"https"}
+    fq=ctx.request.post(ME+"/qr",headers=FH,data=json.dumps({"kind":"project","id":PID})).json()
+    fp=re.search(r'data-testid="wo-print-qr" data-url="([^"]*)"',ctx.request.get(WOE+"/print",headers={"x-forwarded-host":"evil.example"}).text())
+    fpu=fp.group(1) if fp else ""
+    ok("S90b QR 공개 주소 고정 — EDIM_PUBLIC_URL 이 있으면 위조 Host 를 무시(QR API · 인쇄본 둘 다) · 킷 실행은 반드시 공개 주소 설정 · 호스트 실행에서 설정이 없으면 그 사실이 값에 남는다",
+       (TARGET, fq.get("origin"), fq.get("url","")[:40], fpu[:40]),
+       (fq.get("origin")=="env" and "evil" not in fq.get("url","") and fq.get("url","").startswith(BASE) and fpu.startswith(BASE) and "evil" not in fpu)
+       or (TARGET=="host" and fq.get("origin")=="header"))
     vw.close(); gb.close()
     # ── S91 (ccmd L · LA-1 · LA6 · p42) — 설계 우선순위 · 기준점 · 오류 체크 → 기존 설계 검증으로 판정 · 바꿀 후보(우선순위 역순) · 상위설계 우선자료 ──
     s91=run_spf().json(); p91=(s91.get("dims") or {}).get("priority") or {}
