@@ -503,7 +503,8 @@ Docker 만 있으면 된다. **설치 → 실행 → 시연** 세 단계:
 
 ```bash
 git clone https://github.com/parksubeom99/EDIM.git && cd EDIM
-AUTH_SECRET=$(openssl rand -base64 32) docker compose -f docker-compose.prod.yml up -d --build
+export AUTH_SECRET=$(openssl rand -base64 32)
+docker compose -f docker-compose.prod.yml up -d --build
 docker compose -f docker-compose.prod.yml ps
 ```
 

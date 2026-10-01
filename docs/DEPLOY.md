@@ -6,8 +6,11 @@
 ## 1. 한 줄로 띄우기 (로컬 운영 모드)
 
 ```bash
+export AUTH_SECRET=$(openssl rand -base64 32)
 docker compose -f docker-compose.prod.yml up -d --build
 ```
+
+- `AUTH_SECRET` 은 **셸에 먼저 둔다**(`export`). `ps` · `down` · `logs` 도 compose 파일을 읽으며 이 값을 요구한다 — `AUTH_SECRET=… docker compose … up` 처럼 한 명령에만 주면 다음 `ps` 가 "required variable AUTH_SECRET is missing" 으로 실패한다(ccmd P fresh clone 실측).
 
 - `db` (PostgreSQL 16) → `migrate` (1회성: 마이그레이션 + 샘플 시드) → `web` (Next.js `next start`, 운영 모드) 순서로 뜬다.
 - 브라우저: http://localhost:3000/login — 샘플 계정 `owner@acme.test` / 비밀번호 `edim-demo-2026` (**공개 데모용 샘플 값**).

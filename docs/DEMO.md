@@ -41,7 +41,8 @@ pnpm --filter @edim/web start
 **(나) docker 운영 킷 — 한 줄** ([`DEPLOY.md`](DEPLOY.md) 1 · 6절)
 
 ```bash
-AUTH_SECRET=$(openssl rand -base64 32) docker compose -f docker-compose.prod.yml up -d --build
+export AUTH_SECRET=$(openssl rand -base64 32)
+docker compose -f docker-compose.prod.yml up -d --build
 ```
 
 - 초기화는 `db:reset:demo` 가 아니라 `docker compose -f docker-compose.prod.yml down -v` 뒤 다시 `up -d --build`(샘플 데이터를 새로 넣는다 — 볼륨의 데이터는 지워진다).
